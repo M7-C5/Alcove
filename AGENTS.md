@@ -1,0 +1,95 @@
+# AGENTS.md — Alcove Agentic Workflow & Collaboration Guide
+
+Welcome to the **Alcove** codebase. This file specifies instructions, rules, and protocols for AI agents working in this repository.
+
+---
+
+## 1. Project Overview & Philosophy
+
+**Alcove** is an interior design educational app for iPad (native landscape). Users scan or import their own rooms and progress through a 4-stage pedagogical curriculum:
+1. **The Audit**: Spatial analysis, bottleneck discovery, clearance checks.
+2. **The Rearrangement**: Furniture placement, orientation, circulation flow.
+3. **The Illumination**: Daylight path, ambient/task/accent lighting balance.
+4. **The Harmony Reveal**: Before/After split comparison, room scorecard, walkthrough.
+
+Users are accompanied on every stage by an interactive **Mascot AI Companion** providing onboarding, real-time feedback, open chat, and stage completion evaluations.
+
+---
+
+## 2. Directory Architecture
+
+```
+Alcove/
+├── .agents/
+│   └── rules/
+│       ├── 00-general-engineering.md       # Sendable, nil safety, zero local paths
+│       ├── 01-verification-loop.md         # Autonomous test verification & thermal guard
+│       ├── 02-swift-apple-architecture.md   # SwiftData models, Vertical Slices, HIG
+│       ├── 03-apple-hig-design-standards.md # iPad landscape HUD, 44pt touch targets
+│       └── 04-learned-patterns.md          # LP-001 through LP-013 patterns & traps
+├── .github/
+│   └── pull_request_template.md            # Standardized PR template
+├── docs/
+│   ├── ARCHITECTURE.md                     # Deep technical and domain architecture
+│   └── adr/                                # Architectural Decision Records (MADR format)
+├── scripts/
+│   ├── verify.sh                           # Fast verification and test runner with thermal cleanup
+│   └── changelog.sh                        # Automated conventional commit changelog generator
+├── Alcove/
+│   ├── MyApp.swift                         # App entrypoint & SwiftData schema configuration
+│   ├── Core/
+│   │   ├── Models/                         # SwiftData models (Room, Layout, Furniture, StageProgress)
+│   │   ├── Services/                       # Mascot AI, evaluation engine, fast-path rules
+│   │   └── Storage/                        # Seed data, sample rooms, sample furniture assets
+│   ├── Features/
+│   │   ├── Dashboard/                      # Room list & scan launcher
+│   │   ├── Stages/                         # 4-stage progression cards & stage launcher
+│   │   ├── Studio3D/                       # RealityKit 3D viewport, mascot HUD, dialogue overlay
+│   │   └── MascotChat/                     # Mascot conversation sheet & evaluation dialog
+│   └── UI/                                 # Reusable HUD elements, cards, buttons, dials
+└── AlcoveTests/                            # Swift Testing / XCTest suite
+```
+
+---
+
+## 3. Strict Operating Rules
+
+### Rule 1: Git Commits & Push Protocol
+- **NEVER commit changes to git until the user explicitly instructs you to commit.** Only write code, build, and verify.
+- When instructed to commit, always make **distinct, atomic commits** adhering to Conventional Commits: `<type>(<scope>): <subject>`. Never commit monolithic batches.
+- The shorthand **"CnP"** or **"cnp"** stands for Commit and Push.
+- Local branch flow: `dev` (feature development) $\rightarrow$ `staging` (pre-release validation) $\rightarrow$ `main` (production).
+- Remote pushes are managed by the user unless explicitly delegated.
+
+### Rule 2: Zero Machine-Specific Local Paths
+- **NEVER** write absolute machine paths (e.g. `/Users/...` or `file:///Users/...`) into repository files, markdown, documentation, or code. Always use clean relative project paths (e.g. `docs/ARCHITECTURE.md`, `scripts/verify.sh`).
+
+### Rule 3: Verification & Thermal Management
+- Always verify builds and tests locally using:
+  ```bash
+  ./scripts/verify.sh
+  ```
+- Always shut down simulators after test runs to preserve battery and thermal headroom:
+  ```bash
+  xcrun simctl shutdown all 2>/dev/null || true
+  ```
+
+### Rule 4: Critical Thinking & Conversational Protocol
+- If a user prompt ends in a question, answer the question first and align before taking action.
+- Challenge bad ideas or degraded user experience directly with honest, constructive engineering arguments. Do not be a yes-man.
+- If ambiguous requirements arise, stop immediately and ask targeted clarifying questions.
+
+---
+
+## 4. Conventional Commit Standards
+
+| Type | Description |
+|---|---|
+| `feat` | A new user-facing feature |
+| `fix` | A bug fix |
+| `refactor` | Code restructuring without functional change |
+| `test` | Adding or updating tests |
+| `docs` | Documentation changes |
+| `chore` | Build scripts, tooling, or project configuration |
+| `perf` | Code changes that improve performance |
+| `ci` | CI/CD pipeline modifications |
