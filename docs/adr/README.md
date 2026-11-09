@@ -9,3 +9,5 @@ This directory documents key architectural decisions made in the Alcove project,
 | ADR | Title | Status | Date |
 |---|---|---|---|
 | [ADR-0001](0001-clean-slate-alcove-architecture.md) | Clean-Slate Architecture for Gamified Educational iPad App | Accepted | 2026-11-08 |
+| [ADR-0002](0002-industry-grade-vertical-slice-architecture.md) | Industry-Grade Vertical Slice Architecture (VSA) | Accepted | 2026-11-09 |
+| [ADR-0003](0003-value-based-vsa-router-and-spatial-simulation-contracts.md) | Modern Value-Based VSA Router & Spatial Simulation Contracts | Accepted | 2026-11-09 |
