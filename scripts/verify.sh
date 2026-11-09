@@ -26,17 +26,25 @@ xcodebuild \
 echo " Build completed successfully."
 
 # 2. Run Tests
-echo "[2/2] Running test suite on iPad simulator..."
+DEVICE_NAME="${TEST_DEVICE_NAME:-iPad Air 11-inch (M4)}"
+if ! xcrun simctl list devices available | grep -q "${DEVICE_NAME}"; then
+  FALLBACK_DEVICE="$(xcrun simctl list devices available | grep -E "iPad" | head -n 1 | sed -E 's/^[[:space:]]+//; s/[[:space:]]+\(.*//' || true)"
+  if [ -n "${FALLBACK_DEVICE}" ]; then
+    DEVICE_NAME="${FALLBACK_DEVICE}"
+  fi
+fi
+
+echo "[2/2] Running test suite on iPad simulator (${DEVICE_NAME})..."
 xcodebuild \
   -project Alcove.xcodeproj \
   -scheme Alcove \
-  -destination "platform=iOS Simulator,name=iPad Air 11-inch (M4)" \
+  -destination "platform=iOS Simulator,name=${DEVICE_NAME}" \
   test \
   CODE_SIGNING_ALLOWED=NO \
   | xcbeautify 2>/dev/null || xcodebuild \
   -project Alcove.xcodeproj \
   -scheme Alcove \
-  -destination "platform=iOS Simulator,name=iPad Air 11-inch (M4)" \
+  -destination "platform=iOS Simulator,name=${DEVICE_NAME}" \
   test \
   CODE_SIGNING_ALLOWED=NO
 
