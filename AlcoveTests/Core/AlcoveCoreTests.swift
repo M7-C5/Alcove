@@ -111,6 +111,16 @@ struct AlcoveCoreTests {
         #expect(room.isCompleted(.audit) == true)
         #expect(room.isUnlocked(.rearrangement) == true)
         #expect(room.isUnlocked(.illumination) == false)
+
+        // Stage 3 Illumination evaluation
+        let illumResult = await mascot.evaluateStage(stage: .illumination, room: room)
+        #expect(illumResult.canAdvance == true)
+        #expect(illumResult.score >= 70)
+
+        // Stage 4 Harmony evaluation
+        let harmonyResult = await mascot.evaluateStage(stage: .harmony, room: room)
+        #expect(harmonyResult.canAdvance == true)
+        #expect(harmonyResult.score >= 50)
     }
 
     @Test func mascotAskContextualAnswers() async {

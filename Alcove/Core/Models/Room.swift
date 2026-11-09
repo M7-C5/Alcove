@@ -78,6 +78,8 @@ public final class Room {
     /// Resets the working layout back to the baseline scan
     public func resetWorkingLayoutToBaseline() {
         guard let baseline = baselineLayout else { return }
-        self.workingLayout = baseline.createCopy(name: "Working Layout (Reset)", isBaseline: false)
+        let resetCopy = baseline.createCopy(name: "Working Layout (Reset)", isBaseline: false)
+        resetCopy.room = self
+        self.workingLayout = resetCopy
     }
 }
