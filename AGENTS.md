@@ -21,20 +21,30 @@ Users are accompanied on every stage by an interactive **Mascot AI Companion** p
 ```
 Alcove/
 ├── .agents/
-│   └── rules/
-│       ├── 00-general-engineering.md       # Sendable, nil safety, zero local paths
-│       ├── 01-verification-loop.md         # Autonomous test verification & thermal guard
-│       ├── 02-swift-apple-architecture.md   # SwiftData models, Vertical Slices, HIG
-│       ├── 03-apple-hig-design-standards.md # iPad landscape HUD, 44pt touch targets
-│       └── 04-learned-patterns.md          # LP-001 through LP-013 patterns & traps
+│   ├── rules/
+│   │   ├── 00-general-engineering.md       # Sendable, nil safety, zero local paths
+│   │   ├── 01-verification-loop.md         # Autonomous test verification & thermal guard
+│   │   ├── 02-swift-apple-architecture.md   # SwiftData models, Vertical Slices, HIG
+│   │   ├── 03-apple-hig-design-standards.md # iPad landscape HUD, 44pt touch targets
+│   │   └── 04-learned-patterns.md          # LP-001 through LP-015 patterns & traps
+│   └── skills/
+│       ├── code-review/SKILL.md            # Adversarial Swift 6, @MainActor, and HIG checklist
+│       ├── perf-audit/SKILL.md             # Compile flags, RealityKit retain cycles, fast-path latency
+│       ├── scaffold-module/SKILL.md        # Contract-first vertical slice scaffolding
+│       ├── security-audit/SKILL.md         # SwiftData local security, ATS, and entitlements
+│       └── ui-audit/SKILL.md               # iPad landscape ergonomics, 44pt targets, contrast
 ├── .github/
 │   └── pull_request_template.md            # Standardized PR template
 ├── docs/
+│   ├── AGENTIC_PLAYBOOK.md                 # Agentic collaboration axioms, curriculum & circuit breakers
 │   ├── ARCHITECTURE.md                     # Deep technical and domain architecture
+│   ├── RECIPES.md                          # Prompt recipes for scaffolding, triage & zero-miss delivery
 │   └── adr/                                # Architectural Decision Records (MADR format)
 ├── scripts/
-│   ├── verify.sh                           # Fast verification and test runner with thermal cleanup
-│   └── changelog.sh                        # Automated conventional commit changelog generator
+│   ├── audit-ui.sh                         # Headless multimodal iPad visual contrast & Dynamic Type inspector
+│   ├── changelog.sh                        # Automated conventional commit changelog generator
+│   ├── install-hooks.sh                    # Conventional commit & raw path git hook installer
+│   └── verify.sh                           # Fast verification and test runner with thermal cleanup
 ├── Alcove/
 │   ├── MyApp.swift                         # App entrypoint & SwiftData schema configuration
 │   ├── Core/
@@ -93,3 +103,15 @@ Alcove/
 | `chore` | Build scripts, tooling, or project configuration |
 | `perf` | Code changes that improve performance |
 | `ci` | CI/CD pipeline modifications |
+
+---
+
+## 5. Domain Rules & Specialized Skills
+
+When working in specific functional areas, consult and follow the corresponding rulebooks and superpower skills:
+- **Scaffold Module** (`.agents/skills/scaffold-module/SKILL.md`): Contract-first vertical slice development.
+- **Code Review** (`.agents/skills/code-review/SKILL.md`): Adversarial checklist for `@MainActor`, Swift 6 `Sendable`, and iPad landscape HUD touch targets.
+- **Performance Audit** (`.agents/skills/perf-audit/SKILL.md`): Compile overhead, RealityKit entity retain cycles, and fast-path reaction latency.
+- **Security Audit** (`.agents/skills/security-audit/SKILL.md`): Local SwiftData file protection, on-device boundaries, and ATS.
+- **UI & HIG Audit** (`.agents/skills/ui-audit/SKILL.md`): iPad landscape ergonomics, 44pt touch targets, Dynamic Type, and contrast symmetry.
+
