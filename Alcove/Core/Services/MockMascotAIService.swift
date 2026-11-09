@@ -1,7 +1,8 @@
 import Foundation
 
 /// Deterministic mock implementation of MascotAIServiceProtocol for offline development, previews, and tests
-public final class MockMascotAIService: MascotAIServiceProtocol, @unchecked Sendable {
+@MainActor
+public final class MockMascotAIService: MascotAIServiceProtocol {
     private let rulebook = FastPathRulebook()
 
     public init() {}

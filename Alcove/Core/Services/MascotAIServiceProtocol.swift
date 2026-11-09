@@ -100,6 +100,7 @@ public struct MicroReaction: Sendable {
 }
 
 /// Core protocol for the Mascot AI system
+@MainActor
 public protocol MascotAIServiceProtocol: Sendable {
     /// Onboarding introductory dialogue for a stage
     func stageGreeting(stage: StageType, roomName: String) -> String

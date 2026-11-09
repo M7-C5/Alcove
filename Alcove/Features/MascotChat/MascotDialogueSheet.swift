@@ -20,6 +20,16 @@ public struct StageEvaluationSheet: View {
         self.onKeepRefining = onKeepRefining
     }
 
+    private var scoreColor: Color {
+        if result.score >= 80 {
+            return .green
+        } else if result.score >= 60 {
+            return .orange
+        } else {
+            return .red
+        }
+    }
+
     public var body: some View {
         NavigationStack {
             ScrollView {
@@ -33,7 +43,7 @@ public struct StageEvaluationSheet: View {
                                 .font(.title2.bold())
                             Text("Evaluation Score: \(result.score)/100")
                                 .font(.subheadline.bold())
-                                .foregroundStyle(result.score >= 80 ? .green : (result.score >= 60 ? .orange : .red))
+                                .foregroundStyle(scoreColor)
                         }
                     }
                     .padding(20)

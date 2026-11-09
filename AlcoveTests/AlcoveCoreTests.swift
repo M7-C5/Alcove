@@ -2,6 +2,7 @@ import Foundation
 import Testing
 @testable import Alcove
 
+@Suite @MainActor
 struct AlcoveCoreTests {
 
     @Test func stageTypeProgressionAndTools() {
