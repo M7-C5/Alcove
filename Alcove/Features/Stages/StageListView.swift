@@ -3,10 +3,11 @@ import SwiftData
 
 public struct StageListView: View {
     @Bindable var room: Room
-    @State private var showingResetConfirmation = false
+    @State private var viewModel: StageListViewModel
 
     public init(room: Room) {
         self.room = room
+        self._viewModel = State(initialValue: StageListViewModel(room: room))
     }
 
     public var body: some View {
@@ -25,13 +26,23 @@ public struct StageListView: View {
                             let progress = room.progress(for: stage)
 
                             if isUnlocked {
-                                NavigationLink(destination: Studio3DView(room: room, stage: stage)) {
-                                    StageCard(stage: stage, isUnlocked: true, isCompleted: isCompleted, score: progress?.score ?? 0)
+                                NavigationLink(value: AlcoveRoute.studio(room: room, stage: stage)) {
+                                    StageCardView(
+                                        stage: stage,
+                                        isUnlocked: true,
+                                        isCompleted: isCompleted,
+                                        score: progress?.score ?? 0
+                                    )
                                 }
                                 .buttonStyle(.plain)
                             } else {
-                                StageCard(stage: stage, isUnlocked: false, isCompleted: false, score: 0)
-                                    .opacity(0.55)
+                                StageCardView(
+                                    stage: stage,
+                                    isUnlocked: false,
+                                    isCompleted: false,
+                                    score: 0
+                                )
+                                .opacity(0.55)
                             }
                         }
                     }
@@ -45,7 +56,7 @@ public struct StageListView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button(role: .destructive) {
-                    showingResetConfirmation = true
+                    viewModel.showingResetConfirmation = true
                 } label: {
                     Label("Reset Room", systemImage: "arrow.counterclockwise")
                         .font(.subheadline)
@@ -54,11 +65,11 @@ public struct StageListView: View {
         }
         .confirmationDialog(
             "Reset Room to Baseline Scan?",
-            isPresented: $showingResetConfirmation,
+            isPresented: $viewModel.showingResetConfirmation,
             titleVisibility: .visible
         ) {
             Button("Reset to Original Scan", role: .destructive) {
-                room.resetWorkingLayoutToBaseline()
+                viewModel.resetWorkingLayoutToBaseline()
             }
             Button("Cancel", role: .cancel) {}
         } message: {
@@ -77,12 +88,11 @@ public struct StageListView: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                let completedCount = room.stageProgress.filter { $0.isCompleted }.count
                 VStack(alignment: .trailing, spacing: 2) {
-                    Text("\(completedCount) of 4 Completed")
+                    Text("\(viewModel.completedStagesCount) of \(viewModel.totalStagesCount) Completed")
                         .font(.subheadline.bold())
                         .foregroundStyle(.indigo)
-                    ProgressView(value: Double(completedCount), total: 4.0)
+                    ProgressView(value: viewModel.progressRatio)
                         .frame(width: 160)
                         .tint(.indigo)
                 }
@@ -92,83 +102,6 @@ public struct StageListView: View {
         .background(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .fill(Color(uiColor: .secondarySystemGroupedBackground))
-        )
-    }
-}
-
-private struct StageCard: View {
-    let stage: StageType
-    let isUnlocked: Bool
-    let isCompleted: Bool
-    let score: Int
-
-    var body: some View {
-        HStack(spacing: 20) {
-            ZStack {
-                Circle()
-                    .fill(isCompleted ? Color.green : (isUnlocked ? Color.indigo : Color.secondary.opacity(0.3)))
-                    .frame(width: 56, height: 56)
-                Image(systemName: isCompleted ? "checkmark" : (isUnlocked ? stage.icon : "lock.fill"))
-                    .font(.title3.bold())
-                    .foregroundStyle(.white)
-            }
-
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 8) {
-                    Text("STAGE \(stage.stageNumber)")
-                        .font(.caption.bold())
-                        .foregroundStyle(isCompleted ? Color.green : (isUnlocked ? Color.indigo : Color.secondary))
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(
-                            Capsule().fill(
-                                isCompleted ? Color.green.opacity(0.15) :
-                                (isUnlocked ? Color.indigo.opacity(0.12) : Color.gray.opacity(0.12))
-                            )
-                        )
-
-                    if isCompleted {
-                        Text("Score: \(score)/100")
-                            .font(.caption.bold())
-                            .foregroundStyle(.green)
-                    }
-                }
-
-                Text(stage.title)
-                    .font(.title3.bold())
-                    .foregroundStyle(.primary)
-
-                Text(stage.subtitle)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer()
-
-            if isUnlocked {
-                HStack(spacing: 4) {
-                    Text(isCompleted ? "Review" : "Enter")
-                        .font(.callout.bold())
-                    Image(systemName: "chevron.right")
-                        .font(.footnote.bold())
-                }
-                .foregroundStyle(.indigo)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                .background(
-                    Capsule().fill(Color.indigo.opacity(0.12))
-                )
-            } else {
-                Text("Complete Stage \(stage.stageNumber - 1) first")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .padding(20)
-        .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color(uiColor: .secondarySystemGroupedBackground))
-                .shadow(color: .black.opacity(0.04), radius: 6, x: 0, y: 3)
         )
     }
 }

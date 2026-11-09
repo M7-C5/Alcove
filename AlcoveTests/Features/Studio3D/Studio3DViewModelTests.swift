@@ -1,0 +1,193 @@
+import Foundation
+import Testing
+@testable import Alcove
+
+@Suite("Studio3D Slice Tests") @MainActor
+struct Studio3DViewModelTests {
+
+    @Test func initializationAndMascotGreeting() {
+        let room = SampleData.createStarterRoom()
+        let vm = Studio3DViewModel(room: room, stage: .audit)
+
+        #expect(vm.currentStage == .audit)
+        #expect(vm.mascotEmotion == .neutral)
+        #expect(vm.mascotMessage.contains("Welcome to Sample Studio Apartment"))
+        #expect(vm.daylightHour == 12.0)
+        #expect(vm.beforeAfterSplit == 0.5)
+    }
+
+    @Test func furnitureSelectionAndRotation() {
+        let room = SampleData.createStarterRoom()
+        let vm = Studio3DViewModel(room: room, stage: .rearrangement)
+
+        let bed = room.workingLayout?.furnitures.first { $0.name == "Queen Bed" }
+        #expect(bed != nil)
+
+        vm.selectFurniture(id: bed?.id)
+        #expect(vm.selectedFurniture?.id == bed?.id)
+
+        let initialYaw = bed?.rotationYaw ?? 0.0
+        vm.rotateSelectedFurniture(delta: .pi / 4)
+        #expect(bed?.rotationYaw == initialYaw + (.pi / 4))
+    }
+
+    @Test func furnitureArchivingToggle() {
+        let room = SampleData.createStarterRoom()
+        let vm = Studio3DViewModel(room: room, stage: .rearrangement)
+
+        let desk = room.workingLayout?.furnitures.first { $0.name == "Work Desk" }
+        #expect(desk?.isArchived == false)
+
+        vm.selectFurniture(id: desk?.id)
+        vm.toggleSelectedFurnitureArchive()
+
+        #expect(desk?.isArchived == true)
+        #expect(vm.selectedFurnitureID == nil)
+        #expect(vm.mascotMessage.contains("Archived Work Desk"))
+    }
+
+    @Test func stageSwitchingGatedByUnlocks() {
+        let room = SampleData.createStarterRoom()
+        let vm = Studio3DViewModel(room: room, stage: .audit)
+
+        // Stage 2 is locked initially
+        vm.switchToStage(.rearrangement)
+        #expect(vm.currentStage == .audit) // Did not change
+
+        // Unlock Stage 2
+        room.completeStage(.audit, score: 90, feedback: "Passed")
+        #expect(room.isUnlocked(.rearrangement) == true)
+
+        vm.switchToStage(.rearrangement)
+        #expect(vm.currentStage == .rearrangement)
+        #expect(vm.mascotMessage.contains("Stage 2 unlocked"))
+    }
+
+    @Test func stageEvaluationAndAdvancement() async {
+        let room = SampleData.createStarterRoom()
+        let vm = Studio3DViewModel(room: room, stage: .audit)
+
+        let result = await vm.mascotService.evaluateStage(stage: .audit, room: room)
+        vm.advanceToNextStage(result: result)
+
+        #expect(room.isCompleted(.audit) == true)
+        #expect(vm.currentStage == .rearrangement)
+    }
+
+    @Test func furnitureMoveTriggersMicroReactionAndBoldRearrangement() {
+        let room = SampleData.createStarterRoom()
+        let vm = Studio3DViewModel(room: room, stage: .rearrangement)
+
+        // Move Queen Bed more than 0.8m (Rule 4: Bold rearrangement)
+        let moveEvent = FurnitureMoveEvent(
+            furnitureName: "Queen Bed",
+            category: .bed,
+            oldPosition: (x: -1.2, z: -1.5),
+            newPosition: (x: 0.0, z: 0.0),
+            rotationYaw: 0.0
+        )
+
+        vm.handleFurnitureMoved(moveEvent)
+        #expect(vm.mascotEmotion == .thinking)
+        #expect(vm.mascotMessage.contains("Bold rearrangement"))
+    }
+
+    @Test func repeatedEvaluationGuardPreventsParallelRuns() {
+        let room = SampleData.createStarterRoom()
+        let vm = Studio3DViewModel(room: room, stage: .audit)
+
+        vm.isEvaluating = true
+        vm.triggerStageEvaluation()
+
+        // evaluationResult should remain nil because trigger was rejected by guard
+        #expect(vm.evaluationResult == nil)
+        #expect(vm.showingEvaluationSheet == false)
+    }
+
+    @Test func illuminationFixtureManagementAndReport() {
+        let room = SampleData.createStarterRoom()
+        let vm = Studio3DViewModel(room: room, stage: .illumination)
+
+        #expect(vm.room.workingLayout?.lightFixtures.isEmpty == true)
+
+        vm.addLightFixture(
+            name: "Main Pendant",
+            layer: .ambient,
+            positionX: 0.0,
+            positionZ: 0.0,
+            lumens: 1500.0,
+            colorTemperatureKelvin: 3000
+        )
+
+        #expect(vm.room.workingLayout?.lightFixtures.count == 1)
+        let fixture = vm.room.workingLayout?.lightFixtures.first
+        #expect(fixture?.isOn == true)
+        #expect(vm.mascotMessage.contains("Main Pendant"))
+
+        // Toggle fixture
+        if let id = fixture?.id {
+            vm.toggleLightFixture(id: id)
+            #expect(vm.room.workingLayout?.lightFixtures.first?.isOn == false)
+        }
+
+        let report = vm.currentIlluminationReport
+        #expect(report.daylightState.hour == 12.0)
+    }
+
+    @Test func harmonyMetricsComputation() {
+        let room = SampleData.createStarterRoom()
+        let vm = Studio3DViewModel(room: room, stage: .harmony)
+
+        let metrics = vm.currentHarmonyMetrics
+        #expect(metrics.overallHarmonyScore >= 50)
+        #expect(!metrics.summaryVerdict.isEmpty)
+    }
+
+    @Test func cameraPresetAndFeedbackInteractions() {
+        let feedback = MockMascotFeedbackService()
+        let room = SampleData.createStarterRoom()
+        let vm = Studio3DViewModel(
+            room: room,
+            stage: .rearrangement,
+            mascotService: MockMascotAIService(),
+            feedbackService: feedback
+        )
+
+        // Select furniture triggers haptic
+        let desk = room.workingLayout?.furnitures.first { $0.name == "Work Desk" }
+        vm.selectFurniture(id: desk?.id)
+        #expect(feedback.playedImpacts.contains(.light))
+
+        // Rotate triggers medium impact
+        vm.rotateSelectedFurniture(delta: .pi / 4)
+        #expect(feedback.playedImpacts.contains(.medium))
+
+        // Archive triggers heavy impact
+        vm.toggleSelectedFurnitureArchive()
+        #expect(feedback.playedImpacts.contains(.heavy))
+
+        // Camera preset
+        vm.cameraState.setPreset(.dollhouseIsometric)
+        #expect(vm.cameraState.isIsometric3D == true)
+
+        // Voice toggle
+        #expect(!vm.isVoiceNarrationEnabled)
+        vm.toggleVoiceNarration()
+        #expect(vm.isVoiceNarrationEnabled)
+        #expect(feedback.isVoiceNarrationEnabled)
+        #expect(feedback.spokenTexts.contains("Voice narration enabled"))
+        vm.toggleVoiceNarration()
+        #expect(!vm.isVoiceNarrationEnabled)
+    }
+
+    @Test func harmonyRevealModeSelection() {
+        let room = SampleData.createStarterRoom()
+        let vm = Studio3DViewModel(room: room, stage: .harmony)
+
+        #expect(vm.revealMode == .splitSlider)
+        vm.revealMode = .overlayDiff
+        #expect(vm.revealMode == .overlayDiff)
+        vm.revealMode = .sideBySide
+        #expect(vm.revealMode == .sideBySide)
+    }
+}
