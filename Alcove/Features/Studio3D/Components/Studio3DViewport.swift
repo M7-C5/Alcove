@@ -36,8 +36,12 @@ public struct Studio3DViewport: View {
             // Camera orbit and zoom transforms
             let yawQuat = simd_quatf(angle: yaw, axis: SIMD3<Float>(0, 1, 0))
             let pitchQuat = simd_quatf(angle: pitch, axis: SIMD3<Float>(1, 0, 0))
-            root.orientation = pitchQuat * yawQuat
+            let rootOrient = pitchQuat * yawQuat
+            root.orientation = rootOrient
             root.scale = SIMD3<Float>(repeating: zoomScale)
+
+            // Dynamic camera-facing wall cutaways
+            updateWallCutaways(in: root, orientation: rootOrient, pitch: pitch)
 
             // Update selection halos
             updateSelectionHalos(in: root)
@@ -147,6 +151,13 @@ public struct Studio3DViewport: View {
         fill.look(at: .zero, from: fill.position, relativeTo: nil)
         root.addChild(fill)
 
+        // 5. Initial Camera-Facing Wall Cutaways
+        let yawQuat = simd_quatf(angle: yaw, axis: SIMD3<Float>(0, 1, 0))
+        let pitchQuat = simd_quatf(angle: pitch, axis: SIMD3<Float>(1, 0, 0))
+        let initialOrient = pitchQuat * yawQuat
+        root.orientation = initialOrient
+        updateWallCutaways(in: root, orientation: initialOrient, pitch: pitch)
+
         return root
     }
 
@@ -177,7 +188,7 @@ public struct Studio3DViewport: View {
         floorEntity.position = SIMD3<Float>(0, -0.01, 0)
         shell.addChild(floorEntity)
 
-        // Wall & Trim Materials
+        // Wall & Architectural Trim Materials
         let wallMaterial = SimpleMaterial(
             color: UIColor(red: 0.94, green: 0.93, blue: 0.91, alpha: 1.0),
             roughness: 0.85,
@@ -198,8 +209,19 @@ public struct Studio3DViewport: View {
             roughness: 0.05,
             isMetallic: false
         )
+        let doorFrameMaterial = SimpleMaterial(
+            color: UIColor(red: 0.38, green: 0.26, blue: 0.18, alpha: 1.0),
+            roughness: 0.40,
+            isMetallic: false
+        )
 
-        // 1. Back Wall with Architectural Window Aperture
+        let baseboardH: Float = 0.08
+        let baseboardThickness: Float = 0.015
+
+        // MARK: 1. Back Wall Group (Window Aperture + Baseboard)
+        let backWallGroup = Entity()
+        backWallGroup.name = "BackWallGroup"
+
         let windowW: Float = min(1.8, roomW * 0.40)
         let windowH: Float = 1.30
         let sillH: Float = 0.85
@@ -207,40 +229,34 @@ public struct Studio3DViewport: View {
         let sideW = (roomW - windowW) / 2.0
         let backWallZ = -halfL - (wallThickness / 2.0)
 
-        // Left section of back wall
         let backLeftMesh = MeshResource.generateBox(size: SIMD3<Float>(sideW, roomH, wallThickness))
         let backLeft = ModelEntity(mesh: backLeftMesh, materials: [wallMaterial])
         backLeft.position = SIMD3<Float>(-halfW + (sideW / 2.0), roomH / 2.0, backWallZ)
-        shell.addChild(backLeft)
+        backWallGroup.addChild(backLeft)
 
-        // Right section of back wall
         let backRightMesh = MeshResource.generateBox(size: SIMD3<Float>(sideW, roomH, wallThickness))
         let backRight = ModelEntity(mesh: backRightMesh, materials: [wallMaterial])
         backRight.position = SIMD3<Float>(halfW - (sideW / 2.0), roomH / 2.0, backWallZ)
-        shell.addChild(backRight)
+        backWallGroup.addChild(backRight)
 
-        // Bottom sill section of back wall
         let backSillMesh = MeshResource.generateBox(size: SIMD3<Float>(windowW, sillH, wallThickness))
         let backSill = ModelEntity(mesh: backSillMesh, materials: [wallMaterial])
         backSill.position = SIMD3<Float>(0, sillH / 2.0, backWallZ)
-        shell.addChild(backSill)
+        backWallGroup.addChild(backSill)
 
-        // Top header section of back wall
         let backHeaderMesh = MeshResource.generateBox(size: SIMD3<Float>(windowW, headerH, wallThickness))
         let backHeader = ModelEntity(mesh: backHeaderMesh, materials: [wallMaterial])
         backHeader.position = SIMD3<Float>(0, roomH - (headerH / 2.0), backWallZ)
-        shell.addChild(backHeader)
+        backWallGroup.addChild(backHeader)
 
-        // Window Sill Projecting Ledge
         let sillLedgeMesh = MeshResource.generateBox(
             size: SIMD3<Float>(windowW + 0.10, 0.035, wallThickness + 0.08),
             cornerRadius: 0.005
         )
         let sillLedge = ModelEntity(mesh: sillLedgeMesh, materials: [trimMaterial])
         sillLedge.position = SIMD3<Float>(0, sillH + 0.0175, backWallZ + 0.02)
-        shell.addChild(sillLedge)
+        backWallGroup.addChild(sillLedge)
 
-        // Window Glass Pane
         let frameCasingMesh = MeshResource.generateBox(
             size: SIMD3<Float>(windowW, windowH, 0.015),
             cornerRadius: 0.005
@@ -248,65 +264,142 @@ public struct Studio3DViewport: View {
         let glass = ModelEntity(mesh: frameCasingMesh, materials: [glassMaterial])
         let windowCenterY = sillH + (windowH / 2.0)
         glass.position = SIMD3<Float>(0, windowCenterY, backWallZ)
-        shell.addChild(glass)
+        backWallGroup.addChild(glass)
 
-        // Vertical Mullion Bar
         let vMullionMesh = MeshResource.generateBox(size: SIMD3<Float>(0.025, windowH, 0.03))
         let vMullion = ModelEntity(mesh: vMullionMesh, materials: [windowFrameMaterial])
         vMullion.position = SIMD3<Float>(0, windowCenterY, backWallZ)
-        shell.addChild(vMullion)
+        backWallGroup.addChild(vMullion)
 
-        // Horizontal Mullion Bar
         let hMullionMesh = MeshResource.generateBox(size: SIMD3<Float>(windowW, 0.025, 0.03))
         let hMullion = ModelEntity(mesh: hMullionMesh, materials: [windowFrameMaterial])
         hMullion.position = SIMD3<Float>(0, windowCenterY, backWallZ)
-        shell.addChild(hMullion)
+        backWallGroup.addChild(hMullion)
 
-        // 2. Left Wall (X = -halfW, Full Height)
-        let leftWallMesh = MeshResource.generateBox(size: SIMD3<Float>(wallThickness, roomH, roomL + wallThickness))
-        let leftWall = ModelEntity(mesh: leftWallMesh, materials: [wallMaterial])
-        leftWall.name = "LeftWall"
-        leftWall.position = SIMD3<Float>(-halfW - (wallThickness / 2.0), roomH / 2.0, -(wallThickness / 4.0))
-        shell.addChild(leftWall)
-
-        // 3. Right Wall (X = +halfW, Full Height)
-        let rightWallMesh = MeshResource.generateBox(size: SIMD3<Float>(wallThickness, roomH, roomL + wallThickness))
-        let rightWall = ModelEntity(mesh: rightWallMesh, materials: [wallMaterial])
-        rightWall.name = "RightWall"
-        rightWall.position = SIMD3<Float>(halfW + (wallThickness / 2.0), roomH / 2.0, -(wallThickness / 4.0))
-        shell.addChild(rightWall)
-
-        // 4. Front Wall (Z = +halfL, Cutaway height ~0.35m for dollhouse viewing)
-        let frontCurbHeight: Float = 0.35
-        let frontWallMesh = MeshResource.generateBox(size: SIMD3<Float>(roomW, frontCurbHeight, wallThickness))
-        let frontWall = ModelEntity(mesh: frontWallMesh, materials: [wallMaterial])
-        frontWall.name = "FrontWall"
-        frontWall.position = SIMD3<Float>(0, frontCurbHeight / 2.0, halfL + (wallThickness / 2.0))
-        shell.addChild(frontWall)
-
-        // 5. Perimeter Baseboards (Skirting Boards)
-        let baseboardH: Float = 0.08
-        let baseboardThickness: Float = 0.015
-
-        // Back baseboard
         let backBaseboardMesh = MeshResource.generateBox(size: SIMD3<Float>(roomW, baseboardH, baseboardThickness))
         let backBaseboard = ModelEntity(mesh: backBaseboardMesh, materials: [trimMaterial])
         backBaseboard.position = SIMD3<Float>(0, baseboardH / 2.0, -halfL + (baseboardThickness / 2.0))
-        shell.addChild(backBaseboard)
+        backWallGroup.addChild(backBaseboard)
 
-        // Left baseboard
+        shell.addChild(backWallGroup)
+
+        // MARK: 2. Left Wall Group
+        let leftWallGroup = Entity()
+        leftWallGroup.name = "LeftWallGroup"
+
+        let leftWallMesh = MeshResource.generateBox(size: SIMD3<Float>(wallThickness, roomH, roomL + wallThickness))
+        let leftWall = ModelEntity(mesh: leftWallMesh, materials: [wallMaterial])
+        leftWall.position = SIMD3<Float>(-halfW - (wallThickness / 2.0), roomH / 2.0, -(wallThickness / 4.0))
+        leftWallGroup.addChild(leftWall)
+
         let leftBaseboardMesh = MeshResource.generateBox(size: SIMD3<Float>(baseboardThickness, baseboardH, roomL))
         let leftBaseboard = ModelEntity(mesh: leftBaseboardMesh, materials: [trimMaterial])
         leftBaseboard.position = SIMD3<Float>(-halfW + (baseboardThickness / 2.0), baseboardH / 2.0, 0)
-        shell.addChild(leftBaseboard)
+        leftWallGroup.addChild(leftBaseboard)
 
-        // Right baseboard
+        shell.addChild(leftWallGroup)
+
+        // MARK: 3. Right Wall Group
+        let rightWallGroup = Entity()
+        rightWallGroup.name = "RightWallGroup"
+
+        let rightWallMesh = MeshResource.generateBox(size: SIMD3<Float>(wallThickness, roomH, roomL + wallThickness))
+        let rightWall = ModelEntity(mesh: rightWallMesh, materials: [wallMaterial])
+        rightWall.position = SIMD3<Float>(halfW + (wallThickness / 2.0), roomH / 2.0, -(wallThickness / 4.0))
+        rightWallGroup.addChild(rightWall)
+
         let rightBaseboardMesh = MeshResource.generateBox(size: SIMD3<Float>(baseboardThickness, baseboardH, roomL))
         let rightBaseboard = ModelEntity(mesh: rightBaseboardMesh, materials: [trimMaterial])
         rightBaseboard.position = SIMD3<Float>(halfW - (baseboardThickness / 2.0), baseboardH / 2.0, 0)
-        shell.addChild(rightBaseboard)
+        rightWallGroup.addChild(rightBaseboard)
+
+        shell.addChild(rightWallGroup)
+
+        // MARK: 4. Front Wall Group (Full Height with Doorway Aperture)
+        let frontWallGroup = Entity()
+        frontWallGroup.name = "FrontWallGroup"
+        let frontWallZ = halfL + (wallThickness / 2.0)
+
+        let doorW: Float = 0.90
+        let doorH: Float = 2.10
+        let doorCenterX: Float = min(1.20, halfW - 0.60)
+        let doorMinX = doorCenterX - (doorW / 2.0)
+        let doorMaxX = doorCenterX + (doorW / 2.0)
+
+        // Left section of front wall
+        let frontLeftW = doorMinX - (-halfW)
+        if frontLeftW > 0.05 {
+            let frontLeftMesh = MeshResource.generateBox(size: SIMD3<Float>(frontLeftW, roomH, wallThickness))
+            let frontLeft = ModelEntity(mesh: frontLeftMesh, materials: [wallMaterial])
+            frontLeft.position = SIMD3<Float>(-halfW + (frontLeftW / 2.0), roomH / 2.0, frontWallZ)
+            frontWallGroup.addChild(frontLeft)
+
+            let frontBaseboardLeftMesh = MeshResource.generateBox(size: SIMD3<Float>(frontLeftW, baseboardH, baseboardThickness))
+            let frontBaseboardLeft = ModelEntity(mesh: frontBaseboardLeftMesh, materials: [trimMaterial])
+            frontBaseboardLeft.position = SIMD3<Float>(-halfW + (frontLeftW / 2.0), baseboardH / 2.0, halfL - (baseboardThickness / 2.0))
+            frontWallGroup.addChild(frontBaseboardLeft)
+        }
+
+        // Right section of front wall
+        let frontRightW = halfW - doorMaxX
+        if frontRightW > 0.05 {
+            let frontRightMesh = MeshResource.generateBox(size: SIMD3<Float>(frontRightW, roomH, wallThickness))
+            let frontRight = ModelEntity(mesh: frontRightMesh, materials: [wallMaterial])
+            frontRight.position = SIMD3<Float>(doorMaxX + (frontRightW / 2.0), roomH / 2.0, frontWallZ)
+            frontWallGroup.addChild(frontRight)
+
+            let frontBaseboardRightMesh = MeshResource.generateBox(size: SIMD3<Float>(frontRightW, baseboardH, baseboardThickness))
+            let frontBaseboardRight = ModelEntity(mesh: frontBaseboardRightMesh, materials: [trimMaterial])
+            frontBaseboardRight.position = SIMD3<Float>(doorMaxX + (frontRightW / 2.0), baseboardH / 2.0, halfL - (baseboardThickness / 2.0))
+            frontWallGroup.addChild(frontBaseboardRight)
+        }
+
+        // Header above doorway
+        let doorHeaderH = roomH - doorH
+        let doorHeaderMesh = MeshResource.generateBox(size: SIMD3<Float>(doorW, doorHeaderH, wallThickness))
+        let doorHeader = ModelEntity(mesh: doorHeaderMesh, materials: [wallMaterial])
+        doorHeader.position = SIMD3<Float>(doorCenterX, doorH + (doorHeaderH / 2.0), frontWallZ)
+        frontWallGroup.addChild(doorHeader)
+
+        // Door frame trim and door panel
+        let doorFrameMesh = MeshResource.generateBox(size: SIMD3<Float>(doorW + 0.04, doorH + 0.02, wallThickness + 0.02), cornerRadius: 0.005)
+        let doorFrame = ModelEntity(mesh: doorFrameMesh, materials: [doorFrameMaterial])
+        doorFrame.position = SIMD3<Float>(doorCenterX, (doorH + 0.02) / 2.0, frontWallZ)
+        frontWallGroup.addChild(doorFrame)
+
+        let doorPanelMesh = MeshResource.generateBox(size: SIMD3<Float>(doorW - 0.02, doorH - 0.02, 0.035), cornerRadius: 0.005)
+        let doorPanel = ModelEntity(mesh: doorPanelMesh, materials: [doorFrameMaterial])
+        doorPanel.position = SIMD3<Float>(doorCenterX, doorH / 2.0, frontWallZ)
+        frontWallGroup.addChild(doorPanel)
+
+        shell.addChild(frontWallGroup)
 
         return shell
+    }
+
+    // MARK: - Dynamic Camera-Facing Wall Cutaways
+
+    @MainActor
+    private func updateWallCutaways(in root: Entity, orientation: simd_quatf, pitch: Float) {
+        guard let shell = root.findEntity(named: "RoomShell") else { return }
+
+        let walls: [(name: String, normal: SIMD3<Float>)] = [
+            ("FrontWallGroup", WallCutawayEvaluator.frontNormal),
+            ("BackWallGroup", WallCutawayEvaluator.backNormal),
+            ("LeftWallGroup", WallCutawayEvaluator.leftNormal),
+            ("RightWallGroup", WallCutawayEvaluator.rightNormal)
+        ]
+
+        for wall in walls {
+            if let entity = shell.findEntity(named: wall.name) {
+                let isHidden = WallCutawayEvaluator.isWallHidden(
+                    wallNormal: wall.normal,
+                    orientation: orientation,
+                    pitch: pitch
+                )
+                entity.isEnabled = !isHidden
+            }
+        }
     }
 
     @MainActor
