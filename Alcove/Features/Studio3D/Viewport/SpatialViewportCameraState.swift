@@ -5,17 +5,17 @@ import Observation
 @Observable
 @MainActor
 public final class SpatialViewportCameraState {
-    public var preset: ViewportPreset = .topDown
+    public var preset: ViewportPreset = .top
     public var zoomScale: Double = 1.0
     public var panOffsetX: Double = 0.0
     public var panOffsetY: Double = 0.0
 
-    public init(preset: ViewportPreset = .topDown) {
+    public init(preset: ViewportPreset = .top) {
         self.preset = preset
     }
 
     public var isIsometric3D: Bool {
-        preset == .dollhouseIsometric
+        preset == .dollhouse
     }
 
     public var pitchAngleDegrees: Double {
@@ -40,7 +40,7 @@ public final class SpatialViewportCameraState {
     }
 
     public func resetCamera() {
-        preset = .topDown
+        preset = .top
         zoomScale = 1.0
         panOffsetX = 0.0
         panOffsetY = 0.0

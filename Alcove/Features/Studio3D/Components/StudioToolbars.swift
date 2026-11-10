@@ -18,7 +18,7 @@ public struct StudioToolbars: View {
         selectedFurniture: Furniture?,
         daylightHour: Binding<Double>,
         beforeAfterSplit: Binding<Double>,
-        cameraPreset: Binding<ViewportPreset> = .constant(.topDown),
+        cameraPreset: Binding<ViewportPreset> = .constant(.top),
         revealMode: Binding<HarmonyRevealMode> = .constant(.splitSlider),
         illuminationReport: IlluminationReport? = nil,
         harmonyMetrics: HarmonyComparisonMetrics? = nil,
