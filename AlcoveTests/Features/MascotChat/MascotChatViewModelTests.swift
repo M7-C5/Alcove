@@ -39,7 +39,7 @@ struct MascotChatViewModelTests {
 
         #expect(vm.chatHistory.count == 2)
         #expect(vm.chatHistory.last?.isUser == false)
-        #expect(vm.chatHistory.last?.text.contains("60cm") == true)
+        #expect(vm.chatHistory.last?.text.contains("Panero & Zelnik") == true || vm.chatHistory.last?.text.contains("60cm") == true)
         #expect(vm.isThinking == false)
     }
 

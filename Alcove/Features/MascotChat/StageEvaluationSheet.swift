@@ -60,9 +60,15 @@ public struct StageEvaluationSheet: View {
                             .foregroundStyle(.indigo)
                             .textCase(.uppercase)
 
-                        Text(result.dialogue)
-                            .font(.body)
-                            .lineSpacing(4)
+                        if let attributed = try? AttributedString(markdown: result.dialogue, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)) {
+                            Text(attributed)
+                                .font(.body)
+                                .lineSpacing(4)
+                        } else {
+                            Text(result.dialogue)
+                                .font(.body)
+                                .lineSpacing(4)
+                        }
                     }
                     .padding(20)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -95,6 +101,38 @@ public struct StageEvaluationSheet: View {
                                 .background(
                                     RoundedRectangle(cornerRadius: 12, style: .continuous)
                                         .fill(Color.orange.opacity(0.1))
+                                )
+                            }
+                        }
+                    }
+
+                    // Recommendations section (textbook-grounded improvements)
+                    if !result.recommendations.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Textbook Recommendations")
+                                .font(.headline)
+
+                            ForEach(result.recommendations, id: \.self) { rec in
+                                HStack(alignment: .top, spacing: 10) {
+                                    Image(systemName: "lightbulb.fill")
+                                        .foregroundStyle(.yellow)
+                                        .font(.subheadline)
+                                        .padding(.top, 2)
+                                    if let attributed = try? AttributedString(markdown: rec, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)) {
+                                        Text(attributed)
+                                            .font(.subheadline)
+                                            .foregroundStyle(.primary)
+                                    } else {
+                                        Text(rec)
+                                            .font(.subheadline)
+                                            .foregroundStyle(.primary)
+                                    }
+                                }
+                                .padding(12)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                        .fill(Color(uiColor: .tertiarySystemGroupedBackground))
                                 )
                             }
                         }

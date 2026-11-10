@@ -40,3 +40,9 @@ Packages/
 
 # Logs
 *.log
+
+# Secrets & Local Environment Configs
+Secrets.swift
+*.env
+*.secret
+*.local

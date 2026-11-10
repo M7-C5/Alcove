@@ -4,6 +4,7 @@ import SwiftUI
 public struct MascotChatDrawer: View {
     @Environment(\.dismiss) private var dismiss
     @State private var viewModel: MascotChatViewModel
+    @State private var showingConfigSheet: Bool = false
 
     public init(
         mascotService: any MascotAIServiceProtocol,
@@ -36,7 +37,7 @@ public struct MascotChatDrawer: View {
                         )
 
                         ForEach(viewModel.chatHistory) { entry in
-                            chatBubble(isUser: entry.isUser, text: entry.text)
+                            chatBubble(isUser: entry.isUser, text: entry.text, modelBadge: entry.modelBadge)
                         }
 
                         if viewModel.isThinking {
@@ -90,22 +91,53 @@ public struct MascotChatDrawer: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Done") { dismiss() }
                 }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showingConfigSheet = true
+                    } label: {
+                        Label("AI Model", systemImage: "sparkles")
+                    }
+                }
+            }
+            .sheet(isPresented: $showingConfigSheet) {
+                AIModelConfigSheet(room: viewModel.room, currentStage: viewModel.currentStage)
             }
         }
     }
 
-    private func chatBubble(isUser: Bool, text: String) -> some View {
+    private func chatBubble(isUser: Bool, text: String, modelBadge: String? = nil) -> some View {
         HStack {
             if isUser { Spacer(minLength: 40) }
-            Text(text)
-                .font(.body)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-                .background(
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .fill(isUser ? Color.indigo : Color(uiColor: .secondarySystemGroupedBackground))
-                )
-                .foregroundStyle(isUser ? .white : .primary)
+            VStack(alignment: isUser ? .trailing : .leading, spacing: 4) {
+                if let modelBadge, !isUser {
+                    Text(modelBadge)
+                        .font(.caption2.bold())
+                        .foregroundStyle(.indigo)
+                        .padding(.horizontal, 4)
+                }
+
+                if let attributed = try? AttributedString(markdown: text, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)) {
+                    Text(attributed)
+                        .font(.body)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .fill(isUser ? Color.indigo : Color(uiColor: .secondarySystemGroupedBackground))
+                        )
+                        .foregroundStyle(isUser ? .white : .primary)
+                } else {
+                    Text(text)
+                        .font(.body)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .fill(isUser ? Color.indigo : Color(uiColor: .secondarySystemGroupedBackground))
+                        )
+                        .foregroundStyle(isUser ? .white : .primary)
+                }
+            }
             if !isUser { Spacer(minLength: 40) }
         }
     }

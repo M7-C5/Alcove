@@ -3,6 +3,8 @@ import SwiftUI
 public struct StudioToolbars: View {
     let currentStage: StageType
     let selectedFurniture: Furniture?
+    let selectedLightFixture: LightFixture?
+    let allFixtures: [LightFixture]
     @Binding var daylightHour: Double
     @Binding var beforeAfterSplit: Double
     @Binding var cameraPreset: ViewportPreset
@@ -11,13 +13,22 @@ public struct StudioToolbars: View {
     let harmonyMetrics: HarmonyComparisonMetrics?
     let onRotate: (Double) -> Void
     let onToggleArchive: () -> Void
+    let onAddFixture: (String, LightLayer) -> Void
     let onOpenLightingSetup: () -> Void
     let onOpenLightingSimulation: () -> Void
+    let onSelectFixture: ((UUID?) -> Void)?
+    let onMoveFixture: ((Double, Double) -> Void)?
+    let onUpdateFixture: ((Double?, Int?, String?) -> Void)?
+    let onDeleteFixture: (() -> Void)?
+    let onToggleFixturePower: ((UUID) -> Void)?
+    let onOpenAR: (() -> Void)?
 
     public init(
         currentStage: StageType,
         selectedFurniture: Furniture?,
-        daylightHour: Binding<Double>,
+        selectedLightFixture: LightFixture? = nil,
+        allFixtures: [LightFixture] = [],
+        daylightHour: Binding<Double> = .constant(12.0),
         beforeAfterSplit: Binding<Double>,
         cameraPreset: Binding<ViewportPreset> = .constant(.top),
         revealMode: Binding<HarmonyRevealMode> = .constant(.splitSlider),
@@ -25,11 +36,20 @@ public struct StudioToolbars: View {
         harmonyMetrics: HarmonyComparisonMetrics? = nil,
         onRotate: @escaping (Double) -> Void,
         onToggleArchive: @escaping () -> Void,
+        onAddFixture: @escaping (String, LightLayer) -> Void = { _, _ in },
         onOpenLightingSetup: @escaping () -> Void = {},
-        onOpenLightingSimulation: @escaping () -> Void = {}
+        onOpenLightingSimulation: @escaping () -> Void = {},
+        onSelectFixture: ((UUID?) -> Void)? = nil,
+        onMoveFixture: ((Double, Double) -> Void)? = nil,
+        onUpdateFixture: ((Double?, Int?, String?) -> Void)? = nil,
+        onDeleteFixture: (() -> Void)? = nil,
+        onToggleFixturePower: ((UUID) -> Void)? = nil,
+        onOpenAR: (() -> Void)? = nil
     ) {
         self.currentStage = currentStage
         self.selectedFurniture = selectedFurniture
+        self.selectedLightFixture = selectedLightFixture
+        self.allFixtures = allFixtures
         self._daylightHour = daylightHour
         self._beforeAfterSplit = beforeAfterSplit
         self._cameraPreset = cameraPreset
@@ -38,8 +58,15 @@ public struct StudioToolbars: View {
         self.harmonyMetrics = harmonyMetrics
         self.onRotate = onRotate
         self.onToggleArchive = onToggleArchive
+        self.onAddFixture = onAddFixture
         self.onOpenLightingSetup = onOpenLightingSetup
         self.onOpenLightingSimulation = onOpenLightingSimulation
+        self.onSelectFixture = onSelectFixture
+        self.onMoveFixture = onMoveFixture
+        self.onUpdateFixture = onUpdateFixture
+        self.onDeleteFixture = onDeleteFixture
+        self.onToggleFixturePower = onToggleFixturePower
+        self.onOpenAR = onOpenAR
     }
 
     public var body: some View {
@@ -127,47 +154,165 @@ public struct StudioToolbars: View {
 
         case .illumination:
             VStack(alignment: .leading, spacing: 10) {
-                Label("Daylight: \(String(format: "%02d:%02d", Int(daylightHour), Int((daylightHour * 60).rounded()) % 60))", systemImage: "sun.max.fill")
-                    .font(.caption.bold())
-                    .foregroundStyle(.orange)
-
-                Slider(value: $daylightHour, in: 0...(23 + 59.0 / 60), step: 1.0 / 60)
-                    .tint(.orange)
-                    .frame(width: 200)
-                    .frame(minHeight: 44)
-                    .accessibilityLabel("Daylight hour")
-
-                Divider()
-
-                if let report = illuminationReport {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Layers Status: \(report.balanceScore)/100")
-                            .font(.caption2.bold())
-                            .foregroundStyle(report.isPassingScore ? .green : .orange)
-
-                        HStack(spacing: 12) {
-                            Label("\(Int(report.ambientLux)) lx", systemImage: "light.recessed.fill")
-                                .font(.caption2)
-                            Label("\(report.taskZonesCoveredCount)/\(max(1, report.totalTaskZonesCount)) Tasks", systemImage: "lamp.desk.fill")
-                                .font(.caption2)
+                if let fixture = selectedLightFixture {
+                    // Selected Light Editor Header
+                    HStack {
+                        Label(fixture.name, systemImage: fixture.layer.icon)
+                            .font(.caption.bold())
+                            .foregroundStyle(.orange)
+                        Spacer()
+                        Button {
+                            onSelectFixture?(nil)
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundStyle(.secondary)
                         }
+                    }
+
+                    // Power & Directional Nudges
+                    HStack(spacing: 8) {
+                        Button {
+                            onToggleFixturePower?(fixture.id)
+                        } label: {
+                            Label(fixture.isOn ? "On" : "Off", systemImage: fixture.isOn ? "lightbulb.fill" : "lightbulb.slash")
+                                .font(.caption2.bold())
+                                .foregroundStyle(fixture.isOn ? .yellow : .secondary)
+                        }
+                        .buttonStyle(.bordered)
+
+                        Spacer()
+
+                        // Directional Nudge buttons
+                        HStack(spacing: 4) {
+                            Button { onMoveFixture?(-0.2, 0) } label: { Image(systemName: "arrow.left") }
+                            Button { onMoveFixture?(0, -0.2) } label: { Image(systemName: "arrow.up") }
+                            Button { onMoveFixture?(0, 0.2) } label: { Image(systemName: "arrow.down") }
+                            Button { onMoveFixture?(0.2, 0) } label: { Image(systemName: "arrow.right") }
+                        }
+                        .font(.caption2)
+                        .buttonStyle(.bordered)
+                    }
+
+                    // Brightness slider (lumens)
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack {
+                            Text("Brightness")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Text("\(Int(fixture.lumens)) lm")
+                                .font(.caption2.bold())
+                        }
+                        Slider(
+                            value: Binding(
+                                get: { fixture.lumens },
+                                set: { onUpdateFixture?($0, nil, nil) }
+                            ),
+                            in: 200...2000,
+                            step: 50
+                        )
+                        .tint(.orange)
+                    }
+
+                    // Warmth / Kelvin slider
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack {
+                            Text("Warmth")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Text("\(fixture.colorTemperatureKelvin)K")
+                                .font(.caption2.bold())
+                        }
+                        Slider(
+                            value: Binding(
+                                get: { Double(fixture.colorTemperatureKelvin) },
+                                set: { onUpdateFixture?(nil, Int($0), nil) }
+                            ),
+                            in: 2200...5500,
+                            step: 100
+                        )
+                        .tint(.yellow)
+                    }
+
+                    // Delete button
+                    Button(role: .destructive) {
+                        onDeleteFixture?()
+                    } label: {
+                        Label("Remove Light", systemImage: "trash")
+                            .font(.caption2)
+                    }
+                    .buttonStyle(.bordered)
+                } else {
+                    // Summary and Add Lights
+                    if let report = illuminationReport {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Layers Status: \(report.balanceScore)/100")
+                                .font(.caption2.bold())
+                                .foregroundStyle(report.isPassingScore ? .green : .orange)
+
+                            HStack(spacing: 12) {
+                                Label("\(Int(report.ambientLux)) lx", systemImage: "light.recessed.fill")
+                                    .font(.caption2)
+                                Label("\(report.taskZonesCoveredCount)/\(max(1, report.totalTaskZonesCount)) Tasks", systemImage: "lamp.desk.fill")
+                                    .font(.caption2)
+                            }
+                            .foregroundStyle(.secondary)
+                        }
+                        Divider()
+                    }
+
+                    Text("Add Lighting Layers")
+                        .font(.caption2.bold())
                         .foregroundStyle(.secondary)
+
+                    HStack(spacing: 6) {
+                        Button("+ Ambient") {
+                            onAddFixture("Ceiling Light", .ambient)
+                        }
+                        .buttonStyle(.bordered)
+                        .font(.caption2)
+
+                        Button("+ Task Lamp") {
+                            onAddFixture("Desk Lamp", .task)
+                        }
+                        .buttonStyle(.bordered)
+                        .font(.caption2)
+
+                        Button("+ Accent") {
+                            onAddFixture("Wall Sconce", .accent)
+                        }
+                        .buttonStyle(.bordered)
+                        .font(.caption2)
+                    }
+
+                    if !allFixtures.isEmpty {
+                        Divider()
+                        Text("Room Fixtures (Tap to Edit):")
+                            .font(.caption2.bold())
+                            .foregroundStyle(.secondary)
+
+                        ForEach(allFixtures) { fix in
+                            Button {
+                                onSelectFixture?(fix.id)
+                            } label: {
+                                HStack {
+                                    Image(systemName: fix.layer.icon)
+                                        .font(.caption2)
+                                    Text(fix.name)
+                                        .font(.caption2)
+                                    Spacer()
+                                    Text("\(Int(fix.lumens)) lm")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .buttonStyle(.bordered)
+                        }
                     }
                 }
-
-                VStack(alignment: .leading, spacing: 8) {
-                    Button(action: onOpenLightingSetup) {
-                        Label("Add Lighting", systemImage: "plus.circle").frame(minHeight: 44)
-                    }
-                    .buttonStyle(.bordered)
-
-                    Button(action: onOpenLightingSimulation) {
-                        Label("Lighting Simulation", systemImage: "sun.max").frame(minHeight: 44)
-                    }
-                    .buttonStyle(.bordered)
-                }
-                .font(.subheadline)
             }
+            .frame(width: 230)
             .padding(14)
             .background(RoundedRectangle(cornerRadius: 14).fill(.regularMaterial))
 
@@ -226,6 +371,24 @@ public struct StudioToolbars: View {
                             .font(.caption2)
                             .foregroundStyle(.indigo)
                     }
+                }
+
+                Divider()
+
+                // AR Walkthrough Placeholder Button
+                Button {
+                    onOpenAR?()
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "arkit")
+                            .font(.headline)
+                        Text("View in AR Walkthrough")
+                            .font(.caption.bold())
+                    }
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 38)
+                    .background(RoundedRectangle(cornerRadius: 10).fill(Color.indigo.gradient))
                 }
             }
             .padding(14)
