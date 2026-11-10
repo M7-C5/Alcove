@@ -12,20 +12,33 @@ public struct Studio3DViewport: UIViewRepresentable {
     @Binding public var selectedFurnitureID: UUID?
     @Binding public var selectedFurnitureScreenPosition: CGPoint?
     public var viewportSize: CGSize = .zero
+    public var ghostFurnitureID: UUID? = nil
+    public var ghostFloorPosition: SIMD3<Float>? = nil
+    public typealias FloorRaycaster = (CGPoint) -> SIMD3<Float>?
     public var onFurnitureMoved: ((FurnitureMoveEvent) -> Void)? = nil
+    public var onFloorRaycasterResolved: ((@escaping FloorRaycaster) -> Void)? = nil
+    public var onTapBackground: (() -> Void)? = nil
 
     public init(
         room: Room,
         selectedFurnitureID: Binding<UUID?>,
         selectedFurnitureScreenPosition: Binding<CGPoint?>,
         viewportSize: CGSize = .zero,
-        onFurnitureMoved: ((FurnitureMoveEvent) -> Void)? = nil
+        ghostFurnitureID: UUID? = nil,
+        ghostFloorPosition: SIMD3<Float>? = nil,
+        onFurnitureMoved: ((FurnitureMoveEvent) -> Void)? = nil,
+        onFloorRaycasterResolved: ((@escaping FloorRaycaster) -> Void)? = nil,
+        onTapBackground: (() -> Void)? = nil
     ) {
         self.room = room
         self._selectedFurnitureID = selectedFurnitureID
         self._selectedFurnitureScreenPosition = selectedFurnitureScreenPosition
         self.viewportSize = viewportSize
+        self.ghostFurnitureID = ghostFurnitureID
+        self.ghostFloorPosition = ghostFloorPosition
         self.onFurnitureMoved = onFurnitureMoved
+        self.onFloorRaycasterResolved = onFloorRaycasterResolved
+        self.onTapBackground = onTapBackground
     }
 
     public func makeCoordinator() -> Coordinator {
@@ -38,7 +51,8 @@ public struct Studio3DViewport: UIViewRepresentable {
             onProjectSelectedFurniture: { point in
                 selectedFurnitureScreenPosition = point
             },
-            onFurnitureMoved: onFurnitureMoved
+            onFurnitureMoved: onFurnitureMoved,
+            onTapBackground: onTapBackground
         )
     }
 
@@ -52,14 +66,27 @@ public struct Studio3DViewport: UIViewRepresentable {
             coordinator?.updateSelectedProjection()
         }
 
+        onFloorRaycasterResolved? { [weak coordinator = context.coordinator, weak view] screenPoint in
+            guard let coordinator, let view else { return nil }
+            return coordinator.projectToFloor(from: screenPoint, in: view)
+        }
+
         return view
     }
 
     public func updateUIView(_ arView: ARView, context: Context) {
         context.coordinator.selectedFurnitureID = selectedFurnitureID
+        context.coordinator.ghostFurnitureID = ghostFurnitureID
+        context.coordinator.ghostFloorPosition = ghostFloorPosition
         context.coordinator.updateFurnitureEntities(from: room)
         context.coordinator.updateSelectionHalos()
         context.coordinator.updateSelectedProjection()
+        context.coordinator.onTapBackground = onTapBackground
+
+        onFloorRaycasterResolved? { [weak coordinator = context.coordinator, weak arView] screenPoint in
+            guard let coordinator, let arView else { return nil }
+            return coordinator.projectToFloor(from: screenPoint, in: arView)
+        }
     }
 
     public static func dismantleUIView(_ view: ARView, coordinator: Coordinator) {
@@ -74,9 +101,12 @@ public struct Studio3DViewport: UIViewRepresentable {
         weak var arView: ARView?
         var room: Room
         var selectedFurnitureID: UUID?
+        var ghostFurnitureID: UUID?
+        var ghostFloorPosition: SIMD3<Float>?
         var onSelectFurniture: ((UUID?) -> Void)?
         var onProjectSelectedFurniture: ((CGPoint?) -> Void)?
         var onFurnitureMoved: ((FurnitureMoveEvent) -> Void)?
+        var onTapBackground: (() -> Void)?
 
         let root = Entity()
         let camera = PerspectiveCamera()
@@ -105,13 +135,15 @@ public struct Studio3DViewport: UIViewRepresentable {
             selectedFurnitureID: UUID?,
             onSelectFurniture: ((UUID?) -> Void)?,
             onProjectSelectedFurniture: ((CGPoint?) -> Void)?,
-            onFurnitureMoved: ((FurnitureMoveEvent) -> Void)?
+            onFurnitureMoved: ((FurnitureMoveEvent) -> Void)?,
+            onTapBackground: (() -> Void)? = nil
         ) {
             self.room = room
             self.selectedFurnitureID = selectedFurnitureID
             self.onSelectFurniture = onSelectFurniture
             self.onProjectSelectedFurniture = onProjectSelectedFurniture
             self.onFurnitureMoved = onFurnitureMoved
+            self.onTapBackground = onTapBackground
             super.init()
 
             let span = Float(max(room.dimensionsWidth, room.dimensionsLength, 3.0))
@@ -160,8 +192,9 @@ public struct Studio3DViewport: UIViewRepresentable {
             furnitureGroup.name = "FurnitureGroup"
             let layout = room.workingLayout ?? room.baselineLayout
             if let layout {
-                for item in layout.furnitures where !item.isArchived {
+                for item in layout.furnitures {
                     let entity = buildFurnitureEntity(for: item)
+                    entity.isEnabled = !item.isArchived
                     furnitureGroup.addChild(entity)
                 }
             }
@@ -251,11 +284,18 @@ public struct Studio3DViewport: UIViewRepresentable {
 
         func projectToFloor(from screenPoint: CGPoint, in arView: ARView) -> SIMD3<Float>? {
             guard let ray = arView.ray(through: screenPoint) else { return nil }
-            guard abs(ray.direction.y) > 1e-4 else { return nil }
             let floorY: Float = 0.0
+            guard abs(ray.direction.y) > 1e-4 else {
+                let projected = ray.origin + distance * ray.direction
+                return SIMD3<Float>(projected.x, floorY, projected.z)
+            }
             let t = (floorY - ray.origin.y) / ray.direction.y
-            guard t > 0 else { return nil }
-            return ray.origin + t * ray.direction
+            if t > 0 {
+                return ray.origin + t * ray.direction
+            } else {
+                let projected = ray.origin + distance * ray.direction
+                return SIMD3<Float>(projected.x, floorY, projected.z)
+            }
         }
 
         // MARK: - Gesture Setup & Handling
@@ -306,6 +346,7 @@ public struct Studio3DViewport: UIViewRepresentable {
             // Tapped empty space -> deselect
             selectedFurnitureID = nil
             onSelectFurniture?(nil)
+            onTapBackground?()
             updateSelectionHalos()
             updateSelectedProjection()
         }
@@ -427,6 +468,16 @@ public struct Studio3DViewport: UIViewRepresentable {
 
         // MARK: - Scene Entities & Halos Synchronization
 
+        private func applyGhostAppearance(to entity: Entity, isGhost: Bool) {
+            if #available(iOS 18.0, *) {
+                if isGhost {
+                    entity.components.set(OpacityComponent(opacity: 0.55))
+                } else {
+                    entity.components.remove(OpacityComponent.self)
+                }
+            }
+        }
+
         func updateFurnitureEntities(from room: Room) {
             self.room = room
             guard let group = root.children.first(where: { $0.name == "FurnitureGroup" }) else { return }
@@ -434,7 +485,24 @@ public struct Studio3DViewport: UIViewRepresentable {
             guard let layout else { return }
 
             for item in layout.furnitures {
-                if let entity = group.children.first(where: { $0.name == "Furniture_\(item.id.uuidString)" }) {
+                var entity = group.children.first(where: { $0.name == "Furniture_\(item.id.uuidString)" })
+                if entity == nil {
+                    let newEntity = buildFurnitureEntity(for: item)
+                    newEntity.isEnabled = !item.isArchived
+                    group.addChild(newEntity)
+                    entity = newEntity
+                }
+                guard let entity else { continue }
+
+                let isGhost = (item.id == ghostFurnitureID && ghostFloorPosition != nil)
+
+                if isGhost, let pos = ghostFloorPosition {
+                    entity.isEnabled = true
+                    entity.position = pos
+                    entity.orientation = simd_quatf(angle: Float(item.rotationYaw), axis: SIMD3<Float>(0, 1, 0))
+                    applyGhostAppearance(to: entity, isGhost: true)
+                } else {
+                    applyGhostAppearance(to: entity, isGhost: false)
                     entity.isEnabled = !item.isArchived
 
                     // Do not override translation if currently actively dragging
@@ -454,8 +522,9 @@ public struct Studio3DViewport: UIViewRepresentable {
                 if child.name.starts(with: "Furniture_") {
                     let idString = String(child.name.dropFirst("Furniture_".count))
                     let isSelected = (idString == selectedFurnitureID?.uuidString)
+                    let isGhost = (idString == ghostFurnitureID?.uuidString && ghostFloorPosition != nil)
                     if let halo = child.children.first(where: { $0.name == "SelectionHalo" }) {
-                        halo.isEnabled = isSelected
+                        halo.isEnabled = isSelected || isGhost
                     }
                 }
             }
