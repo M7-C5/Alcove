@@ -27,16 +27,20 @@ public struct FastPathRulebook: Sendable {
             )
         }
 
-        // Rule 2: Walkway clearance check against other furniture
+        // Rule 2: Walkway clearance & crowding check against other furniture
         for item in allFurnitures where item.name != event.furnitureName && !item.isArchived {
             let dx = item.positionX - newX
             let dz = item.positionZ - newZ
             let dist = sqrt(dx * dx + dz * dz)
 
-            let combinedRadius = (item.width + item.length) / 4.0 + 0.30 // Rough clearance boundary
+            let isNightstandBedPair = (event.category == .bed && item.name.localizedCaseInsensitiveContains("nightstand")) ||
+                                      (item.category == .bed && event.furnitureName.localizedCaseInsensitiveContains("nightstand"))
+            if isNightstandBedPair && dist >= 0.30 { continue } // Nightstands naturally sit adjacent to a bed
+
+            let combinedRadius = (item.width + item.length) / 4.0 + 0.30 // Physical encroachment threshold
             if dist < combinedRadius {
                 return MicroReaction(
-                    message: "Careful! \(event.furnitureName) is crowding \(item.name). Aim for 60cm clearance.",
+                    message: "Careful! \(event.furnitureName) is crowding \(item.name). It feels a little too tight to walk through—try giving them more breathing room!",
                     emotion: .warning
                 )
             }

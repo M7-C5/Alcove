@@ -132,7 +132,8 @@ struct AlcoveCoreTests {
             currentStage: .rearrangement,
             room: room
         )
-        #expect(clearanceAnswer.contains("60cm"))
+        #expect(clearanceAnswer.contains("76.2cm") || clearanceAnswer.contains("60cm"))
+        #expect(clearanceAnswer.contains("circulation") || clearanceAnswer.contains("passage") || clearanceAnswer.contains("Panero & Zelnik"))
 
         let lightAnswer = await mascot.askMascot(
             question: "How should I place items near a window for natural light?",
