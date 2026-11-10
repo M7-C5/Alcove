@@ -141,4 +141,29 @@ struct AlcoveCoreTests {
         )
         #expect(lightAnswer.contains("shadows") || lightAnswer.contains("daylight"))
     }
+
+    @Test func mockRoomGeneratorBedroomOfficeCombo() {
+        let room = MockRoomGenerator.generateBedroomOfficeCombo()
+
+        #expect(room.name == "Bedroom & Office Combo")
+        #expect(room.dimensionsWidth == 4.5)
+        #expect(room.dimensionsLength == 4.0)
+        #expect(room.dimensionsHeight == 2.6)
+
+        guard let furnitures = room.workingLayout?.furnitures else {
+            Issue.record("Working layout furnitures should exist")
+            return
+        }
+
+        #expect(furnitures.count == 6)
+        #expect(furnitures.contains(where: { $0.name == "Queen Bed" && $0.category == .bed }))
+        #expect(furnitures.contains(where: { $0.name == "Bedside Nightstand" && $0.category == .table }))
+        #expect(furnitures.contains(where: { $0.name == "Double Wardrobe Cupboard" && $0.category == .storage }))
+        #expect(furnitures.contains(where: { $0.name == "Home Office Desk" && $0.category == .table }))
+        #expect(furnitures.contains(where: { $0.name == "Ergonomic Desk Chair" && $0.category == .seating }))
+        #expect(furnitures.contains(where: { $0.name == "Corner Floor Lamp" && $0.category == .lighting }))
+
+        // Ensure baseline layout was also populated
+        #expect(room.baselineLayout?.furnitures.count == 6)
+    }
 }
