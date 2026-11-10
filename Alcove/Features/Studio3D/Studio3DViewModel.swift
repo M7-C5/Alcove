@@ -107,17 +107,54 @@ public final class Studio3DViewModel {
     public func rotateSelectedFurniture(delta: Double) {
         guard let item = selectedFurniture else { return }
         let oldPos = (x: item.positionX, z: item.positionZ)
-        item.rotationYaw += delta
+        item.rotationYaw = FurnitureTransformEngine.normalizeYaw(item.rotationYaw + delta)
+
+        // Ensure rotated bounds stay clamped inside room boundaries
+        let clamped = FurnitureTransformEngine.clampPosition(
+            position: SIMD3<Float>(Float(item.positionX), Float(item.positionY), Float(item.positionZ)),
+            furnitureWidth: Float(item.width),
+            furnitureLength: Float(item.length),
+            rotationYaw: Float(item.rotationYaw),
+            roomWidth: Float(room.dimensionsWidth),
+            roomLength: Float(room.dimensionsLength)
+        )
+        item.positionX = Double(clamped.x)
+        item.positionZ = Double(clamped.z)
+
         feedbackService.playImpact(.medium)
         handleFurnitureMoved(
             FurnitureMoveEvent(
                 furnitureName: item.name,
                 category: item.category,
                 oldPosition: oldPos,
-                newPosition: oldPos,
+                newPosition: (x: item.positionX, z: item.positionZ),
                 rotationYaw: item.rotationYaw
             )
         )
+    }
+
+    public func resetSelectedFurniture() {
+        guard let selected = selectedFurniture else { return }
+        let oldPos = (x: selected.positionX, z: selected.positionZ)
+        if let baselineItem = room.baselineLayout?.furnitures.first(where: { $0.id == selected.id || $0.name == selected.name }) {
+            selected.positionX = baselineItem.positionX
+            selected.positionY = baselineItem.positionY
+            selected.positionZ = baselineItem.positionZ
+            selected.rotationYaw = baselineItem.rotationYaw
+            feedbackService.playNotification(.warning)
+            mascotEmotion = .curious
+            mascotMessage = "Reset \(selected.name) back to original baseline position."
+            feedbackService.speak(mascotMessage)
+            handleFurnitureMoved(
+                FurnitureMoveEvent(
+                    furnitureName: selected.name,
+                    category: selected.category,
+                    oldPosition: oldPos,
+                    newPosition: (x: selected.positionX, z: selected.positionZ),
+                    rotationYaw: selected.rotationYaw
+                )
+            )
+        }
     }
 
     public func toggleSelectedFurnitureArchive() {
