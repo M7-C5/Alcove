@@ -226,4 +226,33 @@ struct Studio3DViewModelTests {
         #expect(vm.activeFurnitures.count == initialActiveCount)
         #expect(vm.mascotMessage.contains("Restored"))
     }
+
+    @Test func snapToViewportClosureInvocation() {
+        let room = SampleData.createStarterRoom()
+        let vm = Studio3DViewModel(room: room, stage: .rearrangement)
+
+        var snappedPreset: ViewportPreset? = nil
+        vm.snapToViewport = { preset in
+            snappedPreset = preset
+        }
+
+        #expect(vm.snapToViewport != nil)
+        vm.snapToViewport?(.top)
+        #expect(snappedPreset == .top)
+
+        vm.snapToViewport?(.left)
+        #expect(snappedPreset == .left)
+
+        vm.snapToViewport?(.right)
+        #expect(snappedPreset == .right)
+
+        vm.snapToViewport?(.front)
+        #expect(snappedPreset == .front)
+
+        vm.snapToViewport?(.back)
+        #expect(snappedPreset == .back)
+
+        vm.snapToViewport?(.dollhouse)
+        #expect(snappedPreset == .dollhouse)
+    }
 }
