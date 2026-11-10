@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- feat(studio): add point of view snap menu to top toolbar beside archive dock button (83a0810)
+- feat(studio): implement ease-in-out orbit camera snapping and dynamic cutaway updates in viewport (bbe75c8)
+- feat(studio): add architectural viewport presets for top, elevations, and reset angles (7a40e43)
 - feat(studio): wire archive inventory button and real-time 3D ghost raycast in studio view (b6113fb)
 - feat(studio): support floor raycasting and real-time 3D ghost placement in viewport (b73b620)
 - feat(studio): add freeform furniture inventory dock supporting tap and drag restoration (e0b261b)
@@ -34,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix(build): resolve iPad interface orientations, bundle id, and app icon assets (e5946cb)
 
 ### Documentation
+- docs(changelog): update automated release notes (7980a8d)
 - docs(changelog): update automated release notes (f04fdf6)
 - docs(agents): streamline repository guidelines to project-specific invariants (1364c2e)
 - docs(architecture): record vertical slice architecture and simulation contracts (2a90b81)
@@ -43,6 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - docs(architecture): add project documentation and ADR-0001 (c0645bc)
 
 ### Tooling & Maintenance
+- test(studio): add unit tests for camera presets, wall cutaways, and snap closure bindings (1521be4)
 - test(studio): add unit tests for inventory archiving and restoration (7efc8ae)
 - ci(workflows): remove legacy runner configuration in favor of xcode cloud (c3a1099)
 - chore(agents): add specialized domain skills for review and auditing (911fa16)
