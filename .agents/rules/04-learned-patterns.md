@@ -9,7 +9,6 @@
 
 | ID | Category | Title | Heuristic Summary | Date Added |
 | :--- | :--- | :--- | :--- | :--- |
-| **LP-001** | Portability | Machine-Specific Path Prohibition | Never use absolute machine paths (`/Users/...`); always use clean repository-relative project paths. | 2026-11-08 |
 | **LP-002** | Git Discipline | Conventional Commits Specification | Atomic commits following `<type>(<scope>): <subject>`. No commits without explicit user approval. | 2026-11-08 |
 | **LP-003** | Architecture | Subagent & Verification Delegation | Read-only subagents must have strictly bounded scopes and never mutate files or execute git commands. | 2026-11-08 |
 | **LP-004** | Architecture | Clean-Slate Architecture | Never copy-paste legacy code from prior projects; build purposeful, idiomatic Swift domain types. | 2026-11-08 |
@@ -28,21 +27,6 @@
 ---
 
 ## 🔍 Detailed Heuristic Profiles
-
-### LP-001: Machine-Specific Path Prohibition
-* **Context**: Absolute machine paths leak individual user environment details and break portability across CI runners and developer workstations.
-* **Bad Pattern**:
-  ```markdown
-  <!-- ❌ Leaks local machine path and breaks on other machines -->
-  See architecture documentation at [Architecture](file:///local/machine/path/to/docs/ARCHITECTURE.md).
-  ```
-* **Good Pattern**:
-  ```markdown
-  <!-- ✅ Clean, portable repository-relative path -->
-  See architecture documentation at [Architecture](docs/ARCHITECTURE.md).
-  ```
-
----
 
 ### LP-002: Conventional Commits Specification
 * **Context**: Commit histories must remain clean, searchable, and machine-parsable for automated changelogs. Commits must be atomic and authorized.

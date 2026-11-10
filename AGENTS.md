@@ -22,7 +22,7 @@ Users are accompanied on every stage by an interactive **Mascot AI Companion** p
 Alcove/
 ├── .agents/
 │   ├── rules/
-│   │   ├── 00-general-engineering.md       # Sendable, nil safety, zero local paths
+│   │   ├── 00-general-engineering.md       # Sendable, nil safety, value decoupling
 │   │   ├── 01-verification-loop.md         # Autonomous test verification & thermal guard
 │   │   ├── 02-swift-apple-architecture.md   # SwiftData models, Vertical Slices, HIG
 │   │   ├── 03-apple-hig-design-standards.md # iPad landscape HUD, 44pt touch targets
@@ -62,19 +62,13 @@ Alcove/
 
 ---
 
-## 3. Strict Operating Rules
+## 3. Engineering Operating Standards
 
-### Rule 1: Git Commits & Push Protocol
-- **NEVER commit changes to git until the user explicitly instructs you to commit.** Only write code, build, and verify.
-- When instructed to commit, always make **distinct, atomic commits** adhering to Conventional Commits: `<type>(<scope>): <subject>`. Never commit monolithic batches.
-- The shorthand **"CnP"** or **"cnp"** stands for Commit and Push.
+### Git Branch & Commit Protocol
+- Atomic commits adhering to Conventional Commits: `<type>(<scope>): <subject>`.
 - Local branch flow: `dev` (feature development) $\rightarrow$ `staging` (pre-release validation) $\rightarrow$ `main` (production).
-- Remote pushes are managed by the user unless explicitly delegated.
 
-### Rule 2: Zero Machine-Specific Local Paths
-- **NEVER** write absolute machine paths (e.g. `/Users/...` or `file:///Users/...`) into repository files, markdown, documentation, or code. Always use clean relative project paths (e.g. `docs/ARCHITECTURE.md`, `scripts/verify.sh`).
-
-### Rule 3: Verification & Thermal Management
+### Verification & Thermal Management
 - Always verify builds and tests locally using:
   ```bash
   ./scripts/verify.sh
@@ -83,11 +77,6 @@ Alcove/
   ```bash
   xcrun simctl shutdown all 2>/dev/null || true
   ```
-
-### Rule 4: Critical Thinking & Conversational Protocol
-- If a user prompt ends in a question, answer the question first and align before taking action.
-- Challenge bad ideas or degraded user experience directly with honest, constructive engineering arguments. Do not be a yes-man.
-- If ambiguous requirements arise, stop immediately and ask targeted clarifying questions.
 
 ---
 
