@@ -190,4 +190,40 @@ struct Studio3DViewModelTests {
         vm.revealMode = .sideBySide
         #expect(vm.revealMode == .sideBySide)
     }
+
+    @Test func furnitureArchivingAndRestorationInInventory() {
+        let room = SampleData.createStarterRoom()
+        let vm = Studio3DViewModel(room: room, stage: .rearrangement)
+
+        #expect(!vm.isArchiveListPresented)
+        vm.isArchiveListPresented = true
+        #expect(vm.isArchiveListPresented)
+
+        let initialActiveCount = vm.activeFurnitures.count
+        #expect(vm.archivedFurnitures.isEmpty)
+
+        guard let firstItem = vm.activeFurnitures.first else {
+            Issue.record("Expected starter room to have active furniture")
+            return
+        }
+
+        // Archive item
+        vm.selectFurniture(id: firstItem.id)
+        #expect(vm.selectedFurnitureID == firstItem.id)
+
+        vm.archiveFurniture(firstItem)
+        #expect(firstItem.isArchived == true)
+        #expect(vm.selectedFurnitureID == nil) // Deselected upon archive
+        #expect(vm.archivedFurnitures.count == 1)
+        #expect(vm.activeFurnitures.count == initialActiveCount - 1)
+        #expect(vm.mascotMessage.contains("Archived"))
+
+        // Restore item
+        vm.restoreFurniture(firstItem)
+        #expect(firstItem.isArchived == false)
+        #expect(vm.selectedFurnitureID == firstItem.id) // Selected upon restore
+        #expect(vm.archivedFurnitures.isEmpty)
+        #expect(vm.activeFurnitures.count == initialActiveCount)
+        #expect(vm.mascotMessage.contains("Restored"))
+    }
 }
