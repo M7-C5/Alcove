@@ -1,47 +1,83 @@
 import Foundation
 
-/// Viewport angle presets for spatial canvas inspection.
+/// Architectural viewport angle presets for spatial canvas inspection and POV alignment.
 public enum ViewportPreset: String, CaseIterable, Identifiable, Sendable {
-    case topDown
-    case dollhouseIsometric
-    case frontElevation
-    case sideElevation
+    case top
+    case left
+    case right
+    case front
+    case back
+    case dollhouse
+
+    // Backward compatibility static aliases
+    public static var topDown: ViewportPreset { .top }
+    public static var dollhouseIsometric: ViewportPreset { .dollhouse }
+    public static var frontElevation: ViewportPreset { .front }
+    public static var sideElevation: ViewportPreset { .left }
 
     public var id: String { rawValue }
 
     public var title: String {
         switch self {
-        case .topDown: return "2D Plan"
-        case .dollhouseIsometric: return "3D Dollhouse"
-        case .frontElevation: return "Front"
-        case .sideElevation: return "Side"
+        case .top: return "Top"
+        case .left: return "Left"
+        case .right: return "Right"
+        case .front: return "Front"
+        case .back: return "Back"
+        case .dollhouse: return "Reset Angle"
+        }
+    }
+
+    public var systemImage: String {
+        switch self {
+        case .top: return "view.2d"
+        case .left: return "arrow.left.to.line"
+        case .right: return "arrow.right.to.line"
+        case .front: return "arrow.up.to.line"
+        case .back: return "arrow.down.to.line"
+        case .dollhouse: return "arrow.counterclockwise"
         }
     }
 
     public var icon: String {
+        systemImage
+    }
+
+    public var targetYaw: Float {
         switch self {
-        case .topDown: return "square.topthird.inset.filled"
-        case .dollhouseIsometric: return "cube.transparent"
-        case .frontElevation: return "rectangle.portrait.and.arrow.forward"
-        case .sideElevation: return "arrow.left.to.line"
+        case .top: return 0.0
+        case .front: return 0.0
+        case .back: return .pi
+        case .left: return -.pi / 2.0
+        case .right: return .pi / 2.0
+        case .dollhouse: return 0.0
+        }
+    }
+
+    public var targetPitch: Float {
+        switch self {
+        case .top: return 1.55 // ~89° bird's-eye
+        case .front, .back, .left, .right: return 0.15 // Eye-level orthogonal angle
+        case .dollhouse: return 0.62 // Standard dollhouse elevation
         }
     }
 
     public var pitchAngleDegrees: Double {
         switch self {
-        case .topDown: return 0.0
-        case .dollhouseIsometric: return 40.0
-        case .frontElevation: return 75.0
-        case .sideElevation: return 75.0
+        case .top: return 0.0
+        case .dollhouse: return 40.0
+        case .front, .left, .right, .back: return 75.0
         }
     }
 
     public var yawAngleDegrees: Double {
         switch self {
-        case .topDown: return 0.0
-        case .dollhouseIsometric: return -35.0
-        case .frontElevation: return 0.0
-        case .sideElevation: return -90.0
+        case .top: return 0.0
+        case .dollhouse: return -35.0
+        case .front: return 0.0
+        case .left: return -90.0
+        case .right: return 90.0
+        case .back: return 180.0
         }
     }
 }
