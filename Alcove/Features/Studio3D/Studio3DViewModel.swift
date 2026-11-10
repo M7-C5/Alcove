@@ -79,6 +79,7 @@ public final class Studio3DViewModel {
     // Archive & Inventory Presentation
     public var isArchiveListPresented: Bool = false
     public var floorRaycaster: ((CGPoint) -> SIMD3<Float>?)? = nil
+    public var snapToViewport: ((ViewportPreset) -> Void)? = nil
 
     public var archivedFurnitures: [Furniture] {
         room.workingLayout?.furnitures.filter { $0.isArchived } ?? []

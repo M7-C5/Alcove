@@ -15,8 +15,10 @@ public struct Studio3DViewport: UIViewRepresentable {
     public var ghostFurnitureID: UUID? = nil
     public var ghostFloorPosition: SIMD3<Float>? = nil
     public typealias FloorRaycaster = (CGPoint) -> SIMD3<Float>?
+    public typealias ViewportSnapper = (ViewportPreset) -> Void
     public var onFurnitureMoved: ((FurnitureMoveEvent) -> Void)? = nil
     public var onFloorRaycasterResolved: ((@escaping FloorRaycaster) -> Void)? = nil
+    public var onSnapToViewportResolved: ((@escaping ViewportSnapper) -> Void)? = nil
     public var onTapBackground: (() -> Void)? = nil
 
     public init(
@@ -28,6 +30,7 @@ public struct Studio3DViewport: UIViewRepresentable {
         ghostFloorPosition: SIMD3<Float>? = nil,
         onFurnitureMoved: ((FurnitureMoveEvent) -> Void)? = nil,
         onFloorRaycasterResolved: ((@escaping FloorRaycaster) -> Void)? = nil,
+        onSnapToViewportResolved: ((@escaping ViewportSnapper) -> Void)? = nil,
         onTapBackground: (() -> Void)? = nil
     ) {
         self.room = room
@@ -38,6 +41,7 @@ public struct Studio3DViewport: UIViewRepresentable {
         self.ghostFloorPosition = ghostFloorPosition
         self.onFurnitureMoved = onFurnitureMoved
         self.onFloorRaycasterResolved = onFloorRaycasterResolved
+        self.onSnapToViewportResolved = onSnapToViewportResolved
         self.onTapBackground = onTapBackground
     }
 
@@ -71,6 +75,10 @@ public struct Studio3DViewport: UIViewRepresentable {
             return coordinator.projectToFloor(from: screenPoint, in: view)
         }
 
+        onSnapToViewportResolved? { [weak coordinator = context.coordinator] preset in
+            coordinator?.snapToViewport(preset)
+        }
+
         return view
     }
 
@@ -87,9 +95,14 @@ public struct Studio3DViewport: UIViewRepresentable {
             guard let coordinator, let arView else { return nil }
             return coordinator.projectToFloor(from: screenPoint, in: arView)
         }
+
+        onSnapToViewportResolved? { [weak coordinator = context.coordinator] preset in
+            coordinator?.snapToViewport(preset)
+        }
     }
 
     public static func dismantleUIView(_ view: ARView, coordinator: Coordinator) {
+        coordinator.animationTask?.cancel()
         coordinator.updateSubscription?.cancel()
         view.scene.anchors.removeAll()
     }
@@ -114,6 +127,7 @@ public struct Studio3DViewport: UIViewRepresentable {
         let fill = DirectionalLight()
 
         var updateSubscription: (any Cancellable)?
+        var animationTask: Task<Void, Never>? = nil
 
         // Camera Orbit & Distance
         var yaw: Float = 0.0
@@ -256,6 +270,52 @@ public struct Studio3DViewport: UIViewRepresentable {
             }
         }
 
+        // MARK: - Viewport Snapping & Cutaways
+
+        /// Snaps the orbit camera to an architectural viewport preset, smoothly interpolating by default.
+        public func snapToViewport(_ preset: ViewportPreset, animated: Bool = true) {
+            let startYaw = self.yaw
+            let startPitch = self.pitch
+            let targetYaw = preset.targetYaw
+            let targetPitch = preset.targetPitch
+
+            if !animated {
+                animationTask?.cancel()
+                self.yaw = targetYaw
+                self.pitch = targetPitch
+                updateCamera()
+                updateWallCutaways()
+                updateSelectedProjection()
+                return
+            }
+
+            animationTask?.cancel()
+            animationTask = Task { @MainActor [weak self] in
+                guard let self else { return }
+                let duration: Double = 0.35
+                let startTime = CACurrentMediaTime()
+
+                var deltaYaw = (targetYaw - startYaw).truncatingRemainder(dividingBy: .pi * 2)
+                if deltaYaw > .pi { deltaYaw -= .pi * 2 }
+                if deltaYaw < -.pi { deltaYaw += .pi * 2 }
+
+                while !Task.isCancelled {
+                    let elapsed = CACurrentMediaTime() - startTime
+                    let progress = min(1.0, elapsed / duration)
+                    let t = Float(progress < 0.5 ? 2 * progress * progress : 1 - pow(-2 * progress + 2, 2) / 2)
+
+                    self.yaw = startYaw + deltaYaw * t
+                    self.pitch = startPitch + (targetPitch - startPitch) * t
+                    self.updateCamera()
+                    self.updateWallCutaways()
+                    self.updateSelectedProjection()
+
+                    if progress >= 1.0 { break }
+                    try? await Task.sleep(nanoseconds: 16_000_000)
+                }
+            }
+        }
+
         // MARK: - 3D to 2D Screen Projection (Native RealityKit Hardware Matrix)
 
         func updateSelectedProjection() {
@@ -357,6 +417,7 @@ public struct Studio3DViewport: UIViewRepresentable {
 
             switch gesture.state {
             case .began:
+                animationTask?.cancel()
                 if let hitEntity = arView.entity(at: point) {
                     var current: Entity? = hitEntity
                     while let p = current, !p.name.hasPrefix("Furniture_") {
@@ -405,7 +466,7 @@ public struct Studio3DViewport: UIViewRepresentable {
                     let translation = gesture.translation(in: arView)
                     yaw = startYaw - Float(translation.x) * 0.007
                     let rawPitch = startPitch + Float(translation.y) * 0.007
-                    pitch = min(1.50, max(0.12, rawPitch))
+                    pitch = min(1.55, max(0.12, rawPitch))
                     updateCamera()
                     updateWallCutaways()
                     updateSelectedProjection()
