@@ -42,6 +42,9 @@ public struct Studio3DView: View {
                     onFloorRaycasterResolved: { raycaster in
                         viewModel.floorRaycaster = raycaster
                     },
+                    onSnapToViewportResolved: { snapper in
+                        viewModel.snapToViewport = snapper
+                    },
                     onTapBackground: {
                         if viewModel.isArchiveListPresented {
                             withAnimation(.spring(response: 0.35, dampingFraction: 0.78)) {
@@ -122,48 +125,82 @@ public struct Studio3DView: View {
 
                     Spacer()
 
-                    // Circular Archive Button (Icon + number badge pinned on top right)
-                    Button {
-                        withAnimation(.spring(response: 0.35, dampingFraction: 0.78)) {
-                            viewModel.isArchiveListPresented.toggle()
-                        }
-                        playSnapFeedback()
-                    } label: {
-                        ZStack(alignment: .topTrailing) {
-                            Image(systemName: viewModel.isArchiveListPresented ? "archivebox.fill" : "archivebox")
-                                .font(.body.weight(.semibold))
-                                .foregroundStyle(viewModel.isArchiveListPresented ? .white : .primary)
-                                .frame(width: 44, height: 44)
-                                .background {
-                                    if viewModel.isArchiveListPresented {
-                                        Circle().fill(Color.accentColor)
-                                    } else {
-                                        Circle().fill(.regularMaterial)
-                                    }
+                    // Trailing Controls: Point of View (POV) Snap Menu & Circular Archive Button
+                    HStack(spacing: 8) {
+                        Menu {
+                            ForEach(ViewportPreset.allCases) { preset in
+                                if preset == .dollhouse {
+                                    Divider()
                                 }
+                                Button {
+                                    viewModel.snapToViewport?(preset)
+                                    playSnapFeedback()
+                                } label: {
+                                    Label(preset.title, systemImage: preset.systemImage)
+                                }
+                            }
+                        } label: {
+                            Image(systemName: "rotate.3d")
+                                .font(.body.weight(.semibold))
+                                .foregroundStyle(.primary)
+                                .frame(width: 44, height: 44)
+                                .background(.regularMaterial, in: Circle())
                                 .overlay(
                                     Circle()
-                                        .stroke(viewModel.isArchiveListPresented ? Color.accentColor : Color.primary.opacity(0.08), lineWidth: 1)
+                                        .stroke(Color.primary.opacity(0.08), lineWidth: 1)
                                 )
                                 .shadow(
-                                    color: viewModel.isArchiveListPresented ? Color.accentColor.opacity(0.40) : Color.black.opacity(0.04),
+                                    color: Color.black.opacity(0.04),
                                     radius: 8,
                                     y: 2
                                 )
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Point of View")
 
-                            if !viewModel.archivedFurnitures.isEmpty {
-                                Text("\(viewModel.archivedFurnitures.count)")
-                                    .font(.caption2.weight(.bold))
-                                    .foregroundStyle(.white)
-                                    .padding(.horizontal, 5)
-                                    .padding(.vertical, 2)
-                                    .background(Color.accentColor, in: Capsule())
-                                    .offset(x: 4, y: -4)
+                        // Circular Archive Button (Icon + number badge pinned on top right)
+                        Button {
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.78)) {
+                                viewModel.isArchiveListPresented.toggle()
+                            }
+                            playSnapFeedback()
+                        } label: {
+                            ZStack(alignment: .topTrailing) {
+                                Image(systemName: viewModel.isArchiveListPresented ? "archivebox.fill" : "archivebox")
+                                    .font(.body.weight(.semibold))
+                                    .foregroundStyle(viewModel.isArchiveListPresented ? .white : .primary)
+                                    .frame(width: 44, height: 44)
+                                    .background {
+                                        if viewModel.isArchiveListPresented {
+                                            Circle().fill(Color.accentColor)
+                                        } else {
+                                            Circle().fill(.regularMaterial)
+                                        }
+                                    }
+                                    .overlay(
+                                        Circle()
+                                            .stroke(viewModel.isArchiveListPresented ? Color.accentColor : Color.primary.opacity(0.08), lineWidth: 1)
+                                    )
+                                    .shadow(
+                                        color: viewModel.isArchiveListPresented ? Color.accentColor.opacity(0.40) : Color.black.opacity(0.04),
+                                        radius: 8,
+                                        y: 2
+                                    )
+
+                                if !viewModel.archivedFurnitures.isEmpty {
+                                    Text("\(viewModel.archivedFurnitures.count)")
+                                        .font(.caption2.weight(.bold))
+                                        .foregroundStyle(.white)
+                                        .padding(.horizontal, 5)
+                                        .padding(.vertical, 2)
+                                        .background(Color.accentColor, in: Capsule())
+                                        .offset(x: 4, y: -4)
+                                }
                             }
                         }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(viewModel.isArchiveListPresented ? "Close archive inventory" : "Open archive inventory, \(viewModel.archivedFurnitures.count) items archived")
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(viewModel.isArchiveListPresented ? "Close archive inventory" : "Open archive inventory, \(viewModel.archivedFurnitures.count) items archived")
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 16)
