@@ -5,11 +5,13 @@ public struct ChatMessage: Identifiable, Sendable {
     public let id: UUID
     public let isUser: Bool
     public let text: String
+    public let modelBadge: String?
 
-    public init(id: UUID = UUID(), isUser: Bool, text: String) {
+    public init(id: UUID = UUID(), isUser: Bool, text: String, modelBadge: String? = nil) {
         self.id = id
         self.isUser = isUser
         self.text = text
+        self.modelBadge = modelBadge
     }
 }
 
@@ -53,7 +55,16 @@ public final class MascotChatViewModel {
                 currentStage: currentStage,
                 room: room
             )
-            self.chatHistory.append(ChatMessage(isUser: false, text: response))
+            let badge: String
+            if LLMMascotAIService.shared.apiKey.isEmpty {
+                badge = "📖 Local Engine"
+            } else if LLMMascotAIService.shared.isQuotaExhausted {
+                badge = "📖 Local Engine (Cloud Quota Resting)"
+            } else {
+                badge = "✨ \(LLMMascotAIService.shared.provider.rawValue)"
+            }
+
+            self.chatHistory.append(ChatMessage(isUser: false, text: response, modelBadge: badge))
             self.isThinking = false
             self.feedbackService?.playNotification(.success)
             self.feedbackService?.speak(response)

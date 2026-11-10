@@ -68,12 +68,21 @@ public struct StudioBottomHUD: View {
                         }
                     }
 
-                    Text(mascotMessage)
-                        .font(.subheadline)
-                        .foregroundStyle(.primary)
-                        .lineLimit(3)
-                        .minimumScaleFactor(0.85)
-                        .animation(.easeInOut, value: mascotMessage)
+                    if let attributed = try? AttributedString(markdown: mascotMessage, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)) {
+                        Text(attributed)
+                            .font(.subheadline)
+                            .foregroundStyle(.primary)
+                            .lineLimit(3)
+                            .minimumScaleFactor(0.85)
+                            .animation(.easeInOut, value: mascotMessage)
+                    } else {
+                        Text(mascotMessage)
+                            .font(.subheadline)
+                            .foregroundStyle(.primary)
+                            .lineLimit(3)
+                            .minimumScaleFactor(0.85)
+                            .animation(.easeInOut, value: mascotMessage)
+                    }
                 }
 
                 Divider()

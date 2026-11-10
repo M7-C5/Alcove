@@ -3,7 +3,8 @@ import SwiftData
 import AudioToolbox
 
 /// 3D Studio workspace rendering the low-poly RealityKit room and furniture layout,
-/// featuring Resign's circular Sims Action HUD where the rotate button glides along the orbit rim.
+/// featuring Resign's circular Sims Action HUD where the rotate button glides along the orbit rim,
+/// accompanied by the pedagogical Mascot AI Companion bottom HUD and contextual chat drawer.
 public struct Studio3DView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(NavigationRouter.self) private var router: NavigationRouter?
@@ -51,6 +52,9 @@ public struct Studio3DView: View {
                         viewportSize: geometry.size,
                         ghostFurnitureID: ghostFurnitureID,
                         ghostFloorPosition: ghostFloorPosition,
+                        currentStage: viewModel.currentStage,
+                        beforeAfterSplit: viewModel.beforeAfterSplit,
+                        revealMode: viewModel.revealMode,
                         onFurnitureMoved: { event in
                             viewModel.handleFurnitureMoved(event)
                         },
@@ -130,8 +134,8 @@ public struct Studio3DView: View {
                                 .font(.subheadline)
                             Text(viewModel.mascotMessage)
                                 .font(.caption.weight(.medium))
-                            .foregroundStyle(.primary)
-                            .lineLimit(1)
+                                .foregroundStyle(.primary)
+                                .lineLimit(1)
                         }
                         .padding(.horizontal, 14)
                         .frame(minHeight: 44)
@@ -244,6 +248,17 @@ public struct Studio3DView: View {
                 .padding(.top, 16)
                 .safeAreaPadding(.top)
 
+                // Stage 4 Harmony: Full-Screen Interactive Split Divider Curtain (Like phone photo editing before/after sliders)
+                if viewModel.currentStage == .harmony && !viewModel.isArchiveListPresented {
+                    SplitCurtainDividerView(
+                        splitFraction: $bindableVM.beforeAfterSplit,
+                        totalWidth: geometry.size.width,
+                        totalHeight: geometry.size.height
+                    )
+                    .transition(.opacity)
+                    .zIndex(14)
+                }
+
                 // Freeform Pen Selection Style Bottom Center Furniture Archive Dock (60% screen width)
                 if viewModel.isArchiveListPresented {
                     VStack {
@@ -285,31 +300,103 @@ public struct Studio3DView: View {
                     )
                     .zIndex(20)
                 }
+
+                // Bottom Mascot & Dialogue Controls (Visible when archive drawer is closed)
+                if !viewModel.isArchiveListPresented {
+                    VStack {
+                        Spacer()
+                        StudioBottomHUD(
+                            mascotEmotion: viewModel.mascotEmotion,
+                            mascotMessage: viewModel.mascotMessage,
+                            onTriggerEvaluation: { viewModel.triggerStageEvaluation() },
+                            onOpenChat: { viewModel.showingChatDrawer = true }
+                        )
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+                    .zIndex(15)
+                }
+
+                // Stage Walkthrough Dialogue Overlay (Figma Image 1 & 2)
+                if viewModel.isWalkthroughActive {
+                    StageWalkthroughOverlay(
+                        steps: viewModel.walkthroughSteps,
+                        currentStepIndex: viewModel.walkthroughStepIndex,
+                        onAdvance: { viewModel.advanceWalkthrough() },
+                        onSkip: { viewModel.completeWalkthrough() }
+                    )
+                    .transition(.opacity)
+                    .zIndex(30)
+                }
             }
             .coordinateSpace(name: "Studio3DViewportSpace")
         }
         .ignoresSafeArea()
         .navigationBarBackButtonHidden(true)
+        .onAppear {
+            viewModel.updateMascotGreeting()
+            if viewModel.currentStage == .audit {
+                viewModel.startWalkthrough()
+            }
+        }
         .sheet(isPresented: $viewModel.showingChatDrawer) {
             MascotChatDrawer(
                 mascotService: viewModel.mascotService,
                 feedbackService: viewModel.feedbackService,
                 currentStage: viewModel.currentStage,
-                room: room
+                room: viewModel.room
             )
+            .presentationDetents([.fraction(0.55), .fraction(0.85), .large])
+            .presentationDragIndicator(.visible)
+            .presentationBackgroundInteraction(.enabled(upThrough: .fraction(0.55)))
         }
         .sheet(isPresented: $viewModel.showingEvaluationSheet) {
             if let result = viewModel.evaluationResult {
                 StageEvaluationSheet(
                     result: result,
                     stage: viewModel.currentStage,
-                    onProceedAnyway: { viewModel.advanceToNextStage(result: result) },
-                    onKeepRefining: {}
+                    onProceedAnyway: {
+                        if viewModel.currentStage == .harmony {
+                            isARWalkthroughPresented = true
+                        } else {
+                            viewModel.advanceToNextStage(result: result)
+                        }
+                    },
+                    onKeepRefining: {
+                        // User stays to refine
+                    },
+                    onReevaluate: {
+                        viewModel.triggerStageEvaluation(forceReprompt: true)
+                    }
                 )
             }
         }
+        .sheet(isPresented: $viewModel.showingScorecardSheet) {
+            RoomHarmonyScorecardSheet(
+                room: viewModel.room,
+                metrics: viewModel.currentHarmonyMetrics,
+                onInteractiveSplitTapped: {
+                    // Scorecard dismisses automatically, leaving user to scrub 3D split
+                },
+                onStartGuidedTour: {
+                    viewModel.startCinematicWalkthroughTour()
+                },
+                onOpenARWalkthrough: {
+                    isARWalkthroughPresented = true
+                },
+                onCompleteCurriculum: {
+                    viewModel.completeHarmonyCurriculum()
+                }
+            )
+            .presentationDetents([.fraction(0.85), .large])
+            .presentationDragIndicator(.visible)
+        }
         .fullScreenCover(isPresented: $isARWalkthroughPresented) {
             ARWalkthroughView(room: room)
+        }
+        .alert("AR Room Walkthrough", isPresented: $viewModel.showingARPlaceholder) {
+            Button("Got it!", role: .cancel) {}
+        } message: {
+            Text("The 1:1 scale AR Walkthrough experience is currently in development! You'll soon be able to step directly inside your redesigned room in physical augmented reality using ARKit & RealityKit.")
         }
     }
 
