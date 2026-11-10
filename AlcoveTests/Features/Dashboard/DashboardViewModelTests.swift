@@ -77,4 +77,18 @@ struct DashboardViewModelTests {
         #expect(rooms.first?.name == "Cozy Master Bedroom")
         #expect(rooms.first?.workingLayout?.lightFixtures.count == 3)
     }
+
+    @Test func seedBedroomOfficeComboInsertsMockRoom() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let vm = DashboardViewModel()
+
+        vm.seedBedroomOfficeCombo(modelContext: context)
+
+        let descriptor = FetchDescriptor<Room>()
+        let rooms = try context.fetch(descriptor)
+        #expect(rooms.count == 1)
+        #expect(rooms.first?.name == "Bedroom & Office Combo")
+        #expect(rooms.first?.workingLayout?.furnitures.count == 6)
+    }
 }
