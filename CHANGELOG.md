@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- feat(studio): migrate viewport to native arview with sub-pixel projection and touch triage (ff51f9e)
+- feat(studio): support incremental furniture rotation and position synchronization in view model (0788a44)
+- feat(studio): implement circular sims action dial with gliding orbit rotation (9cec259)
+- feat(studio): add furniture transform engine with boundary clamping and yaw snapping (4c3a696)
+- feat(studio): add full-height perimeter walls and dynamic camera-facing cutaways (ee891d7)
+- feat(studio): introduce wall cutaway evaluator for camera occlusion (cd2da61)
+- feat(studio): implement interactive RealityKit 3D viewport with room shell and sunlight (8580c34)
+- feat(studio): add procedural multi-part furniture mesh builder (339ffb7)
+- feat(dashboard): add mock bedroom seed action to dashboard toolbar (7a41af8)
+- feat(core): introduce mock bedroom and office generator with dual layouts (368862a)
 - feat(navigation): implement value-based router and decoupled feature navigation (47c81d0)
 - feat(core): enhance spatial models with lighting fixtures and preview containers (c2309c7)
 - feat(ui): add ipad landscape screen flow and mascot hud (ec746bc)
@@ -21,6 +31,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix(build): resolve iPad interface orientations, bundle id, and app icon assets (e5946cb)
 
 ### Documentation
+- docs(agents): streamline repository guidelines to project-specific invariants (1364c2e)
+- docs(architecture): record vertical slice architecture and simulation contracts (2a90b81)
 - docs(changelog): update automated release notes (98b5d89)
 - docs(playbook): add agentic development playbook and architectural recipes (0dd751c)
 - docs(rules): update autonomous directives and apple engineering standards (64629de)
