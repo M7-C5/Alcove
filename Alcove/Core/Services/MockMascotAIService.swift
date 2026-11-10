@@ -14,7 +14,7 @@ public final class MockMascotAIService: MascotAIServiceProtocol {
         case .audit:
             return "Welcome to \(roomName)! Let's begin by assessing your current space. Look around and spot any tight corners or obstructed paths."
         case .rearrangement:
-            return "Stage 2 unlocked! Now you can grab, slide, and rotate furniture. Aim for at least 60cm of open walkway clearance."
+            return "Stage 2 unlocked! Now you can grab, slide, and rotate furniture. Aim for at least 76.2cm of open walkway clearance (Panero & Zelnik standard)."
         case .illumination:
             return "Stage 3 is all about light! Scrub through daylight hours to observe sun angles, and balance ambient, task, and accent lighting layers."
         case .harmony:
@@ -65,24 +65,58 @@ public final class MockMascotAIService: MascotAIServiceProtocol {
             var bottlenecks: [SpatialBottleneck] = []
             var score = 90
 
-            // Check clearances between all pairs
+            // Check clearances between all pairs using Panero & Zelnik anthropometric standards
             for i in 0..<furnitures.count {
                 for j in (i + 1)..<furnitures.count {
                     let a = furnitures[i]
                     let b = furnitures[j]
                     let dx = a.positionX - b.positionX
                     let dz = a.positionZ - b.positionZ
-                    let dist = sqrt(dx * dx + dz * dz)
-                    let minAllowed = (a.width + b.width) / 2.0 + 0.50
+                    let centerDist = sqrt(dx * dx + dz * dz)
+                    let footprintRadiusSum = (a.width + a.length) / 4.0 + (b.width + b.length) / 4.0
+                    let clearance = max(0.0, centerDist - footprintRadiusSum)
 
-                    if dist < minAllowed {
+                    let isCompanionPair = (a.category == .bed && b.name.localizedCaseInsensitiveContains("nightstand")) ||
+                                          (b.category == .bed && a.name.localizedCaseInsensitiveContains("nightstand")) ||
+                                          (a.category == .table && b.category == .seating) ||
+                                          (b.category == .table && a.category == .seating)
+                    if isCompanionPair { continue }
+
+                    // Check Bed-to-Bed clearance (91.4 cm min)
+                    if a.category == .bed && b.category == .bed {
+                        if clearance < AnthropometricStandards.bedToBedClearanceMin {
+                            bottlenecks.append(SpatialBottleneck(
+                                title: "Bed-to-Bed Clearance Too Tight",
+                                detail: "Clearance between \(a.name) and \(b.name) is ~\(Int(clearance * 100))cm. Standard requires at least 91.4cm.",
+                                severity: .critical,
+                                affectedFurnitureName: a.name
+                            ))
+                            score -= 15
+                            continue
+                        }
+                    }
+
+                    // Check General Circulation (76.2 cm min, 91.4 cm recommended)
+                    let compliance = AnthropometricStandards.evaluateCirculation(clearanceInMeters: clearance)
+                    switch compliance {
+                    case .bottleneckCritical:
+                        bottlenecks.append(SpatialBottleneck(
+                            title: "Critical Bottleneck Between \(a.name) & \(b.name)",
+                            detail: "Current clearance is ~\(Int(clearance * 100))cm. Below minimum 1-person passage of 76.2cm.",
+                            severity: .critical,
+                            affectedFurnitureName: a.name
+                        ))
+                        score -= 15
+                    case .acceptableMinimum:
                         bottlenecks.append(SpatialBottleneck(
                             title: "Tight Walkway Between \(a.name) & \(b.name)",
-                            detail: "Current clearance is ~\(String(format: "%.0f", dist * 100))cm. Standard interior design recommends at least 60cm.",
+                            detail: "Current clearance is ~\(Int(clearance * 100))cm. Meets minimum 76.2cm, but 91.4cm is recommended for carrying items.",
                             severity: .warning,
                             affectedFurnitureName: a.name
                         ))
-                        score -= 10
+                        score -= 5
+                    case .optimalComfort:
+                        break
                     }
                 }
             }
@@ -91,12 +125,14 @@ public final class MockMascotAIService: MascotAIServiceProtocol {
             return StageEvaluationResult(
                 canAdvance: canAdvance,
                 score: max(score, 50),
-                title: bottlenecks.isEmpty ? "Flawless Layout!" : "Good Progress!",
+                title: bottlenecks.isEmpty ? "Flawless Layout!" : (canAdvance ? "Good Progress!" : "Clearance Issues"),
                 dialogue: bottlenecks.isEmpty
-                    ? "Incredible circulation! All walkways are spacious and inviting."
-                    : "I spotted a few tight spots. You can tweak them or proceed anyway if you like this intimate layout!",
+                    ? "Incredible circulation! All walkways adhere to comfortable circulation standards (≥91.4cm)."
+                    : (canAdvance
+                        ? "Circulation meets baseline standards. You can tweak tighter spots or proceed to lighting!"
+                        : "There are critical bottlenecks below 76.2cm that block natural 1-person passage. Please widen the pathways."),
                 bottlenecks: bottlenecks,
-                recommendations: ["Ensure minimum 60cm circulation", "Keep main doorway unimpeded"],
+                recommendations: ["Ensure minimum 76.2cm 1-person circulation", "Aim for 91.4cm comfortable passage", "Keep bed perimeter at 66-99cm for bed-making"],
                 praise: ["Focal points established", "Proportions balanced"]
             )
 
@@ -155,15 +191,19 @@ public final class MockMascotAIService: MascotAIServiceProtocol {
     ) async -> String {
         let q = question.lowercased()
         if q.contains("clearance") || q.contains("walkway") || q.contains("space") {
-            return "In interior design, secondary walkways need at least 60cm (24 inches), while primary paths (like from the door to the bed) feel best with 90cm (36 inches) of unobstructed flow."
+            return "For room walkways, minimum 1-person passage requires at least 76.2cm (secondary paths need at least 60cm), while comfortable circulation with carrying objects needs 91.4cm. A bed-making perimeter needs 66–99cm of open space."
         } else if q.contains("light") || q.contains("window") || q.contains("sun") {
-            return "Always balance your 4 lighting layers: daylight from windows without harsh shadows, ambient overhead fill (150-300 lux), task lamps on desks/beds, and accent lighting to add visual depth."
-        } else if q.contains("focal") || q.contains("point") {
-            return "Every room needs a strong anchor. Whether it's a large window, artwork, or your bed/desk, orient key seating towards it to create visual harmony."
+            return "A balanced room coordinates 3 essential layers: Ambient (general fill), Task (focused reading/desk lights), and Accent (visual interest). Aim for 5 to 7 light points per room to achieve balanced warmth and eliminate harsh shadows."
+        } else if q.contains("focal") || q.contains("point") || q.contains("style") || q.contains("balance") {
+            return "A room feels harmonious when key pieces like the bed or sofa are firmly anchored against solid walls, visual weight is distributed evenly across the room, and clear sightlines are preserved toward windows."
+        } else if q.contains("bed") {
+            return "Bed-to-bed clearance should be at least 91.4cm, and the bed perimeter needs 66–99cm for easily making sheets. Placing the headboard facing the entry door also helps you feel psychologically secure."
+        } else if q.contains("desk") || q.contains("work") {
+            return "Leave at least 76.2cm behind a desk for chair egress (91.4cm if someone walks behind). Also, angle desk lamps to avoid computer monitor glare."
         } else if q.contains("harmony") || q.contains("before") || q.contains("after") {
-            return "The Harmony stage compares your new design directly against your initial LiDAR scan. Notice how removing bottlenecks and decluttering opens up natural sightlines."
+            return "The Harmony stage compares your new design against your baseline scan. True harmony happens when circulation paths and layered light points work together effortlessly."
         } else {
-            return "Great question! On \(currentStage.title), focus on creating open breathing room. Small changes in furniture angle or lighting can completely transform how large the room feels."
+            return "Great design question! On \(currentStage.title), we focus on comfortable spatial clearances, layered lighting, and visual balance. How does the arrangement feel to you right now?"
         }
     }
 }
