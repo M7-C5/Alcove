@@ -34,6 +34,19 @@ public final class MockMascotAIService: MascotAIServiceProtocol {
         )
     }
 
+    public func daylightMicroReact(
+        hour: Double,
+        room: Room
+    ) -> MicroReaction? {
+        let furnitures = room.workingLayout?.furnitures ?? []
+        let fixtures = room.workingLayout?.lightFixtures ?? []
+        return rulebook.evaluateDaylightChange(
+            hour: hour,
+            furnitures: furnitures,
+            fixtures: fixtures
+        )
+    }
+
     public func evaluateStage(
         stage: StageType,
         room: Room

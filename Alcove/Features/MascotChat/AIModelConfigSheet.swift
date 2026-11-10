@@ -140,8 +140,8 @@ public struct AIModelConfigSheet: View {
     private var providerPlaceholder: String {
         switch selectedProvider {
         case .gemini: return "Enter Gemini API Key..."
-        case .claude: return "sk-ant-..."
-        case .openai: return "sk-proj-..."
+        case .claude: return "Enter Claude API Key..."
+        case .openai: return "Enter OpenAI API Key..."
         }
     }
 }
