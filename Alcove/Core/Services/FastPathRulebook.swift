@@ -67,4 +67,57 @@ public struct FastPathRulebook: Sendable {
 
         return nil
     }
+
+    /// Evaluates natural daylight time scrubbing in Stage 3 (Illumination)
+    public func evaluateDaylightChange(
+        hour: Double,
+        furnitures: [Furniture],
+        fixtures: [LightFixture]
+    ) -> MicroReaction? {
+        let hasDesk = furnitures.contains { !$0.isArchived && ($0.category == .table || $0.name.localizedCaseInsensitiveContains("desk")) }
+        let activeFixtures = fixtures.filter { $0.isOn }
+        let activeAmbientOrTask = activeFixtures.filter { $0.layer == .ambient || $0.layer == .task }
+
+        if hour >= 8.0 && hour < 11.0 {
+            // Morning
+            if hasDesk {
+                return MicroReaction(
+                    message: "Soft morning rays! If you work early, angle your desk toward this gentle natural light.",
+                    emotion: .happy
+                )
+            } else {
+                return MicroReaction(
+                    message: "Gentle morning sun! A calm time to let natural light brighten up your seating area.",
+                    emotion: .happy
+                )
+            }
+        } else if hour >= 11.0 && hour < 15.0 {
+            // Midday
+            return MicroReaction(
+                message: "High midday sun! Watch out for harsh glare on screens and shiny work surfaces.",
+                emotion: .thinking
+            )
+        } else if hour >= 15.0 && hour < 18.5 {
+            // Golden hour
+            return MicroReaction(
+                message: "Golden hour! Warm, low sunlight cuts deep into the room. Super cozy vibe for reading.",
+                emotion: .happy
+            )
+        } else if hour >= 18.5 {
+            // Evening / Dusk
+            if activeAmbientOrTask.isEmpty {
+                return MicroReaction(
+                    message: "The sun is down! Without natural light, the room feels dim. Try turning on ambient or task lamps!",
+                    emotion: .warning
+                )
+            } else {
+                return MicroReaction(
+                    message: "Dusk has settled in! Your warm artificial lamps are stepping up nicely to keep things inviting.",
+                    emotion: .happy
+                )
+            }
+        }
+
+        return nil
+    }
 }

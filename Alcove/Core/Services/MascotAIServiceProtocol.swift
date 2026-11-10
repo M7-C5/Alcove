@@ -112,6 +112,12 @@ public protocol MascotAIServiceProtocol: Sendable {
         allFurnitures: [Furniture]
     ) -> MicroReaction?
 
+    /// Sub-100ms micro-reaction to natural daylight scrubbing in Stage 3 (Illumination)
+    func daylightMicroReact(
+        hour: Double,
+        room: Room
+    ) -> MicroReaction?
+
     /// Comprehensive evaluation gate to assess if user can proceed
     func evaluateStage(
         stage: StageType,

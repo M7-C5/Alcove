@@ -91,6 +91,68 @@ struct AlcoveCoreTests {
         #expect(reaction?.message.contains("Desk") == true)
     }
 
+    @Test func fastPathDaylightMicroReactions() {
+        let rulebook = FastPathRulebook()
+        let desk = Furniture(
+            name: "Work Desk",
+            category: .table,
+            positionX: 0.0,
+            positionY: 0.0,
+            positionZ: 0.0,
+            width: 1.2,
+            length: 0.8
+        )
+
+        // 1. Morning (9:00 AM) with desk -> soft rays & work angle
+        let morningReaction = rulebook.evaluateDaylightChange(
+            hour: 9.0,
+            furnitures: [desk],
+            fixtures: []
+        )
+        #expect(morningReaction != nil)
+        #expect(morningReaction?.emotion == .happy)
+        #expect(morningReaction?.message.contains("morning") == true)
+
+        // 2. Midday (13:00 PM) -> glare warning
+        let middayReaction = rulebook.evaluateDaylightChange(
+            hour: 13.0,
+            furnitures: [desk],
+            fixtures: []
+        )
+        #expect(middayReaction != nil)
+        #expect(middayReaction?.emotion == .thinking)
+        #expect(middayReaction?.message.contains("glare") == true)
+
+        // 3. Golden Hour (17:00 PM) -> warm mood
+        let goldenReaction = rulebook.evaluateDaylightChange(
+            hour: 17.0,
+            furnitures: [desk],
+            fixtures: []
+        )
+        #expect(goldenReaction != nil)
+        #expect(goldenReaction?.emotion == .happy)
+        #expect(goldenReaction?.message.contains("Golden hour") == true)
+
+        // 4. Evening (20:00 PM) without lights -> warning to turn on lamps
+        let eveningDimReaction = rulebook.evaluateDaylightChange(
+            hour: 20.0,
+            furnitures: [desk],
+            fixtures: []
+        )
+        #expect(eveningDimReaction != nil)
+        #expect(eveningDimReaction?.emotion == .warning)
+
+        // 5. Evening (20:00 PM) with active lamps -> warm cozy approval
+        let lamp = LightFixture(name: "Floor Lamp", layer: .ambient, lumens: 800, isOn: true)
+        let eveningLitReaction = rulebook.evaluateDaylightChange(
+            hour: 20.0,
+            furnitures: [desk],
+            fixtures: [lamp]
+        )
+        #expect(eveningLitReaction != nil)
+        #expect(eveningLitReaction?.emotion == .happy)
+    }
+
     @Test func mockMascotEvaluationStageGates() async {
         let mascot = MockMascotAIService()
         let room = SampleData.createStarterRoom()

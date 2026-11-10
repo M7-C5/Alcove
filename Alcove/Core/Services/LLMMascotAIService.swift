@@ -28,16 +28,22 @@ public final class LLMMascotAIService: MascotAIServiceProtocol {
         }
     }
 
-    /// Optional: Paste your API key here to test cloud AI directly in code without using the UI!
+    /// Optional: In-code developer key override (kept empty by default to prevent secret leaks)
     public static var hardcodedDeveloperKey: String = ""
 
     public var apiKey: String {
         get {
-            // 1. Check in-code developer key constant
+            // 1. In-code developer key override (if set at runtime)
             if !Self.hardcodedDeveloperKey.isEmpty {
                 return Self.hardcodedDeveloperKey.trimmingCharacters(in: .whitespacesAndNewlines)
             }
-            // 2. Check Xcode scheme environment variables
+            // 2. Local gitignored developer.secret file (for safe local development)
+            if let secretURL = Bundle.main.url(forResource: "developer", withExtension: "secret"),
+               let secretContent = try? String(contentsOf: secretURL, encoding: .utf8),
+               !secretContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                return secretContent.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+            // 3. Process environment variables (Xcode Scheme)
             if let envKey = ProcessInfo.processInfo.environment["GEMINI_API_KEY"], !envKey.isEmpty {
                 return envKey.trimmingCharacters(in: .whitespacesAndNewlines)
             }
@@ -47,7 +53,7 @@ public final class LLMMascotAIService: MascotAIServiceProtocol {
             if let envKey = ProcessInfo.processInfo.environment["OPENAI_API_KEY"], !envKey.isEmpty {
                 return envKey.trimmingCharacters(in: .whitespacesAndNewlines)
             }
-            // 3. Check UserDefaults (saved via UI sheet)
+            // 4. Check UserDefaults (saved securely via in-app UI config sheet)
             return UserDefaults.standard.string(forKey: "alcove_llm_api_key") ?? ""
         }
         set {
@@ -71,6 +77,13 @@ public final class LLMMascotAIService: MascotAIServiceProtocol {
             roomDimensions: roomDimensions,
             allFurnitures: allFurnitures
         )
+    }
+
+    public func daylightMicroReact(
+        hour: Double,
+        room: Room
+    ) -> MicroReaction? {
+        fallbackService.daylightMicroReact(hour: hour, room: room)
     }
 
     public func evaluateStage(
