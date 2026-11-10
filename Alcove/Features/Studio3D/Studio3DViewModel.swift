@@ -76,6 +76,38 @@ public final class Studio3DViewModel {
         set { feedbackService.isVoiceNarrationEnabled = newValue }
     }
 
+    // Archive & Inventory Presentation
+    public var isArchiveListPresented: Bool = false
+    public var floorRaycaster: ((CGPoint) -> SIMD3<Float>?)? = nil
+
+    public var archivedFurnitures: [Furniture] {
+        room.workingLayout?.furnitures.filter { $0.isArchived } ?? []
+    }
+
+    public var activeFurnitures: [Furniture] {
+        room.workingLayout?.furnitures.filter { !$0.isArchived } ?? []
+    }
+
+    public func restoreFurniture(_ item: Furniture) {
+        item.isArchived = false
+        selectedFurnitureID = item.id
+        mascotEmotion = .happy
+        mascotMessage = "Restored \(item.name) to room!"
+        feedbackService.playImpact(.medium)
+        feedbackService.speak(mascotMessage)
+    }
+
+    public func archiveFurniture(_ item: Furniture) {
+        item.isArchived = true
+        if selectedFurnitureID == item.id {
+            selectedFurnitureID = nil
+        }
+        mascotEmotion = .curious
+        mascotMessage = "Archived \(item.name) into inventory!"
+        feedbackService.playImpact(.heavy)
+        feedbackService.speak(mascotMessage)
+    }
+
     public func toggleVoiceNarration() {
         feedbackService.isVoiceNarrationEnabled.toggle()
         if feedbackService.isVoiceNarrationEnabled {
