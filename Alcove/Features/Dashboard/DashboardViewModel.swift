@@ -21,6 +21,11 @@ public final class DashboardViewModel {
         modelContext.insert(bedroom)
     }
 
+    public func seedBedroomOfficeCombo(modelContext: ModelContext) {
+        let bedroomOffice = MockRoomGenerator.generateBedroomOfficeCombo()
+        modelContext.insert(bedroomOffice)
+    }
+
     public func addScannedRoom(_ room: Room, modelContext: ModelContext) {
         modelContext.insert(room)
         showingScanSheet = false

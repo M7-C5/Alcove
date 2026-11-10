@@ -28,14 +28,22 @@ public struct DashboardView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        viewModel.showingScanSheet = true
-                    } label: {
-                        Label("Scan Room", systemImage: "camera.viewfinder")
-                            .font(.headline)
+                    HStack(spacing: 12) {
+                        Button {
+                            viewModel.seedBedroomOfficeCombo(modelContext: modelContext)
+                        } label: {
+                            Label("Add Mock Bedroom", systemImage: "plus.square.dashed")
+                        }
+
+                        Button {
+                            viewModel.showingScanSheet = true
+                        } label: {
+                            Label("Scan Room", systemImage: "camera.viewfinder")
+                                .font(.headline)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.indigo)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.indigo)
                 }
             }
             .navigationDestination(for: AlcoveRoute.self) { route in
