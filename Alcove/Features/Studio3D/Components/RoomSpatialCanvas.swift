@@ -4,6 +4,7 @@ public struct RoomSpatialCanvas: View {
     @Bindable var room: Room
     let currentStage: StageType
     @Binding var selectedFurnitureID: UUID?
+    @Binding var selectedLightFixtureID: UUID?
     let beforeAfterSplit: Double
     let revealMode: HarmonyRevealMode
     let cameraState: SpatialViewportCameraState?
@@ -19,6 +20,7 @@ public struct RoomSpatialCanvas: View {
         room: Room,
         currentStage: StageType,
         selectedFurnitureID: Binding<UUID?>,
+        selectedLightFixtureID: Binding<UUID?> = .constant(nil),
         beforeAfterSplit: Double,
         revealMode: HarmonyRevealMode = .splitSlider,
         cameraState: SpatialViewportCameraState? = nil,
@@ -27,6 +29,7 @@ public struct RoomSpatialCanvas: View {
         self.room = room
         self.currentStage = currentStage
         self._selectedFurnitureID = selectedFurnitureID
+        self._selectedLightFixtureID = selectedLightFixtureID
         self.beforeAfterSplit = beforeAfterSplit
         self.revealMode = revealMode
         self.cameraState = cameraState
@@ -189,6 +192,7 @@ public struct RoomSpatialCanvas: View {
 
     @ViewBuilder
     private func lightFixtureView(_ fixture: LightFixture, center: CGPoint) -> some View {
+        let isSelected = selectedLightFixtureID == fixture.id
         let posX = center.x + (fixture.positionX * scale)
         let posZ = center.y + (fixture.positionZ * scale)
         let poolRadius = fixture.isOn ? (fixture.lumens / 12.0) : 0
@@ -207,16 +211,58 @@ public struct RoomSpatialCanvas: View {
                     .frame(width: poolRadius * 2, height: poolRadius * 2)
             }
 
+            if isSelected {
+                Circle()
+                    .strokeBorder(Color.white, lineWidth: 2.5)
+                    .frame(width: 32, height: 32)
+                    .background(Circle().fill(Color.orange.opacity(0.35)))
+            }
+
             Circle()
                 .fill(fixture.isOn ? Color.yellow : Color.gray)
-                .frame(width: 18, height: 18)
+                .frame(width: 22, height: 22)
                 .overlay(
                     Image(systemName: fixture.layer.icon)
-                        .font(.system(size: 9).bold())
+                        .font(.system(size: 11).bold())
                         .foregroundStyle(fixture.isOn ? .black : .white)
                 )
         }
         .position(x: posX, y: posZ)
+        .contentShape(Circle())
+        .onTapGesture {
+            if currentStage == .illumination {
+                selectedLightFixtureID = fixture.id
+                selectedFurnitureID = nil
+            }
+        }
+        .gesture(
+            currentStage == .illumination ? DragGesture()
+                .onChanged { value in
+                    selectedLightFixtureID = fixture.id
+                    selectedFurnitureID = nil
+
+                    let halfW = room.dimensionsWidth / 2.0
+                    let halfL = room.dimensionsLength / 2.0
+
+                    let startPos = dragInitialPositions[fixture.id] ?? (fixture.positionX, fixture.positionZ)
+                    if dragInitialPositions[fixture.id] == nil {
+                        dragInitialPositions[fixture.id] = startPos
+                    }
+
+                    let targetX = startPos.x + (value.translation.width / scale)
+                    let targetZ = startPos.z + (value.translation.height / scale)
+
+                    var fixtures = room.workingLayout?.lightFixtures ?? []
+                    if let idx = fixtures.firstIndex(where: { $0.id == fixture.id }) {
+                        fixtures[idx].positionX = max(-halfW, min(halfW, targetX))
+                        fixtures[idx].positionZ = max(-halfL, min(halfL, targetZ))
+                        room.workingLayout?.lightFixtures = fixtures
+                    }
+                }
+                .onEnded { _ in
+                    dragInitialPositions.removeValue(forKey: fixture.id)
+                } : nil
+        )
     }
 
     @ViewBuilder

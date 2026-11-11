@@ -255,4 +255,43 @@ struct Studio3DViewModelTests {
         vm.snapToViewport?(.dollhouse)
         #expect(snappedPreset == .dollhouse)
     }
+
+    @Test func lightFixtureSelectionMovementAndEditing() {
+        let room = SampleData.createStarterRoom()
+        let vm = Studio3DViewModel(room: room, stage: .rearrangement)
+
+        // Add an ambient ceiling light
+        vm.addLightFixture(name: "Pendant Light", layer: .ambient, positionX: 0.0, positionZ: 0.0, lumens: 800)
+        let addedFixture = vm.room.workingLayout?.lightFixtures.first { $0.name == "Pendant Light" }
+        #expect(addedFixture != nil)
+
+        // Select light fixture
+        vm.selectLightFixture(id: addedFixture?.id)
+        #expect(vm.selectedLightFixtureID == addedFixture?.id)
+        #expect(vm.selectedLightFixture?.name == "Pendant Light")
+
+        // Move light fixture
+        vm.moveSelectedLightFixture(deltaX: 0.5, deltaZ: -0.5)
+        #expect(vm.selectedLightFixture?.positionX == 0.5)
+        #expect(vm.selectedLightFixture?.positionZ == -0.5)
+
+        // Edit light properties (lumens and kelvin)
+        vm.updateLightProperties(id: addedFixture!.id, lumens: 1200, kelvin: 3500)
+        #expect(vm.selectedLightFixture?.lumens == 1200)
+        #expect(vm.selectedLightFixture?.colorTemperatureKelvin == 3500)
+
+        // Toggle power
+        vm.toggleLightFixture(id: addedFixture!.id)
+        #expect(vm.selectedLightFixture?.isOn == false)
+
+        // Remove fixture
+        vm.removeLightFixture(id: addedFixture!.id)
+        #expect(vm.selectedLightFixtureID == nil)
+        #expect(vm.room.workingLayout?.lightFixtures.contains { $0.name == "Pendant Light" } == false)
+
+        // AR Walkthrough placeholder
+        #expect(!vm.showingARPlaceholder)
+        vm.showingARPlaceholder = true
+        #expect(vm.showingARPlaceholder)
+    }
 }
