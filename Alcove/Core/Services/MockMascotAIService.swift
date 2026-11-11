@@ -89,6 +89,14 @@ public final class MockMascotAIService: MascotAIServiceProtocol {
                     let footprintRadiusSum = (a.width + a.length) / 4.0 + (b.width + b.length) / 4.0
                     let clearance = max(0.0, centerDist - footprintRadiusSum)
 
+                    let isLightingA = a.category == .lighting || a.name.localizedCaseInsensitiveContains("lamp") || a.name.localizedCaseInsensitiveContains("light") || a.name.localizedCaseInsensitiveContains("pendant") || a.name.localizedCaseInsensitiveContains("sconce")
+                    let isLightingB = b.category == .lighting || b.name.localizedCaseInsensitiveContains("lamp") || b.name.localizedCaseInsensitiveContains("light") || b.name.localizedCaseInsensitiveContains("pendant") || b.name.localizedCaseInsensitiveContains("sconce")
+                    let isSurfaceA = a.category == .table || a.category == .storage || a.name.localizedCaseInsensitiveContains("table") || a.name.localizedCaseInsensitiveContains("desk") || a.name.localizedCaseInsensitiveContains("nightstand")
+                    let isSurfaceB = b.category == .table || b.category == .storage || b.name.localizedCaseInsensitiveContains("table") || b.name.localizedCaseInsensitiveContains("desk") || b.name.localizedCaseInsensitiveContains("nightstand")
+
+                    let isLampOnSurface = (isLightingA && isSurfaceB) || (isLightingB && isSurfaceA)
+                    if isLampOnSurface { continue }
+
                     let isCompanionPair = (a.category == .bed && b.name.localizedCaseInsensitiveContains("nightstand")) ||
                                           (b.category == .bed && a.name.localizedCaseInsensitiveContains("nightstand")) ||
                                           (a.category == .table && b.category == .seating) ||
