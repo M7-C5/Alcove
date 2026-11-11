@@ -61,7 +61,7 @@ struct SpatialViewportCameraTests {
         // Top view: 89° bird's-eye
         #expect(ViewportPreset.top.targetYaw == 0.0)
         #expect(ViewportPreset.top.targetPitch == 1.55)
-        #expect(ViewportPreset.top.systemImage == "view.2d")
+        #expect(ViewportPreset.top.systemImage == "button.horizontal.top.press")
         #expect(ViewportPreset.top.title == "Top")
 
         // Left view: looking from West (-X)
