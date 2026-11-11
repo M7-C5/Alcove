@@ -168,8 +168,16 @@ public struct StageEvaluationSheet: View {
                             dismiss()
                         } label: {
                             HStack {
-                                Text(stage == .audit ? "Proceed to Rearrangement" : (result.canAdvance ? "Advance to Next Stage" : "Proceed Anyway (Advisory Override)"))
-                                Image(systemName: "arrow.right")
+                                if stage == .harmony {
+                                    Text("View in AR Walkthrough")
+                                    Image(systemName: "arkit")
+                                } else if stage == .audit {
+                                    Text("Proceed to Rearrangement")
+                                    Image(systemName: "arrow.right")
+                                } else {
+                                    Text(result.canAdvance ? "Advance to Next Stage" : "Proceed Anyway (Advisory Override)")
+                                    Image(systemName: "arrow.right")
+                                }
                             }
                             .font(.headline)
                             .frame(maxWidth: .infinity)
