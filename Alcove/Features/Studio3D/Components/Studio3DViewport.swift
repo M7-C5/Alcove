@@ -92,6 +92,7 @@ public struct Studio3DViewport: UIViewRepresentable {
     }
 
     public func updateUIView(_ arView: ARView, context: Context) {
+        context.coordinator.viewportSize = viewportSize
         context.coordinator.selectedFurnitureID = selectedFurnitureID
         context.coordinator.ghostFurnitureID = ghostFurnitureID
         context.coordinator.ghostFloorPosition = ghostFloorPosition
@@ -125,6 +126,7 @@ public struct Studio3DViewport: UIViewRepresentable {
     public final class Coordinator: NSObject, UIGestureRecognizerDelegate {
         weak var arView: ARView?
         var room: Room
+        var viewportSize: CGSize = .zero
         var selectedFurnitureID: UUID?
         var ghostFurnitureID: UUID?
         var ghostFloorPosition: SIMD3<Float>?
@@ -265,6 +267,9 @@ public struct Studio3DViewport: UIViewRepresentable {
                 distance * cosPitch * cos(yaw)
             )
             camera.look(at: cameraTarget, from: cameraTarget + offset, relativeTo: nil)
+            if currentStage == .harmony {
+                updateFurnitureEntities(from: room)
+            }
         }
 
         func updateWallCutaways() {
@@ -578,58 +583,22 @@ public struct Studio3DViewport: UIViewRepresentable {
 
             let baselineItems = room.baselineLayout?.furnitures ?? []
 
-            // If not in harmony mode or not in overlayDiff, disable ghost group if present
-            if let existingGhostGroup = root.children.first(where: { $0.name == "BaselineGhostGroup" }) {
-                existingGhostGroup.isEnabled = (currentStage == .harmony && revealMode == .overlayDiff)
+            // Manage Baseline Group for Stage 4 Split Comparison
+            var ghostGroup = root.children.first(where: { $0.name == "BaselineGhostGroup" })
+            if ghostGroup == nil {
+                let newGroup = Entity()
+                newGroup.name = "BaselineGhostGroup"
+                root.addChild(newGroup)
+                ghostGroup = newGroup
             }
 
-            if currentStage == .harmony && revealMode == .splitSlider {
-                let t = Float(max(0.0, min(1.0, beforeAfterSplit)))
+            if currentStage == .harmony {
+                ghostGroup?.isEnabled = true
 
-                for (index, item) in layout.furnitures.enumerated() {
-                    var entity = group.children.first(where: { $0.name == "Furniture_\(item.id.uuidString)" })
-                    if entity == nil {
-                        let newEntity = buildFurnitureEntity(for: item)
-                        group.addChild(newEntity)
-                        entity = newEntity
-                    }
-                    guard let entity else { continue }
+                let screenWidth = Float(arView?.bounds.width ?? (viewportSize.width > 0 ? viewportSize.width : 1024))
+                let splitScreenX = screenWidth * Float(max(0.01, min(0.99, beforeAfterSplit)))
 
-                    let baselineItem: Furniture? = {
-                        if index < baselineItems.count && baselineItems[index].name == item.name {
-                            return baselineItems[index]
-                        }
-                        return baselineItems.first { $0.name == item.name && $0.category == item.category }
-                    }()
-
-                    applyGhostAppearance(to: entity, isGhost: false)
-
-                    if let base = baselineItem {
-                        let posX = Float(base.positionX) * (1.0 - t) + Float(item.positionX) * t
-                        let posY = Float(base.positionY) * (1.0 - t) + Float(item.positionY) * t
-                        let posZ = Float(base.positionZ) * (1.0 - t) + Float(item.positionZ) * t
-                        entity.position = SIMD3<Float>(posX, posY, posZ)
-
-                        let yaw = Float(base.rotationYaw) * (1.0 - t) + Float(item.rotationYaw) * t
-                        entity.orientation = simd_quatf(angle: yaw, axis: SIMD3<Float>(0, 1, 0))
-
-                        if item.isArchived {
-                            let scale = max(0.001, 1.0 - t)
-                            entity.scale = SIMD3<Float>(scale, scale, scale)
-                            entity.isEnabled = t < 0.95
-                        } else {
-                            entity.scale = SIMD3<Float>(1, 1, 1)
-                            entity.isEnabled = true
-                        }
-                    } else {
-                        entity.position = SIMD3<Float>(Float(item.positionX), Float(item.positionY), Float(item.positionZ))
-                        entity.orientation = simd_quatf(angle: Float(item.rotationYaw), axis: SIMD3<Float>(0, 1, 0))
-                        entity.scale = SIMD3<Float>(1, 1, 1)
-                        entity.isEnabled = !item.isArchived
-                    }
-                }
-            } else if currentStage == .harmony && revealMode == .overlayDiff {
-                // Working layout active
+                // 1. Working Layout Entities (After side -> Visible to the RIGHT of splitScreenX)
                 for item in layout.furnitures {
                     var entity = group.children.first(where: { $0.name == "Furniture_\(item.id.uuidString)" })
                     if entity == nil {
@@ -638,23 +607,23 @@ public struct Studio3DViewport: UIViewRepresentable {
                         entity = newEntity
                     }
                     guard let entity else { continue }
-                    applyGhostAppearance(to: entity, isGhost: false)
+
                     entity.position = SIMD3<Float>(Float(item.positionX), Float(item.positionY), Float(item.positionZ))
                     entity.orientation = simd_quatf(angle: Float(item.rotationYaw), axis: SIMD3<Float>(0, 1, 0))
                     entity.scale = SIMD3<Float>(1, 1, 1)
-                    entity.isEnabled = !item.isArchived
+                    applyGhostAppearance(to: entity, isGhost: false)
+
+                    if item.isArchived {
+                        entity.isEnabled = false
+                    } else if let arView = arView, let screenPos = arView.project(entity.position) {
+                        entity.isEnabled = Float(screenPos.x) >= splitScreenX
+                    } else {
+                        entity.isEnabled = true
+                    }
                 }
 
-                // Baseline ghost group
-                var ghostGroup = root.children.first(where: { $0.name == "BaselineGhostGroup" })
-                if ghostGroup == nil {
-                    let newGroup = Entity()
-                    newGroup.name = "BaselineGhostGroup"
-                    root.addChild(newGroup)
-                    ghostGroup = newGroup
-                }
+                // 2. Baseline Layout Entities (Before side -> Visible to the LEFT of splitScreenX)
                 if let ghostGroup {
-                    ghostGroup.isEnabled = true
                     for baseItem in baselineItems {
                         var ghostEntity = ghostGroup.children.first(where: { $0.name == "Ghost_\(baseItem.id.uuidString)" })
                         if ghostEntity == nil {
@@ -663,16 +632,24 @@ public struct Studio3DViewport: UIViewRepresentable {
                             ghostGroup.addChild(newEntity)
                             ghostEntity = newEntity
                         }
-                        if let ghostEntity {
-                            ghostEntity.position = SIMD3<Float>(Float(baseItem.positionX), Float(baseItem.positionY), Float(baseItem.positionZ))
-                            ghostEntity.orientation = simd_quatf(angle: Float(baseItem.rotationYaw), axis: SIMD3<Float>(0, 1, 0))
+                        guard let ghostEntity else { continue }
+
+                        ghostEntity.position = SIMD3<Float>(Float(baseItem.positionX), Float(baseItem.positionY), Float(baseItem.positionZ))
+                        ghostEntity.orientation = simd_quatf(angle: Float(baseItem.rotationYaw), axis: SIMD3<Float>(0, 1, 0))
+                        ghostEntity.scale = SIMD3<Float>(1, 1, 1)
+                        applyGhostAppearance(to: ghostEntity, isGhost: false)
+
+                        if baseItem.isArchived {
+                            ghostEntity.isEnabled = false
+                        } else if let arView = arView, let screenPos = arView.project(ghostEntity.position) {
+                            ghostEntity.isEnabled = Float(screenPos.x) <= splitScreenX
+                        } else {
                             ghostEntity.isEnabled = true
-                            applyGhostAppearance(to: ghostEntity, isGhost: true)
                         }
                     }
                 }
             } else {
-                // Standard mode (Audit, Rearrangement, Illumination)
+                ghostGroup?.isEnabled = false
                 for item in layout.furnitures {
                     var entity = group.children.first(where: { $0.name == "Furniture_\(item.id.uuidString)" })
                     if entity == nil {

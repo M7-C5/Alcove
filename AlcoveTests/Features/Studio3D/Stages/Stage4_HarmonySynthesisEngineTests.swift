@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 import Testing
 @testable import Alcove
 
@@ -93,5 +94,19 @@ struct HarmonySynthesisEngineTests {
         vm.completeHarmonyCurriculum()
         #expect(room.isCompleted(.harmony) == true)
         #expect(vm.mascotEmotion == .celebrating)
+    }
+
+    @Test func splitCurtainDividerProperties() {
+        var split = 0.5
+        let binding = Binding(get: { split }, set: { split = $0 })
+        let divider = SplitCurtainDividerView(
+            splitFraction: binding,
+            totalWidth: 1024,
+            totalHeight: 768
+        )
+
+        #expect(divider.totalWidth == 1024)
+        #expect(divider.totalHeight == 768)
+        #expect(divider.splitFraction == 0.5)
     }
 }
