@@ -19,8 +19,8 @@ public struct StudioBottomHUD: View {
     }
 
     public var body: some View {
-        HStack(alignment: .bottom, spacing: 16) {
-            // Mascot Control Button with Menu
+        HStack(alignment: .center, spacing: 12) {
+            // Mascot Control Button with Menu (44x44 hit target)
             Menu {
                 Button {
                     onTriggerEvaluation()
@@ -34,84 +34,80 @@ public struct StudioBottomHUD: View {
                     Label("Ask Mascot (Design Chat)", systemImage: "bubble.left.and.bubble.right.fill")
                 }
             } label: {
-                VStack(spacing: 4) {
+                ZStack {
+                    Circle()
+                        .fill(Color.indigo.gradient)
                     Text(mascotEmotion.emoji)
-                        .font(.system(size: 38))
-                    Text("Mascot")
-                        .font(.caption2.bold())
-                        .foregroundStyle(.white)
+                        .font(.system(size: 24))
                 }
-                .frame(width: 72, height: 72)
-                .background(Circle().fill(Color.indigo.gradient))
-                .shadow(color: .indigo.opacity(0.4), radius: 8, x: 0, y: 4)
+                .frame(width: 44, height: 44)
+                .shadow(color: .indigo.opacity(0.3), radius: 6, x: 0, y: 2)
             }
 
-            // Visual Novel Dialogue Box
-            HStack(spacing: 16) {
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 8) {
-                        Text("ALCOVE COMPANION")
-                            .font(.caption2.bold())
-                            .foregroundStyle(.indigo)
-                            .tracking(1.2)
-
-                        Spacer()
-
-                        Button {
-                            onOpenChat()
-                        } label: {
-                            Label("Chat", systemImage: "message.fill")
-                                .font(.caption.bold())
-                                .foregroundStyle(.indigo)
-                                .frame(minHeight: 44)
-                                .contentShape(Rectangle())
-                        }
-                    }
-
-                    if let attributed = try? AttributedString(markdown: mascotMessage, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)) {
-                        Text(attributed)
-                            .font(.subheadline)
-                            .foregroundStyle(.primary)
-                            .lineLimit(3)
-                            .minimumScaleFactor(0.85)
-                            .animation(.easeInOut, value: mascotMessage)
-                    } else {
-                        Text(mascotMessage)
-                            .font(.subheadline)
-                            .foregroundStyle(.primary)
-                            .lineLimit(3)
-                            .minimumScaleFactor(0.85)
-                            .animation(.easeInOut, value: mascotMessage)
-                    }
-                }
-
-                Divider()
-
-                // Proceed Button
-                Button {
-                    onTriggerEvaluation()
-                } label: {
-                    VStack(spacing: 2) {
-                        Image(systemName: "arrow.right.circle.fill")
-                            .font(.title2)
-                        Text("Proceed")
-                            .font(.caption2.bold())
-                    }
+            // Compact Visual Novel Dialogue Box
+            VStack(alignment: .leading, spacing: 2) {
+                Text("ALCOVE COMPANION")
+                    .font(.caption2.bold())
                     .foregroundStyle(.indigo)
-                    .frame(width: 58)
-                    .frame(minHeight: 48)
-                    .contentShape(Rectangle())
+                    .tracking(1.0)
+
+                if let attributed = try? AttributedString(markdown: mascotMessage, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)) {
+                    Text(attributed)
+                        .font(.footnote)
+                        .foregroundStyle(.primary)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.85)
+                        .animation(.easeInOut, value: mascotMessage)
+                } else {
+                    Text(mascotMessage)
+                        .font(.footnote)
+                        .foregroundStyle(.primary)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.85)
+                        .animation(.easeInOut, value: mascotMessage)
                 }
             }
-            .padding(16)
-            .background(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(.regularMaterial)
-                    .shadow(color: .black.opacity(0.08), radius: 10, x: 0, y: 4)
-            )
-            .frame(maxWidth: 640)
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            // Chat Action Button (44x44 target)
+            Button {
+                onOpenChat()
+            } label: {
+                Image(systemName: "message.fill")
+                    .font(.subheadline)
+                    .foregroundStyle(.indigo)
+                    .frame(width: 44, height: 44)
+                    .background(Circle().fill(Color.indigo.opacity(0.12)))
+            }
+            .contentShape(Rectangle())
+
+            // Proceed Action Button (44x44 target)
+            Button {
+                onTriggerEvaluation()
+            } label: {
+                HStack(spacing: 4) {
+                    Text("Proceed")
+                        .font(.caption.bold())
+                    Image(systemName: "arrow.right.circle.fill")
+                        .font(.subheadline)
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 12)
+                .frame(height: 36)
+                .background(Capsule().fill(Color.indigo.gradient))
+            }
+            .frame(minWidth: 44, minHeight: 44)
+            .contentShape(Rectangle())
         }
-        .padding(.leading, 24)
-        .padding(.bottom, 24)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(.regularMaterial)
+                .shadow(color: .black.opacity(0.10), radius: 10, x: 0, y: 4)
+        )
+        .frame(maxWidth: 560)
+        .padding(.leading, 20)
+        .padding(.bottom, 12)
     }
 }

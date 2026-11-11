@@ -2,12 +2,10 @@ import Foundation
 
 /// Active LLM provider selection
 public enum LLMProvider: String, CaseIterable, Codable, Sendable {
-    case gemini = "Gemini (Free Tier)"
-    case claude = "Claude 3.5 Sonnet"
-    case openai = "GPT-4o"
+    case gemini = "Google Gemini"
 }
 
-/// Production AI service that connects to Gemini / Claude / GPT-4o with offline fallback
+/// Production AI service that connects to Google Gemini with offline fallback
 @MainActor
 public final class LLMMascotAIService: MascotAIServiceProtocol {
     private let fallbackService = MockMascotAIService()
@@ -59,12 +57,6 @@ public final class LLMMascotAIService: MascotAIServiceProtocol {
         }
 
         if let envKey = ProcessInfo.processInfo.environment["GEMINI_API_KEY"], !envKey.isEmpty {
-            rawSources.append(envKey)
-        }
-        if let envKey = ProcessInfo.processInfo.environment["ANTHROPIC_API_KEY"], !envKey.isEmpty {
-            rawSources.append(envKey)
-        }
-        if let envKey = ProcessInfo.processInfo.environment["OPENAI_API_KEY"], !envKey.isEmpty {
             rawSources.append(envKey)
         }
         if let userKey = UserDefaults.standard.string(forKey: "alcove_llm_api_key"), !userKey.isEmpty {
@@ -146,15 +138,7 @@ public final class LLMMascotAIService: MascotAIServiceProtocol {
             }
             """
 
-            let rawJson: String
-            switch provider {
-            case .gemini:
-                rawJson = try await callGeminiAPI(question: evaluationPrompt, context: spatialContext)
-            case .claude:
-                rawJson = try await callClaudeAPI(question: evaluationPrompt, context: spatialContext)
-            case .openai:
-                rawJson = try await callOpenAIAPI(question: evaluationPrompt, context: spatialContext)
-            }
+            let rawJson = try await callGeminiAPI(question: evaluationPrompt, context: spatialContext)
 
             // Clean potential markdown fencing ```json ... ```
             let cleaned = rawJson
@@ -244,17 +228,7 @@ public final class LLMMascotAIService: MascotAIServiceProtocol {
         // Cloud LLM invocation with live spatial context
         do {
             let spatialContext = contextSerializer.serialize(room: room, stage: currentStage)
-            let answer: String
-            switch provider {
-            case .gemini:
-                answer = try await callGeminiAPI(question: question, context: spatialContext)
-            case .claude:
-                answer = try await callClaudeAPI(question: question, context: spatialContext)
-                print("✅ [Alcove AI] Claude 3.5 Sonnet answered successfully!")
-            case .openai:
-                answer = try await callOpenAIAPI(question: question, context: spatialContext)
-                print("✅ [Alcove AI] GPT-4o answered successfully!")
-            }
+            let answer = try await callGeminiAPI(question: question, context: spatialContext)
             self.isQuotaExhausted = false
             return answer
         } catch {
@@ -356,90 +330,5 @@ public final class LLMMascotAIService: MascotAIServiceProtocol {
         }
 
         throw lastError ?? NSError(domain: "GeminiAPI", code: 429, userInfo: [NSLocalizedDescriptionKey: "All Gemini free models and keys currently exhausted. Please try again in a little while."])
-    }
-
-    // MARK: - Anthropic Claude API Call
-    private func callClaudeAPI(question: String, context: String) async throws -> String {
-        guard let url = URL(string: "https://api.anthropic.com/v1/messages") else {
-            throw URLError(.badURL)
-        }
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.addValue(apiKey, forHTTPHeaderField: "x-api-key")
-        request.addValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
-
-        let body: [String: Any] = [
-            "model": "claude-3-5-sonnet-20241022",
-            "max_tokens": 600,
-            "system": DesignKnowledgeSystemPrompt.prompt,
-            "messages": [
-                [
-                    "role": "user",
-                    "content": "\(context)\n\nUser Question: \(question)"
-                ]
-            ]
-        ]
-
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
-        let (data, response) = try await URLSession.shared.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
-            let errString = String(data: data, encoding: .utf8) ?? "Unknown server response"
-            throw NSError(domain: "ClaudeAPI", code: (response as? HTTPURLResponse)?.statusCode ?? 500, userInfo: [NSLocalizedDescriptionKey: errString])
-        }
-
-        if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-           let content = json["content"] as? [[String: Any]],
-           let firstText = content.first?["text"] as? String {
-            return firstText.trimmingCharacters(in: .whitespacesAndNewlines)
-        }
-
-        throw NSError(domain: "ClaudeAPI", code: 500, userInfo: [NSLocalizedDescriptionKey: "Invalid JSON response structure"])
-    }
-
-    // MARK: - OpenAI GPT-4o API Call
-    private func callOpenAIAPI(question: String, context: String) async throws -> String {
-        guard let url = URL(string: "https://api.openai.com/v1/chat/completions") else {
-            throw URLError(.badURL)
-        }
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.addValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-
-        let body: [String: Any] = [
-            "model": "gpt-4o",
-            "max_tokens": 600,
-            "messages": [
-                [
-                    "role": "system",
-                    "content": DesignKnowledgeSystemPrompt.prompt
-                ],
-                [
-                    "role": "user",
-                    "content": "\(context)\n\nUser Question: \(question)"
-                ]
-            ]
-        ]
-
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
-        let (data, response) = try await URLSession.shared.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
-            let errString = String(data: data, encoding: .utf8) ?? "Unknown server response"
-            throw NSError(domain: "OpenAIAPI", code: (response as? HTTPURLResponse)?.statusCode ?? 500, userInfo: [NSLocalizedDescriptionKey: errString])
-        }
-
-        if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-           let choices = json["choices"] as? [[String: Any]],
-           let message = choices.first?["message"] as? [String: Any],
-           let content = message["content"] as? String {
-            return content.trimmingCharacters(in: .whitespacesAndNewlines)
-        }
-
-        throw NSError(domain: "OpenAIAPI", code: 500, userInfo: [NSLocalizedDescriptionKey: "Invalid OpenAI JSON response structure"])
     }
 }
