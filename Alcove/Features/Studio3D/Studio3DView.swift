@@ -25,6 +25,19 @@ public struct Studio3DView: View {
     }
 
     public var body: some View {
+        Group {
+            if viewModel.currentStage == .illumination {
+                LightingWorkspaceView(room: room, settings: $viewModel.lightingSettings) {
+                    if let router, !router.isEmpty { router.pop() }
+                    else { dismiss() }
+                }
+            } else {
+                furnitureStudio
+            }
+        }
+    }
+
+    @ViewBuilder private var furnitureStudio: some View {
         @Bindable var bindableVM = viewModel
 
         GeometryReader { geometry in
@@ -277,6 +290,24 @@ public struct Studio3DView: View {
         }
         .ignoresSafeArea()
         .navigationBarBackButtonHidden(true)
+        .sheet(isPresented: $viewModel.showingChatDrawer) {
+            MascotChatDrawer(
+                mascotService: viewModel.mascotService,
+                feedbackService: viewModel.feedbackService,
+                currentStage: viewModel.currentStage,
+                room: room
+            )
+        }
+        .sheet(isPresented: $viewModel.showingEvaluationSheet) {
+            if let result = viewModel.evaluationResult {
+                StageEvaluationSheet(
+                    result: result,
+                    stage: viewModel.currentStage,
+                    onProceedAnyway: { viewModel.advanceToNextStage(result: result) },
+                    onKeepRefining: {}
+                )
+            }
+        }
         .fullScreenCover(isPresented: $isARWalkthroughPresented) {
             ARWalkthroughView(room: room)
         }

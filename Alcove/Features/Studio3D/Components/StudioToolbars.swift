@@ -11,7 +11,8 @@ public struct StudioToolbars: View {
     let harmonyMetrics: HarmonyComparisonMetrics?
     let onRotate: (Double) -> Void
     let onToggleArchive: () -> Void
-    let onAddFixture: (String, LightLayer) -> Void
+    let onOpenLightingSetup: () -> Void
+    let onOpenLightingSimulation: () -> Void
 
     public init(
         currentStage: StageType,
@@ -24,7 +25,8 @@ public struct StudioToolbars: View {
         harmonyMetrics: HarmonyComparisonMetrics? = nil,
         onRotate: @escaping (Double) -> Void,
         onToggleArchive: @escaping () -> Void,
-        onAddFixture: @escaping (String, LightLayer) -> Void = { _, _ in }
+        onOpenLightingSetup: @escaping () -> Void = {},
+        onOpenLightingSimulation: @escaping () -> Void = {}
     ) {
         self.currentStage = currentStage
         self.selectedFurniture = selectedFurniture
@@ -36,7 +38,8 @@ public struct StudioToolbars: View {
         self.harmonyMetrics = harmonyMetrics
         self.onRotate = onRotate
         self.onToggleArchive = onToggleArchive
-        self.onAddFixture = onAddFixture
+        self.onOpenLightingSetup = onOpenLightingSetup
+        self.onOpenLightingSimulation = onOpenLightingSimulation
     }
 
     public var body: some View {
@@ -58,13 +61,15 @@ public struct StudioToolbars: View {
                     Image(systemName: preset.icon)
                         .font(.caption2.bold())
                         .padding(6)
+                        .frame(minWidth: 44, minHeight: 44)
                         .background(
                             Circle()
-                                .fill(cameraPreset == preset ? Color.indigo : Color.secondary.opacity(0.18))
+                                .fill(cameraPreset == preset ? Color.accentColor.opacity(0.2) : Color.secondary.opacity(0.18))
                         )
-                        .foregroundStyle(cameraPreset == preset ? .white : .primary)
+                        .foregroundStyle(cameraPreset == preset ? Color.accentColor : Color.primary)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(preset.title)
             }
         }
         .padding(8)
@@ -122,13 +127,15 @@ public struct StudioToolbars: View {
 
         case .illumination:
             VStack(alignment: .leading, spacing: 10) {
-                Label("Daylight Hour: \(String(format: "%.0f:00", daylightHour))", systemImage: "sun.max.fill")
+                Label("Daylight: \(String(format: "%02d:%02d", Int(daylightHour), Int((daylightHour * 60).rounded()) % 60))", systemImage: "sun.max.fill")
                     .font(.caption.bold())
                     .foregroundStyle(.orange)
 
-                Slider(value: $daylightHour, in: 8.0...20.0, step: 1.0)
+                Slider(value: $daylightHour, in: 0...(23 + 59.0 / 60), step: 1.0 / 60)
                     .tint(.orange)
                     .frame(width: 200)
+                    .frame(minHeight: 44)
+                    .accessibilityLabel("Daylight hour")
 
                 Divider()
 
@@ -148,19 +155,18 @@ public struct StudioToolbars: View {
                     }
                 }
 
-                HStack(spacing: 8) {
-                    Button("+ Ambient") {
-                        onAddFixture("Ceiling Light", .ambient)
+                VStack(alignment: .leading, spacing: 8) {
+                    Button(action: onOpenLightingSetup) {
+                        Label("Add Lighting", systemImage: "plus.circle").frame(minHeight: 44)
                     }
                     .buttonStyle(.bordered)
-                    .font(.caption2)
 
-                    Button("+ Task Lamp") {
-                        onAddFixture("Desk Lamp", .task)
+                    Button(action: onOpenLightingSimulation) {
+                        Label("Lighting Simulation", systemImage: "sun.max").frame(minHeight: 44)
                     }
                     .buttonStyle(.bordered)
-                    .font(.caption2)
                 }
+                .font(.subheadline)
             }
             .padding(14)
             .background(RoundedRectangle(cornerRadius: 14).fill(.regularMaterial))

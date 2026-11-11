@@ -31,18 +31,18 @@ public struct IlluminationSimulationEngine: Sendable {
 
     public init() {}
 
-    /// Calculates natural daylight parameters based on hour of day (8.0 AM to 8.0 PM).
+    /// Illustrative solar arc, with darkness outside 08:00–20:00; not a geographic prediction.
     public func calculateDaylight(hourOfDay: Double) -> DaylightState {
-        let clampedHour = max(8.0, min(20.0, hourOfDay))
+        let clampedHour = hourOfDay.isFinite ? max(0, min(23 + 59.0 / 60, hourOfDay)) : 12
 
         // Solar arc: 8:00 (0 rad) -> 14:00 (peak pi/2 rad) -> 20:00 (0 rad)
-        let normalizedProgress = (clampedHour - 8.0) / 12.0 // 0.0 ... 1.0
+        let normalizedProgress = max(0, min(1, (clampedHour - 8.0) / 12.0))
         let elevation = sin(normalizedProgress * .pi) * (.pi / 2.5) // Peak ~72° at 14:00
         let azimuth = (normalizedProgress - 0.5) * .pi // -90° (East) to +90° (West)
 
         // Sunlight intensity (lux)
         let peakLux = 10000.0
-        let intensityLux = max(500.0, peakLux * sin(normalizedProgress * .pi))
+        let intensityLux = clampedHour > 8 && clampedHour < 20 ? peakLux * sin(normalizedProgress * .pi) : 0
 
         // Color temperature in Kelvin: 2500K (golden hour) -> 5800K (midday) -> 2400K (dusk)
         let middayFactor = sin(normalizedProgress * .pi)
