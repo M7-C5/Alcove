@@ -53,4 +53,45 @@ struct HarmonySynthesisEngineTests {
             #expect(!mode.icon.isEmpty)
         }
     }
+
+    @Test func tightestWalkwayCalculation() {
+        let engine = HarmonySynthesisEngine()
+        let room = SampleData.createStarterRoom()
+
+        let metrics = engine.synthesizeHarmony(room: room)
+
+        #expect(metrics.baselineTightestWalkwayMeters >= 0.20)
+        #expect(metrics.workingTightestWalkwayMeters >= 0.20)
+        #expect(metrics.baselineTightestWalkwayMeters <= 2.50)
+        #expect(metrics.workingTightestWalkwayMeters <= 2.50)
+    }
+
+    @Test func studio3DViewModelHarmonyTourAndScorecard() async {
+        let room = SampleData.createStarterRoom()
+        let vm = Studio3DViewModel(room: room, stage: .harmony)
+
+        #expect(vm.currentStage == .harmony)
+        #expect(vm.showingScorecardSheet == false)
+        #expect(vm.isTouringCinematicWalkthrough == false)
+
+        vm.openScorecardSheet()
+        #expect(vm.showingScorecardSheet == true)
+
+        var lastPreset: ViewportPreset?
+        vm.snapToViewport = { preset in
+            lastPreset = preset
+        }
+
+        vm.startCinematicWalkthroughTour()
+        #expect(vm.isTouringCinematicWalkthrough == true)
+        #expect(lastPreset == .dollhouse)
+
+        vm.stopCinematicWalkthroughTour()
+        #expect(vm.isTouringCinematicWalkthrough == false)
+        #expect(lastPreset == .dollhouse)
+
+        vm.completeHarmonyCurriculum()
+        #expect(room.isCompleted(.harmony) == true)
+        #expect(vm.mascotEmotion == .celebrating)
+    }
 }

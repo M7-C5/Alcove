@@ -14,6 +14,9 @@ public struct Studio3DViewport: UIViewRepresentable {
     public var viewportSize: CGSize = .zero
     public var ghostFurnitureID: UUID? = nil
     public var ghostFloorPosition: SIMD3<Float>? = nil
+    public var currentStage: StageType = .rearrangement
+    public var beforeAfterSplit: Double = 1.0
+    public var revealMode: HarmonyRevealMode = .splitSlider
     public typealias FloorRaycaster = (CGPoint) -> SIMD3<Float>?
     public typealias ViewportSnapper = (ViewportPreset) -> Void
     public var onFurnitureMoved: ((FurnitureMoveEvent) -> Void)? = nil
@@ -28,6 +31,9 @@ public struct Studio3DViewport: UIViewRepresentable {
         viewportSize: CGSize = .zero,
         ghostFurnitureID: UUID? = nil,
         ghostFloorPosition: SIMD3<Float>? = nil,
+        currentStage: StageType = .rearrangement,
+        beforeAfterSplit: Double = 1.0,
+        revealMode: HarmonyRevealMode = .splitSlider,
         onFurnitureMoved: ((FurnitureMoveEvent) -> Void)? = nil,
         onFloorRaycasterResolved: ((@escaping FloorRaycaster) -> Void)? = nil,
         onSnapToViewportResolved: ((@escaping ViewportSnapper) -> Void)? = nil,
@@ -39,6 +45,9 @@ public struct Studio3DViewport: UIViewRepresentable {
         self.viewportSize = viewportSize
         self.ghostFurnitureID = ghostFurnitureID
         self.ghostFloorPosition = ghostFloorPosition
+        self.currentStage = currentStage
+        self.beforeAfterSplit = beforeAfterSplit
+        self.revealMode = revealMode
         self.onFurnitureMoved = onFurnitureMoved
         self.onFloorRaycasterResolved = onFloorRaycasterResolved
         self.onSnapToViewportResolved = onSnapToViewportResolved
@@ -86,6 +95,9 @@ public struct Studio3DViewport: UIViewRepresentable {
         context.coordinator.selectedFurnitureID = selectedFurnitureID
         context.coordinator.ghostFurnitureID = ghostFurnitureID
         context.coordinator.ghostFloorPosition = ghostFloorPosition
+        context.coordinator.currentStage = currentStage
+        context.coordinator.beforeAfterSplit = beforeAfterSplit
+        context.coordinator.revealMode = revealMode
         context.coordinator.updateFurnitureEntities(from: room)
         context.coordinator.updateSelectionHalos()
         context.coordinator.updateSelectedProjection()
@@ -116,6 +128,9 @@ public struct Studio3DViewport: UIViewRepresentable {
         var selectedFurnitureID: UUID?
         var ghostFurnitureID: UUID?
         var ghostFloorPosition: SIMD3<Float>?
+        var currentStage: StageType = .rearrangement
+        var beforeAfterSplit: Double = 1.0
+        var revealMode: HarmonyRevealMode = .splitSlider
         var onSelectFurniture: ((UUID?) -> Void)?
         var onProjectSelectedFurniture: ((CGPoint?) -> Void)?
         var onFurnitureMoved: ((FurnitureMoveEvent) -> Void)?
@@ -561,33 +576,132 @@ public struct Studio3DViewport: UIViewRepresentable {
             let layout = room.workingLayout ?? room.baselineLayout
             guard let layout else { return }
 
-            for item in layout.furnitures {
-                var entity = group.children.first(where: { $0.name == "Furniture_\(item.id.uuidString)" })
-                if entity == nil {
-                    let newEntity = buildFurnitureEntity(for: item)
-                    newEntity.isEnabled = !item.isArchived
-                    group.addChild(newEntity)
-                    entity = newEntity
-                }
-                guard let entity else { continue }
+            let baselineItems = room.baselineLayout?.furnitures ?? []
 
-                let isGhost = (item.id == ghostFurnitureID && ghostFloorPosition != nil)
+            // If not in harmony mode or not in overlayDiff, disable ghost group if present
+            if let existingGhostGroup = root.children.first(where: { $0.name == "BaselineGhostGroup" }) {
+                existingGhostGroup.isEnabled = (currentStage == .harmony && revealMode == .overlayDiff)
+            }
 
-                if isGhost, let pos = ghostFloorPosition {
-                    entity.isEnabled = true
-                    entity.position = pos
-                    entity.orientation = simd_quatf(angle: Float(item.rotationYaw), axis: SIMD3<Float>(0, 1, 0))
-                    applyGhostAppearance(to: entity, isGhost: true)
-                } else {
+            if currentStage == .harmony && revealMode == .splitSlider {
+                let t = Float(max(0.0, min(1.0, beforeAfterSplit)))
+
+                for (index, item) in layout.furnitures.enumerated() {
+                    var entity = group.children.first(where: { $0.name == "Furniture_\(item.id.uuidString)" })
+                    if entity == nil {
+                        let newEntity = buildFurnitureEntity(for: item)
+                        group.addChild(newEntity)
+                        entity = newEntity
+                    }
+                    guard let entity else { continue }
+
+                    let baselineItem: Furniture? = {
+                        if index < baselineItems.count && baselineItems[index].name == item.name {
+                            return baselineItems[index]
+                        }
+                        return baselineItems.first { $0.name == item.name && $0.category == item.category }
+                    }()
+
                     applyGhostAppearance(to: entity, isGhost: false)
-                    entity.isEnabled = !item.isArchived
 
-                    // Do not override translation if currently actively dragging
-                    if case .translating(let id, _, _) = dragMode, id == item.id {
-                        // Keep dragged position
+                    if let base = baselineItem {
+                        let posX = Float(base.positionX) * (1.0 - t) + Float(item.positionX) * t
+                        let posY = Float(base.positionY) * (1.0 - t) + Float(item.positionY) * t
+                        let posZ = Float(base.positionZ) * (1.0 - t) + Float(item.positionZ) * t
+                        entity.position = SIMD3<Float>(posX, posY, posZ)
+
+                        let yaw = Float(base.rotationYaw) * (1.0 - t) + Float(item.rotationYaw) * t
+                        entity.orientation = simd_quatf(angle: yaw, axis: SIMD3<Float>(0, 1, 0))
+
+                        if item.isArchived {
+                            let scale = max(0.001, 1.0 - t)
+                            entity.scale = SIMD3<Float>(scale, scale, scale)
+                            entity.isEnabled = t < 0.95
+                        } else {
+                            entity.scale = SIMD3<Float>(1, 1, 1)
+                            entity.isEnabled = true
+                        }
                     } else {
                         entity.position = SIMD3<Float>(Float(item.positionX), Float(item.positionY), Float(item.positionZ))
                         entity.orientation = simd_quatf(angle: Float(item.rotationYaw), axis: SIMD3<Float>(0, 1, 0))
+                        entity.scale = SIMD3<Float>(1, 1, 1)
+                        entity.isEnabled = !item.isArchived
+                    }
+                }
+            } else if currentStage == .harmony && revealMode == .overlayDiff {
+                // Working layout active
+                for item in layout.furnitures {
+                    var entity = group.children.first(where: { $0.name == "Furniture_\(item.id.uuidString)" })
+                    if entity == nil {
+                        let newEntity = buildFurnitureEntity(for: item)
+                        group.addChild(newEntity)
+                        entity = newEntity
+                    }
+                    guard let entity else { continue }
+                    applyGhostAppearance(to: entity, isGhost: false)
+                    entity.position = SIMD3<Float>(Float(item.positionX), Float(item.positionY), Float(item.positionZ))
+                    entity.orientation = simd_quatf(angle: Float(item.rotationYaw), axis: SIMD3<Float>(0, 1, 0))
+                    entity.scale = SIMD3<Float>(1, 1, 1)
+                    entity.isEnabled = !item.isArchived
+                }
+
+                // Baseline ghost group
+                var ghostGroup = root.children.first(where: { $0.name == "BaselineGhostGroup" })
+                if ghostGroup == nil {
+                    let newGroup = Entity()
+                    newGroup.name = "BaselineGhostGroup"
+                    root.addChild(newGroup)
+                    ghostGroup = newGroup
+                }
+                if let ghostGroup {
+                    ghostGroup.isEnabled = true
+                    for baseItem in baselineItems {
+                        var ghostEntity = ghostGroup.children.first(where: { $0.name == "Ghost_\(baseItem.id.uuidString)" })
+                        if ghostEntity == nil {
+                            let newEntity = buildFurnitureEntity(for: baseItem)
+                            newEntity.name = "Ghost_\(baseItem.id.uuidString)"
+                            ghostGroup.addChild(newEntity)
+                            ghostEntity = newEntity
+                        }
+                        if let ghostEntity {
+                            ghostEntity.position = SIMD3<Float>(Float(baseItem.positionX), Float(baseItem.positionY), Float(baseItem.positionZ))
+                            ghostEntity.orientation = simd_quatf(angle: Float(baseItem.rotationYaw), axis: SIMD3<Float>(0, 1, 0))
+                            ghostEntity.isEnabled = true
+                            applyGhostAppearance(to: ghostEntity, isGhost: true)
+                        }
+                    }
+                }
+            } else {
+                // Standard mode (Audit, Rearrangement, Illumination)
+                for item in layout.furnitures {
+                    var entity = group.children.first(where: { $0.name == "Furniture_\(item.id.uuidString)" })
+                    if entity == nil {
+                        let newEntity = buildFurnitureEntity(for: item)
+                        newEntity.isEnabled = !item.isArchived
+                        group.addChild(newEntity)
+                        entity = newEntity
+                    }
+                    guard let entity else { continue }
+
+                    entity.scale = SIMD3<Float>(1, 1, 1)
+                    let isGhost = (item.id == ghostFurnitureID && ghostFloorPosition != nil)
+
+                    if isGhost, let pos = ghostFloorPosition {
+                        entity.isEnabled = true
+                        entity.position = pos
+                        entity.orientation = simd_quatf(angle: Float(item.rotationYaw), axis: SIMD3<Float>(0, 1, 0))
+                        applyGhostAppearance(to: entity, isGhost: true)
+                    } else {
+                        applyGhostAppearance(to: entity, isGhost: false)
+                        entity.isEnabled = !item.isArchived
+
+                        // Do not override translation if currently actively dragging
+                        if case .translating(let id, _, _) = dragMode, id == item.id {
+                            // Keep dragged position
+                        } else {
+                            entity.position = SIMD3<Float>(Float(item.positionX), Float(item.positionY), Float(item.positionZ))
+                            entity.orientation = simd_quatf(angle: Float(item.rotationYaw), axis: SIMD3<Float>(0, 1, 0))
+                        }
                     }
                 }
             }

@@ -12,6 +12,36 @@ public struct HarmonyComparisonMetrics: Sendable, Equatable {
     public let illuminationScore: Int
     public let overallHarmonyScore: Int
     public let summaryVerdict: String
+    public let baselineTightestWalkwayMeters: Double
+    public let workingTightestWalkwayMeters: Double
+
+    public init(
+        baselineBottlenecksCount: Int,
+        workingBottlenecksCount: Int,
+        clearanceImprovementPercentage: Int,
+        baselineFloorUtilizationPercentage: Int,
+        workingFloorUtilizationPercentage: Int,
+        archivedItemsCount: Int,
+        activeItemsCount: Int,
+        illuminationScore: Int,
+        overallHarmonyScore: Int,
+        summaryVerdict: String,
+        baselineTightestWalkwayMeters: Double = 0.55,
+        workingTightestWalkwayMeters: Double = 0.88
+    ) {
+        self.baselineBottlenecksCount = baselineBottlenecksCount
+        self.workingBottlenecksCount = workingBottlenecksCount
+        self.clearanceImprovementPercentage = clearanceImprovementPercentage
+        self.baselineFloorUtilizationPercentage = baselineFloorUtilizationPercentage
+        self.workingFloorUtilizationPercentage = workingFloorUtilizationPercentage
+        self.archivedItemsCount = archivedItemsCount
+        self.activeItemsCount = activeItemsCount
+        self.illuminationScore = illuminationScore
+        self.overallHarmonyScore = overallHarmonyScore
+        self.summaryVerdict = summaryVerdict
+        self.baselineTightestWalkwayMeters = baselineTightestWalkwayMeters
+        self.workingTightestWalkwayMeters = workingTightestWalkwayMeters
+    }
 
     public var isImprovement: Bool {
         clearanceImprovementPercentage > 0 || workingBottlenecksCount < baselineBottlenecksCount
