@@ -49,11 +49,11 @@ public struct ProceduralRoomShellBuilder {
             roughness: 0.35,
             isMetallic: true
         )
-        let glassMaterial = SimpleMaterial(
-            color: UIColor(red: 0.82, green: 0.90, blue: 0.96, alpha: 0.35),
-            roughness: 0.05,
-            isMetallic: false
-        )
+        var glassMaterial = PhysicallyBasedMaterial()
+        glassMaterial.baseColor.tint = UIColor(red: 0.85, green: 0.92, blue: 0.98, alpha: 0.25)
+        glassMaterial.roughness = PhysicallyBasedMaterial.Roughness(floatLiteral: 0.05)
+        glassMaterial.metallic = PhysicallyBasedMaterial.Metallic(floatLiteral: 0.1)
+        glassMaterial.blending = .transparent(opacity: .init(floatLiteral: 0.25))
         let doorFrameMaterial = SimpleMaterial(
             color: UIColor(red: 0.38, green: 0.26, blue: 0.18, alpha: 1.0),
             roughness: 0.40,
@@ -119,21 +119,58 @@ public struct ProceduralRoomShellBuilder {
         sillLedge.position = SIMD3<Float>(0, sillH + 0.0175, backWallZ + 0.02)
         backWallGroup.addChild(sillLedge)
 
-        let frameCasingMesh = MeshResource.generateBox(
-            size: SIMD3<Float>(windowW, windowH, 0.015),
-            cornerRadius: 0.005
+        // Window Glass Pane (PhysicallyBased Transparent)
+        let glassMesh = MeshResource.generateBox(
+            size: SIMD3<Float>(windowW, windowH, 0.005),
+            cornerRadius: 0.002
         )
-        let glass = ModelEntity(mesh: frameCasingMesh, materials: [glassMaterial])
+        let glass = ModelEntity(mesh: glassMesh, materials: [glassMaterial])
         glass.position = SIMD3<Float>(0, sillH + (windowH / 2.0), backWallZ)
         backWallGroup.addChild(glass)
 
-        let frameBorderMesh = MeshResource.generateBox(
-            size: SIMD3<Float>(windowW + 0.06, windowH + 0.06, 0.02),
-            cornerRadius: 0.005
-        )
-        let windowBorder = ModelEntity(mesh: frameBorderMesh, materials: [windowFrameMaterial])
-        windowBorder.position = SIMD3<Float>(0, sillH + (windowH / 2.0), backWallZ)
-        backWallGroup.addChild(windowBorder)
+        // Architectural Hollow Frame Casing (Perimeter Border + Grid Mullions)
+        let frameCasing = Entity()
+        frameCasing.name = "WindowFrameCasing"
+        let casingThickness: Float = 0.04
+        let casingDepth: Float = 0.03
+
+        // Top Frame
+        let topFrameMesh = MeshResource.generateBox(size: SIMD3<Float>(windowW + casingThickness * 2, casingThickness, casingDepth))
+        let topFrame = ModelEntity(mesh: topFrameMesh, materials: [windowFrameMaterial])
+        topFrame.position = SIMD3<Float>(0, sillH + windowH + (casingThickness / 2.0), backWallZ)
+        frameCasing.addChild(topFrame)
+
+        // Bottom Frame
+        let bottomFrameMesh = MeshResource.generateBox(size: SIMD3<Float>(windowW + casingThickness * 2, casingThickness, casingDepth))
+        let bottomFrame = ModelEntity(mesh: bottomFrameMesh, materials: [windowFrameMaterial])
+        bottomFrame.position = SIMD3<Float>(0, sillH - (casingThickness / 2.0), backWallZ)
+        frameCasing.addChild(bottomFrame)
+
+        // Left Frame
+        let leftFrameMesh = MeshResource.generateBox(size: SIMD3<Float>(casingThickness, windowH, casingDepth))
+        let leftFrame = ModelEntity(mesh: leftFrameMesh, materials: [windowFrameMaterial])
+        leftFrame.position = SIMD3<Float>(-(windowW / 2.0) - (casingThickness / 2.0), sillH + (windowH / 2.0), backWallZ)
+        frameCasing.addChild(leftFrame)
+
+        // Right Frame
+        let rightFrameMesh = MeshResource.generateBox(size: SIMD3<Float>(casingThickness, windowH, casingDepth))
+        let rightFrame = ModelEntity(mesh: rightFrameMesh, materials: [windowFrameMaterial])
+        rightFrame.position = SIMD3<Float>((windowW / 2.0) + (casingThickness / 2.0), sillH + (windowH / 2.0), backWallZ)
+        frameCasing.addChild(rightFrame)
+
+        // Vertical Center Mullion
+        let vertMullionMesh = MeshResource.generateBox(size: SIMD3<Float>(0.025, windowH, casingDepth * 0.8))
+        let vertMullion = ModelEntity(mesh: vertMullionMesh, materials: [windowFrameMaterial])
+        vertMullion.position = SIMD3<Float>(0, sillH + (windowH / 2.0), backWallZ)
+        frameCasing.addChild(vertMullion)
+
+        // Horizontal Center Transom
+        let horizMullionMesh = MeshResource.generateBox(size: SIMD3<Float>(windowW, 0.025, casingDepth * 0.8))
+        let horizMullion = ModelEntity(mesh: horizMullionMesh, materials: [windowFrameMaterial])
+        horizMullion.position = SIMD3<Float>(0, sillH + (windowH / 2.0), backWallZ)
+        frameCasing.addChild(horizMullion)
+
+        backWallGroup.addChild(frameCasing)
 
         let backBaseboardLeftMesh = MeshResource.generateBox(size: SIMD3<Float>(sideW, baseboardH, baseboardThickness))
         let backBaseboardLeft = ModelEntity(mesh: backBaseboardLeftMesh, materials: [trimMaterial])
