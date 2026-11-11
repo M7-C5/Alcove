@@ -91,6 +91,37 @@ struct AlcoveCoreTests {
         #expect(reaction?.message.contains("Desk") == true)
     }
 
+    @Test func lampOverlappingTableDoesNotTriggerCrowdingWarning() {
+        let rulebook = FastPathRulebook()
+        let desk = Furniture(
+            name: "Work Desk",
+            category: .table,
+            positionX: 0.0,
+            positionY: 0.0,
+            positionZ: 0.0,
+            width: 1.2,
+            length: 0.8
+        )
+
+        // Move a Desk Lamp directly on top of the Work Desk (overlap at 0, 0)
+        let lampEvent = FurnitureMoveEvent(
+            furnitureName: "Desk Lamp",
+            category: .lighting,
+            oldPosition: (x: 1.0, z: 1.0),
+            newPosition: (x: 0.0, z: 0.0),
+            rotationYaw: 0.0
+        )
+
+        let reaction = rulebook.evaluateMicroMove(
+            event: lampEvent,
+            roomDimensions: (width: 4.0, length: 5.0),
+            allFurnitures: [desk]
+        )
+
+        // A lamp sitting on or near a desk must NEVER trigger a crowding/bottleneck warning
+        #expect(reaction?.emotion != .warning)
+    }
+
     @Test func fastPathDaylightMicroReactions() {
         let rulebook = FastPathRulebook()
         let desk = Furniture(

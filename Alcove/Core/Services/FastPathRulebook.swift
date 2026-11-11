@@ -33,9 +33,47 @@ public struct FastPathRulebook: Sendable {
             let dz = item.positionZ - newZ
             let dist = sqrt(dx * dx + dz * dz)
 
+            // Functional Pair 1: Lamps / lighting naturally rest on tables, desks, nightstands, or hang from ceilings in 3D
+            let isLightingItem = event.category == .lighting ||
+                                 event.furnitureName.localizedCaseInsensitiveContains("lamp") ||
+                                 event.furnitureName.localizedCaseInsensitiveContains("light") ||
+                                 item.category == .lighting ||
+                                 item.name.localizedCaseInsensitiveContains("lamp") ||
+                                 item.name.localizedCaseInsensitiveContains("light")
+
+            let isSurfaceItem = event.category == .table ||
+                                event.category == .storage ||
+                                item.category == .table ||
+                                item.category == .storage ||
+                                item.name.localizedCaseInsensitiveContains("table") ||
+                                item.name.localizedCaseInsensitiveContains("desk") ||
+                                item.name.localizedCaseInsensitiveContains("nightstand") ||
+                                item.name.localizedCaseInsensitiveContains("stand")
+
+            if isLightingItem && isSurfaceItem {
+                // Placing a lamp on or near a table/desk is intentional and desirable in 3D space
+                continue
+            }
+
+            let isSuspendedOrMounted = event.furnitureName.localizedCaseInsensitiveContains("ceiling") ||
+                                       event.furnitureName.localizedCaseInsensitiveContains("pendant") ||
+                                       event.furnitureName.localizedCaseInsensitiveContains("sconce") ||
+                                       item.name.localizedCaseInsensitiveContains("ceiling") ||
+                                       item.name.localizedCaseInsensitiveContains("pendant") ||
+                                       item.name.localizedCaseInsensitiveContains("sconce")
+            if isSuspendedOrMounted {
+                continue
+            }
+
+            // Functional Pair 2: Bed + Nightstand
             let isNightstandBedPair = (event.category == .bed && item.name.localizedCaseInsensitiveContains("nightstand")) ||
                                       (item.category == .bed && event.furnitureName.localizedCaseInsensitiveContains("nightstand"))
             if isNightstandBedPair && dist >= 0.30 { continue } // Nightstands naturally sit adjacent to a bed
+
+            // Functional Pair 3: Table/Desk + Chair/Seating
+            let isDeskChairPair = (event.category == .table && item.category == .seating) ||
+                                  (item.category == .table && event.category == .seating)
+            if isDeskChairPair && dist >= 0.35 { continue }
 
             let combinedRadius = (item.width + item.length) / 4.0 + 0.30 // Physical encroachment threshold
             if dist < combinedRadius {

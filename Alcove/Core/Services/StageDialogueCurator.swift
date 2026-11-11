@@ -79,6 +79,13 @@ public struct StageDialogueCurator: Sendable {
                 for j in (i + 1)..<furnitures.count {
                     let a = furnitures[i]
                     let b = furnitures[j]
+
+                    let isLightingA = a.category == .lighting || a.name.localizedCaseInsensitiveContains("lamp") || a.name.localizedCaseInsensitiveContains("light") || a.name.localizedCaseInsensitiveContains("pendant")
+                    let isLightingB = b.category == .lighting || b.name.localizedCaseInsensitiveContains("lamp") || b.name.localizedCaseInsensitiveContains("light") || b.name.localizedCaseInsensitiveContains("pendant")
+                    let isSurfaceA = a.category == .table || a.category == .storage || a.name.localizedCaseInsensitiveContains("table") || a.name.localizedCaseInsensitiveContains("desk") || a.name.localizedCaseInsensitiveContains("nightstand")
+                    let isSurfaceB = b.category == .table || b.category == .storage || b.name.localizedCaseInsensitiveContains("table") || b.name.localizedCaseInsensitiveContains("desk") || b.name.localizedCaseInsensitiveContains("nightstand")
+                    if (isLightingA && isSurfaceB) || (isLightingB && isSurfaceA) { continue }
+
                     let isCompanionPair = (a.category == .bed && b.name.localizedCaseInsensitiveContains("nightstand")) ||
                                           (b.category == .bed && a.name.localizedCaseInsensitiveContains("nightstand")) ||
                                           (a.category == .table && b.category == .seating) ||
@@ -119,6 +126,13 @@ public struct StageDialogueCurator: Sendable {
                 for j in (i + 1)..<furnitures.count {
                     let a = furnitures[i]
                     let b = furnitures[j]
+
+                    let isLightingA = a.category == .lighting || a.name.localizedCaseInsensitiveContains("lamp") || a.name.localizedCaseInsensitiveContains("light") || a.name.localizedCaseInsensitiveContains("pendant")
+                    let isLightingB = b.category == .lighting || b.name.localizedCaseInsensitiveContains("lamp") || b.name.localizedCaseInsensitiveContains("light") || b.name.localizedCaseInsensitiveContains("pendant")
+                    let isSurfaceA = a.category == .table || a.category == .storage || a.name.localizedCaseInsensitiveContains("table") || a.name.localizedCaseInsensitiveContains("desk") || a.name.localizedCaseInsensitiveContains("nightstand")
+                    let isSurfaceB = b.category == .table || b.category == .storage || b.name.localizedCaseInsensitiveContains("table") || b.name.localizedCaseInsensitiveContains("desk") || b.name.localizedCaseInsensitiveContains("nightstand")
+                    if (isLightingA && isSurfaceB) || (isLightingB && isSurfaceA) { continue }
+
                     let isCompanionPair = (a.category == .bed && b.name.localizedCaseInsensitiveContains("nightstand")) ||
                                           (b.category == .bed && a.name.localizedCaseInsensitiveContains("nightstand")) ||
                                           (a.category == .table && b.category == .seating) ||
