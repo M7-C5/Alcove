@@ -166,8 +166,8 @@ public struct Studio3DView: View {
                             isARWalkthroughPresented = true
                             playSnapFeedback()
                         } label: {
-                            Image(systemName: "arkit")
-                                .font(.body.weight(.semibold))
+                            Text("AR")
+                                .font(.system(size: 15, weight: .bold, design: .rounded))
                                 .foregroundStyle(.primary)
                                 .frame(width: 44, height: 44)
                                 .background(.regularMaterial, in: Circle())
