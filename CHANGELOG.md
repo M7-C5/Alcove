@@ -40,6 +40,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Replace arkit symbol with text label on top toolbar ar button.
+- Update orbit hud icons to use clockwise rotate and archivebox.
 - Configure camera usage description for arkit world tracking.
 - Annotate MascotAIService and test suites with @MainActor for Swift 6.
 - Resolve iPad interface orientations, bundle id, and app icon assets.
