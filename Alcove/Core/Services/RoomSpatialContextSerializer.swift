@@ -59,13 +59,19 @@ public struct RoomSpatialContextSerializer: Sendable {
             lines.append("✅ All evaluated pathways meet or exceed Panero & Zelnik circulation thresholds.")
         }
 
-        // Lighting Summary based on Karlen & Benya and Frida Ramstedt
-        lines.append("\n### LIGHTING & FIXTURE AUDIT (Karlen & Benya + Frida Ramstedt):")
-        let ambientCount = fixtures.filter { $0.layer == .ambient }.count
-        let taskCount = fixtures.filter { $0.layer == .task }.count
-        let accentCount = fixtures.filter { $0.layer == .accent }.count
-        lines.append("- Total Installed Fixtures: \(fixtures.count) (Frida Ramstedt guideline: 5–7 light sources per room)")
-        lines.append("- Layer Breakdown: Ambient (\(ambientCount)), Task (\(taskCount)), Accent (\(accentCount))")
+        // Lighting Summary based on Karlen & Benya and Frida Ramstedt (only active in Stages 3 & 4)
+        if stage == .illumination || stage == .harmony {
+            lines.append("\n### LIGHTING & FIXTURE AUDIT (Karlen & Benya + Frida Ramstedt):")
+            let ambientCount = fixtures.filter { $0.layer == .ambient }.count
+            let taskCount = fixtures.filter { $0.layer == .task }.count
+            let accentCount = fixtures.filter { $0.layer == .accent }.count
+            lines.append("- Total Installed Fixtures: \(fixtures.count) (Frida Ramstedt guideline: 5–7 light sources per room)")
+            lines.append("- Layer Breakdown: Ambient (\(ambientCount)), Task (\(taskCount)), Accent (\(accentCount))")
+        } else if stage == .audit {
+            lines.append("\n### STAGE 1 CURRENT SITUATION & INTAKE:")
+            lines.append("- Diagnosis Mode: Observational baseline intake only.")
+            lines.append("- Rule: Do NOT score or recommend adding artificial lighting in Stage 1. Focus entirely on room scale, current pieces, pathway flow, and daylight.")
+        }
 
         return lines.joined(separator: "\n")
     }

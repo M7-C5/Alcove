@@ -41,9 +41,15 @@ public struct StageEvaluationSheet: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(result.title)
                                 .font(.title2.bold())
-                            Text("Evaluation Score: \(result.score)/100")
-                                .font(.subheadline.bold())
-                                .foregroundStyle(scoreColor)
+                            if stage == .audit {
+                                Text("Current Situation: Baseline Intake Captured")
+                                    .font(.subheadline.bold())
+                                    .foregroundStyle(.indigo)
+                            } else {
+                                Text("Evaluation Score: \(result.score)/100")
+                                    .font(.subheadline.bold())
+                                    .foregroundStyle(scoreColor)
+                            }
                         }
                     }
                     .padding(20)
@@ -55,7 +61,7 @@ public struct StageEvaluationSheet: View {
 
                     // Mascot Dialogue
                     VStack(alignment: .leading, spacing: 8) {
-                        Label("Mascot Critique", systemImage: "quote.bubble.fill")
+                        Label(stage == .audit ? "Mascot Room Diagnosis" : "Mascot Critique", systemImage: "quote.bubble.fill")
                             .font(.caption.bold())
                             .foregroundStyle(.indigo)
                             .textCase(.uppercase)
@@ -159,7 +165,7 @@ public struct StageEvaluationSheet: View {
                             dismiss()
                         } label: {
                             HStack {
-                                Text(result.canAdvance ? "Advance to Next Stage" : "Proceed Anyway (Advisory Override)")
+                                Text(stage == .audit ? "Proceed to Rearrangement" : (result.canAdvance ? "Advance to Next Stage" : "Proceed Anyway (Advisory Override)"))
                                 Image(systemName: "arrow.right")
                             }
                             .font(.headline)
@@ -169,7 +175,7 @@ public struct StageEvaluationSheet: View {
                         .buttonStyle(.borderedProminent)
                         .tint(result.canAdvance ? .indigo : .secondary)
 
-                        Button("Keep Refining Layout") {
+                        Button(stage == .audit ? "Keep Inspecting Baseline" : "Keep Refining Layout") {
                             onKeepRefining()
                             dismiss()
                         }
@@ -181,7 +187,7 @@ public struct StageEvaluationSheet: View {
                 .padding(28)
             }
             .background(Color(uiColor: .systemGroupedBackground))
-            .navigationTitle("Stage Evaluation")
+            .navigationTitle(stage == .audit ? "Room Audit Diagnosis" : "Stage Evaluation")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

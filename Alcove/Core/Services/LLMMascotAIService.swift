@@ -46,13 +46,23 @@ public final class LLMMascotAIService: MascotAIServiceProtocol {
                 rawSources.append(content)
             }
             // Direct project path fallback when running in Xcode / local simulator
-            let projectSecretPath = URL(fileURLWithPath: #filePath)
+            let fileURL = URL(fileURLWithPath: #filePath)
+            let subfolderSecret = fileURL
                 .deletingLastPathComponent() // Services
                 .deletingLastPathComponent() // Core
                 .deletingLastPathComponent() // Alcove
                 .appendingPathComponent("developer.secret").path
-            if let content = try? String(contentsOfFile: projectSecretPath, encoding: .utf8) {
-                rawSources.append(content)
+            let repoRootSecret = fileURL
+                .deletingLastPathComponent() // Services
+                .deletingLastPathComponent() // Core
+                .deletingLastPathComponent() // Alcove
+                .deletingLastPathComponent() // repo root
+                .appendingPathComponent("developer.secret").path
+
+            for path in [subfolderSecret, repoRootSecret] {
+                if let content = try? String(contentsOfFile: path, encoding: .utf8) {
+                    rawSources.append(content)
+                }
             }
         }
 
@@ -125,18 +135,41 @@ public final class LLMMascotAIService: MascotAIServiceProtocol {
         // Generate dynamic LLM critique citing the books
         do {
             let spatialContext = contextSerializer.serialize(room: room, stage: stage)
-            let evaluationPrompt = """
-            Perform a formal stage completion evaluation for \(stage.title) (Stage \(stage.stageNumber)).
-            Return ONLY a raw JSON object (no markdown quotes, no explanation) with this exact schema:
-            {
-              "canAdvance": true/false,
-              "score": 0-100 integer,
-              "title": "Short punchy evaluation title (2-4 words)",
-              "dialogue": "1-2 short, punchy sentences from the Mascot evaluating the layout (under 35 words). Super easy to skim, no walls of text.",
-              "recommendations": ["Short tip 1 (1 sentence)", "Short tip 2 (1 sentence)"],
-              "praise": ["What worked well 1", "What worked well 2"]
+            let evaluationPrompt: String
+            if stage == .audit {
+                evaluationPrompt = """
+                Perform an observational spatial intake diagnosis for Stage 1: The Audit for "\(room.name)".
+                CRITICAL CURRICULUM RULES FOR STAGE 1 (THE AUDIT):
+                - The Audit is strictly an observational diagnosis of the room's CURRENT SITUATION and layout as scanned.
+                - DO NOT mention, score, or criticize artificial lighting, lamps, or fixtures! DO NOT tell the user to "add more lights" or "add lamps" (artificial lighting belongs strictly to Stage 3: The Illumination).
+                - There is NO score penalty in Stage 1. Return "score": 100 and "canAdvance": true.
+                - Describe what is happening right now in the room based on the layout data: room scale, current active furniture pieces, natural walking pathways (roomy vs snug), and where daylight enters.
+                - Mascot voice: warm, perceptive interior design buddy diagnosing what's currently here (under 35 words).
+
+                Return ONLY a raw JSON object (no markdown quotes, no explanation) with this exact schema:
+                {
+                  "canAdvance": true,
+                  "score": 100,
+                  "title": "Short punchy diagnosis title (2-4 words, e.g. 'Room Baseline Diagnosed')",
+                  "dialogue": "1-2 short, punchy sentences describing what's happening right now in the room (under 35 words).",
+                  "recommendations": ["Observation on current pathways or layout", "Observation on natural light/window flow"],
+                  "praise": ["Baseline room scan captured", "Room footprint mapped"]
+                }
+                """
+            } else {
+                evaluationPrompt = """
+                Perform a formal stage completion evaluation for \(stage.title) (Stage \(stage.stageNumber)).
+                Return ONLY a raw JSON object (no markdown quotes, no explanation) with this exact schema:
+                {
+                  "canAdvance": true/false,
+                  "score": 0-100 integer,
+                  "title": "Short punchy evaluation title (2-4 words)",
+                  "dialogue": "1-2 short, punchy sentences from the Mascot evaluating the layout (under 35 words). Super easy to skim, no walls of text.",
+                  "recommendations": ["Short tip 1 (1 sentence)", "Short tip 2 (1 sentence)"],
+                  "praise": ["What worked well 1", "What worked well 2"]
+                }
+                """
             }
-            """
 
             let rawJson = try await callGeminiAPI(question: evaluationPrompt, context: spatialContext)
 
