@@ -45,7 +45,7 @@ public struct AIModelConfigSheet: View {
                             .textInputAutocapitalization(.never)
 
                         if selectedProvider == .gemini {
-                            Text("💡 Tip: Get a free key with 1,500 free requests/day (no credit card needed) at aistudio.google.com")
+                            Text("💡 Tip: Paste 1 or multiple keys (separated by commas) to automatically rotate between accounts when daily limits are reached! (1,500 free requests/day per account at aistudio.google.com)")
                                 .font(.caption2)
                                 .foregroundStyle(.blue)
                         }
@@ -139,7 +139,7 @@ public struct AIModelConfigSheet: View {
 
     private var providerPlaceholder: String {
         switch selectedProvider {
-        case .gemini: return "Enter Gemini API Key..."
+        case .gemini: return "Enter Gemini API Key(s)..."
         case .claude: return "Enter Claude API Key..."
         case .openai: return "Enter OpenAI API Key..."
         }

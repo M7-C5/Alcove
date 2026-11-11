@@ -23,8 +23,13 @@ struct LLMMascotAIServiceTests {
         let room = SampleData.createStarterRoom()
         let service = LLMMascotAIService()
         let originalDevKey = LLMMascotAIService.hardcodedDeveloperKey
-        defer { LLMMascotAIService.hardcodedDeveloperKey = originalDevKey }
+        let originalBypass = LLMMascotAIService.bypassFileSecretLoading
+        defer {
+            LLMMascotAIService.hardcodedDeveloperKey = originalDevKey
+            LLMMascotAIService.bypassFileSecretLoading = originalBypass
+        }
         LLMMascotAIService.hardcodedDeveloperKey = ""
+        LLMMascotAIService.bypassFileSecretLoading = true
         service.apiKey = "" // Explicitly offline
 
         let answer = await service.askMascot(
@@ -35,6 +40,26 @@ struct LLMMascotAIServiceTests {
 
         #expect(!answer.isEmpty)
         #expect(answer.contains("walkways") || answer.contains("clearance") || answer.contains("Panero & Zelnik") || answer.contains("60cm") || answer.contains("76.2cm"))
+    }
+
+    @Test @MainActor func multiKeyParsingAndRotation() {
+        let service = LLMMascotAIService()
+        let originalDevKey = LLMMascotAIService.hardcodedDeveloperKey
+        let originalBypass = LLMMascotAIService.bypassFileSecretLoading
+        defer {
+            LLMMascotAIService.hardcodedDeveloperKey = originalDevKey
+            LLMMascotAIService.bypassFileSecretLoading = originalBypass
+        }
+        LLMMascotAIService.bypassFileSecretLoading = true
+
+        // Test comma separated keys
+        LLMMascotAIService.hardcodedDeveloperKey = "key_alpha_1, key_beta_2 , key_gamma_3"
+        #expect(service.apiKeys == ["key_alpha_1", "key_beta_2", "key_gamma_3"])
+        #expect(service.apiKey == "key_alpha_1")
+
+        // Test newline separated keys
+        LLMMascotAIService.hardcodedDeveloperKey = "key_one\nkey_two\n\nkey_three"
+        #expect(service.apiKeys == ["key_one", "key_two", "key_three"])
     }
 
     @Test @MainActor func providerSelectionAndDefaults() {
