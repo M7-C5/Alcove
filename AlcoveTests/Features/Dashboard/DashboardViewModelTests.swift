@@ -20,6 +20,53 @@ struct DashboardViewModelTests {
     @Test func viewModelInitialState() {
         let vm = DashboardViewModel()
         #expect(vm.showingScanSheet == false)
+        #expect(vm.lightingTestSession == nil)
+    }
+
+    @Test func lightingShortcutOpensUnlockedMockRoomInTemporaryStore() throws {
+        let mainContainer = try makeInMemoryContainer()
+        let mainRoom = SampleData.createStarterRoom()
+        mainContainer.mainContext.insert(mainRoom)
+        try mainContainer.mainContext.save()
+        let vm = DashboardViewModel()
+
+        vm.startLightingTest()
+
+        let session = try #require(vm.lightingTestSession)
+        #expect(vm.lightingTestError == nil)
+        #expect(session.room.name == "Lighting Playground")
+        #expect(session.room.isUnlocked(.illumination))
+        #expect(!session.room.isCompleted(.audit))
+        #expect(!session.room.isCompleted(.rearrangement))
+        #expect(session.room.workingLayout?.furnitures.count == 6)
+        #expect(session.room.workingLayout?.lightFixtures.isEmpty == true)
+        #expect(session.container.configurations.allSatisfy { $0.isStoredInMemoryOnly })
+
+        let editor = LightingSetupViewModel(room: session.room)
+        editor.place(unitX: 0.25, unitZ: 0.75, layer: .ambient)
+        try editor.save(in: session.room, context: session.container.mainContext)
+        #expect(session.room.workingLayout?.lightFixtures.count == 1)
+        let mainRooms = try mainContainer.mainContext.fetch(FetchDescriptor<Room>())
+        #expect(mainRooms.count == 1)
+        #expect(mainRooms.first?.id == mainRoom.id)
+        #expect(mainRoom.workingLayout?.lightFixtures.isEmpty == true)
+    }
+
+    @Test func reopeningLightingShortcutStartsFreshMockLayout() throws {
+        let vm = DashboardViewModel()
+        vm.startLightingTest()
+        let first = try #require(vm.lightingTestSession)
+        let editor = LightingSetupViewModel(room: first.room)
+        editor.place(unitX: 0.5, unitZ: 0.5, layer: .ambient)
+        try editor.save(in: first.room, context: first.container.mainContext)
+        vm.lightingTestSession = nil
+
+        vm.startLightingTest()
+
+        let reopened = try #require(vm.lightingTestSession)
+        #expect(reopened.room.id != first.room.id)
+        #expect(reopened.room.workingLayout?.lightFixtures.isEmpty == true)
+        #expect(reopened.router.isEmpty)
     }
 
     @Test func seedInitialDataWhenEmpty() throws {
