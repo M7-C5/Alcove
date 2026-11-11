@@ -182,19 +182,27 @@ public struct Studio3DViewport: UIViewRepresentable {
             camera.camera.far = 60
             root.addChild(camera)
 
-            // Directional Sunlight pouring through window
+            // Directional Sunlight pouring in fixed projection through the window opening
+            let halfL = Float(room.dimensionsLength) / 2.0
+            let windowCenterY: Float = 0.85 + (1.30 / 2.0) // 1.50m
+            let windowZ: Float = -halfL
+
             sun.name = "SunLight"
             sun.light.intensity = 2800
             sun.light.color = .init(red: 1.0, green: 0.96, blue: 0.90, alpha: 1.0)
-            sun.shadow = DirectionalLightComponent.Shadow(maximumDistance: 14.0, depthBias: 1.0)
-            sun.look(at: .zero, from: [2.5, 4.5, -4.5], relativeTo: nil)
+            sun.shadow = DirectionalLightComponent.Shadow(maximumDistance: 14.0, depthBias: 0.8)
+
+            // Fixed position directly outside the window aperture, aimed across the room floor
+            let sunPos = SIMD3<Float>(0.4, windowCenterY + 0.9, windowZ - 2.5)
+            let sunTarget = SIMD3<Float>(-0.2, 0.0, windowZ + halfL * 0.9)
+            sun.look(at: sunTarget, from: sunPos, relativeTo: root)
             root.addChild(sun)
 
-            // Ambient Fill Light
+            // Ambient Fill Light (soft bounce light without shadows)
             fill.name = "FillLight"
-            fill.light.intensity = 1400
+            fill.light.intensity = 1100
             fill.light.color = .init(red: 0.92, green: 0.95, blue: 1.0, alpha: 1.0)
-            fill.look(at: .zero, from: [-3.0, 4.0, 3.0], relativeTo: nil)
+            fill.look(at: .zero, from: [-2.0, 3.5, 2.5], relativeTo: root)
             root.addChild(fill)
 
             // Procedural Room Shell: Floor and 4 Cardinal Walls
@@ -265,7 +273,15 @@ public struct Studio3DViewport: UIViewRepresentable {
                         orientation: orientation,
                         pitch: pitch
                     )
-                    entity.isEnabled = !isHidden
+                    if #available(iOS 18.0, *) {
+                        if isHidden {
+                            entity.components.set(OpacityComponent(opacity: 0.0))
+                        } else {
+                            entity.components.remove(OpacityComponent.self)
+                        }
+                    } else {
+                        entity.isEnabled = !isHidden
+                    }
                 }
             }
         }
