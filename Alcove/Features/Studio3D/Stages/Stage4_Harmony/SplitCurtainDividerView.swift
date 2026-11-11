@@ -1,15 +1,14 @@
 import SwiftUI
 
-/// Interactive vertical split-screen comparison divider (like photo editing before/after sliders).
-/// Allows the user to slide a vertical divider handle across the screen to reveal the Before (Baseline)
-/// layout on the left and the After (Optimized) layout on the right.
+/// Smooth Before / After 3D Spatial Overlay Controller for Stage 4 (The Harmony Reveal).
+/// Overlays the original baseline scan and the optimized layout in the exact same 3D room orientation,
+/// allowing continuous, buttery-smooth opacity blending without any harsh clipping or popping.
 public struct SplitCurtainDividerView: View {
     @Binding public var splitFraction: Double
     public let totalWidth: CGFloat
     public let totalHeight: CGFloat
     public var onDragChanged: ((Double) -> Void)? = nil
 
-    @State private var isDragging: Bool = false
     @State private var hasHapticSnappedCenter: Bool = false
 
     public init(
@@ -24,112 +23,135 @@ public struct SplitCurtainDividerView: View {
         self.onDragChanged = onDragChanged
     }
 
-    private var dividerX: CGFloat {
-        max(24, min(totalWidth - 24, totalWidth * CGFloat(splitFraction)))
-    }
-
     public var body: some View {
-        ZStack(alignment: .topLeading) {
-            // Floating "BEFORE" and "AFTER" Pills at the top
+        VStack {
+            // Top Floating Status Badges
             HStack {
-                // BEFORE Pill (Baseline Layout)
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(Color.orange)
-                        .frame(width: 8, height: 8)
-                    Text("BEFORE")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(.primary)
+                // BEFORE Pill
+                Button {
+                    withAnimation(.spring(response: 0.32, dampingFraction: 0.78)) {
+                        splitFraction = 0.0
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(Color.orange)
+                            .frame(width: 8, height: 8)
+                        Text("BEFORE")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(splitFraction < 0.35 ? .primary : .secondary)
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 7)
+                    .background(.regularMaterial, in: Capsule())
+                    .overlay(
+                        Capsule()
+                            .stroke(splitFraction < 0.35 ? Color.orange.opacity(0.4) : Color.primary.opacity(0.08), lineWidth: 1)
+                    )
+                    .shadow(color: Color.black.opacity(0.06), radius: 6, y: 2)
                 }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 7)
-                .background(.regularMaterial, in: Capsule())
-                .overlay(
-                    Capsule()
-                        .stroke(Color.primary.opacity(0.08), lineWidth: 1)
-                )
-                .shadow(color: Color.black.opacity(0.08), radius: 8, y: 2)
-                .padding(.leading, 20)
+                .buttonStyle(.plain)
 
                 Spacer()
 
-                // AFTER Pill (Optimized Layout)
+                // Center OVERLAY Pill (Active in middle blend)
                 HStack(spacing: 6) {
-                    Circle()
-                        .fill(Color.green)
-                        .frame(width: 8, height: 8)
-                    Text("AFTER")
+                    Image(systemName: "square.2.layers.3d.top.filled")
+                        .font(.caption.bold())
+                        .foregroundStyle(splitFraction >= 0.35 && splitFraction <= 0.65 ? Color.indigo : Color.secondary)
+                    Text("OVERLAY")
                         .font(.caption.weight(.bold))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(splitFraction >= 0.35 && splitFraction <= 0.65 ? Color.indigo : Color.secondary)
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 7)
                 .background(.regularMaterial, in: Capsule())
                 .overlay(
                     Capsule()
-                        .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+                        .stroke(splitFraction >= 0.35 && splitFraction <= 0.65 ? Color.indigo.opacity(0.4) : Color.primary.opacity(0.08), lineWidth: 1)
                 )
-                .shadow(color: Color.black.opacity(0.08), radius: 8, y: 2)
-                .padding(.trailing, 20)
-            }
-            .padding(.top, 76)
-            .frame(width: totalWidth)
+                .shadow(color: Color.black.opacity(0.06), radius: 6, y: 2)
 
-            // Vertical Divider Line
-            Rectangle()
-                .fill(
-                    LinearGradient(
-                        colors: [Color.white.opacity(0.2), Color.white, Color.white, Color.white.opacity(0.2)],
-                        startPoint: .top,
-                        endPoint: .bottom
+                Spacer()
+
+                // AFTER Pill
+                Button {
+                    withAnimation(.spring(response: 0.32, dampingFraction: 0.78)) {
+                        splitFraction = 1.0
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(Color.green)
+                            .frame(width: 8, height: 8)
+                        Text("AFTER")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(splitFraction > 0.65 ? .primary : .secondary)
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 7)
+                    .background(.regularMaterial, in: Capsule())
+                    .overlay(
+                        Capsule()
+                            .stroke(splitFraction > 0.65 ? Color.green.opacity(0.4) : Color.primary.opacity(0.08), lineWidth: 1)
                     )
-                )
-                .frame(width: 2.5, height: totalHeight)
-                .shadow(color: Color.black.opacity(0.40), radius: 5, x: 0, y: 0)
-                .position(x: dividerX, y: totalHeight / 2)
-
-            // Center Circular Handle Knob (< | >)
-            ZStack {
-                Circle()
-                    .fill(Color.white)
-                    .frame(width: 46, height: 46)
-                    .shadow(color: Color.black.opacity(0.30), radius: 10, x: 0, y: 3)
-
-                Image(systemName: "arrow.left.and.right")
-                    .font(.body.weight(.bold))
-                    .foregroundStyle(Color.black.opacity(0.85))
+                    .shadow(color: Color.black.opacity(0.06), radius: 6, y: 2)
+                }
+                .buttonStyle(.plain)
             }
-            .position(x: dividerX, y: totalHeight / 2)
-            .contentShape(Circle().inset(by: -15))
-            .scaleEffect(isDragging ? 1.14 : 1.0)
-            .animation(.spring(response: 0.24, dampingFraction: 0.72), value: isDragging)
-            .gesture(
-                DragGesture(minimumDistance: 0)
-                    .onChanged { gesture in
-                        isDragging = true
-                        let rawFraction = Double(gesture.location.x / totalWidth)
-                        let clamped = max(0.02, min(0.98, rawFraction))
+            .padding(.horizontal, 24)
+            .padding(.top, 76)
 
-                        // Trigger subtle haptic when crossing center 50%
-                        if abs(clamped - 0.50) < 0.02 {
-                            if !hasHapticSnappedCenter {
-                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                                hasHapticSnappedCenter = true
+            Spacer()
+
+            // Bottom Center Frosted Glass Overlay Slider
+            HStack(spacing: 16) {
+                Text("Before")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(splitFraction < 0.25 ? Color.indigo : Color.secondary)
+
+                Slider(
+                    value: Binding(
+                        get: { splitFraction },
+                        set: { newValue in
+                            let clamped = max(0.0, min(1.0, newValue))
+
+                            // Snap tick at the 50% overlay point
+                            if abs(clamped - 0.50) < 0.02 {
+                                if !hasHapticSnappedCenter {
+                                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                    hasHapticSnappedCenter = true
+                                }
+                            } else {
+                                hasHapticSnappedCenter = false
                             }
-                        } else {
-                            hasHapticSnappedCenter = false
-                        }
 
-                        splitFraction = clamped
-                        onDragChanged?(clamped)
-                    }
-                    .onEnded { _ in
-                        isDragging = false
-                        hasHapticSnappedCenter = false
-                    }
+                            splitFraction = clamped
+                            onDragChanged?(clamped)
+                        }
+                    ),
+                    in: 0.0...1.0
+                )
+                .tint(.indigo)
+                .frame(width: 300)
+                .accessibilityLabel("Before After 3D Overlay Blend Slider")
+
+                Text("After")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(splitFraction > 0.75 ? Color.indigo : Color.secondary)
+            }
+            .padding(.horizontal, 24)
+            .padding(.vertical, 14)
+            .background(.regularMaterial, in: Capsule())
+            .overlay(
+                Capsule()
+                    .stroke(Color.primary.opacity(0.08), lineWidth: 1)
             )
+            .shadow(color: Color.black.opacity(0.12), radius: 14, y: 4)
+            .padding(.bottom, 28)
+            .safeAreaPadding(.bottom)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .allowsHitTesting(true)
     }
 }
-
