@@ -597,18 +597,13 @@ public struct Studio3DViewport: UIViewRepresentable {
             }
 
             if currentStage == .harmony {
-                let s = Float(max(0.0, min(1.0, beforeAfterSplit)))
+                ghostGroup?.isEnabled = true
 
-                // Smooth overlay cross-fade curve in identical orientation:
-                // At s = 0.0 (Before): baseline is 100% solid, working layout is hidden
-                // At s = 0.5 (Overlay): working is 100% solid, baseline is a 55% ghosted overlay trace!
-                // At s = 1.0 (After): working is 100% solid, baseline ghost fades out to 0%
-                let workingOpacity: Float = s <= 0.5 ? (s * 2.0) : 1.0
-                let baselineOpacity: Float = s >= 0.5 ? ((1.0 - s) * 1.1) : (1.0 - s * 0.9)
+                let screenWidth = Float(arView?.bounds.width ?? (viewportSize.width > 0 ? viewportSize.width : 1024))
+                let splitScreenX = screenWidth * Float(max(0.01, min(0.99, beforeAfterSplit)))
+                let featherZone: Float = 160.0 // Smooth screen-space cross-fade overlay band
 
-                ghostGroup?.isEnabled = baselineOpacity > 0.02
-
-                // 1. Working Layout Entities (Optimized Room)
+                // 1. Working Layout Entities (After side -> Fades in smoothly to the right of splitScreenX)
                 for item in layout.furnitures {
                     var entity = group.children.first(where: { $0.name == "Furniture_\(item.id.uuidString)" })
                     if entity == nil {
@@ -622,16 +617,27 @@ public struct Studio3DViewport: UIViewRepresentable {
                     entity.orientation = simd_quatf(angle: Float(item.rotationYaw), axis: SIMD3<Float>(0, 1, 0))
                     entity.scale = SIMD3<Float>(1, 1, 1)
 
-                    if item.isArchived || workingOpacity <= 0.02 {
+                    if item.isArchived {
                         entity.isEnabled = false
+                    } else if let arView = arView, let screenPos = arView.project(entity.position) {
+                        let delta = Float(screenPos.x) - splitScreenX
+                        let t = simd_clamp((delta + featherZone / 2.0) / featherZone, 0.0, 1.0)
+                        let opacity = Float(t)
+
+                        if opacity <= 0.01 {
+                            entity.isEnabled = false
+                        } else {
+                            entity.isEnabled = true
+                            applyOpacity(opacity, to: entity)
+                        }
                     } else {
                         entity.isEnabled = true
-                        applyOpacity(workingOpacity, to: entity)
+                        applyOpacity(1.0, to: entity)
                     }
                 }
 
-                // 2. Baseline Layout Entities (Original Baseline Overlay in identical orientation)
-                if let ghostGroup, baselineOpacity > 0.02 {
+                // 2. Baseline Layout Entities (Before side -> Fades in smoothly to the left of splitScreenX)
+                if let ghostGroup {
                     for baseItem in baselineItems {
                         var ghostEntity = ghostGroup.children.first(where: { $0.name == "Ghost_\(baseItem.id.uuidString)" })
                         if ghostEntity == nil {
@@ -648,9 +654,20 @@ public struct Studio3DViewport: UIViewRepresentable {
 
                         if baseItem.isArchived {
                             ghostEntity.isEnabled = false
+                        } else if let arView = arView, let screenPos = arView.project(ghostEntity.position) {
+                            let delta = Float(screenPos.x) - splitScreenX
+                            let t = simd_clamp((-delta + featherZone / 2.0) / featherZone, 0.0, 1.0)
+                            let opacity = Float(t)
+
+                            if opacity <= 0.01 {
+                                ghostEntity.isEnabled = false
+                            } else {
+                                ghostEntity.isEnabled = true
+                                applyOpacity(opacity, to: ghostEntity)
+                            }
                         } else {
                             ghostEntity.isEnabled = true
-                            applyOpacity(baselineOpacity, to: ghostEntity)
+                            applyOpacity(1.0, to: ghostEntity)
                         }
                     }
                 }
