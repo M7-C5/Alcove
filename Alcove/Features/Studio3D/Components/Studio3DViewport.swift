@@ -565,14 +565,18 @@ public struct Studio3DViewport: UIViewRepresentable {
 
         // MARK: - Scene Entities & Halos Synchronization
 
-        private func applyGhostAppearance(to entity: Entity, isGhost: Bool) {
+        private func applyOpacity(_ opacity: Float, to entity: Entity) {
             if #available(iOS 18.0, *) {
-                if isGhost {
-                    entity.components.set(OpacityComponent(opacity: 0.55))
-                } else {
+                if opacity >= 0.995 {
                     entity.components.remove(OpacityComponent.self)
+                } else {
+                    entity.components.set(OpacityComponent(opacity: max(0.0, min(1.0, opacity))))
                 }
             }
+        }
+
+        private func applyGhostAppearance(to entity: Entity, isGhost: Bool) {
+            applyOpacity(isGhost ? 0.55 : 1.0, to: entity)
         }
 
         func updateFurnitureEntities(from room: Room) {
@@ -583,7 +587,7 @@ public struct Studio3DViewport: UIViewRepresentable {
 
             let baselineItems = room.baselineLayout?.furnitures ?? []
 
-            // Manage Baseline Group for Stage 4 Split Comparison
+            // Manage Baseline Group for Stage 4 Overlay
             var ghostGroup = root.children.first(where: { $0.name == "BaselineGhostGroup" })
             if ghostGroup == nil {
                 let newGroup = Entity()
@@ -593,12 +597,18 @@ public struct Studio3DViewport: UIViewRepresentable {
             }
 
             if currentStage == .harmony {
-                ghostGroup?.isEnabled = true
+                let s = Float(max(0.0, min(1.0, beforeAfterSplit)))
 
-                let screenWidth = Float(arView?.bounds.width ?? (viewportSize.width > 0 ? viewportSize.width : 1024))
-                let splitScreenX = screenWidth * Float(max(0.01, min(0.99, beforeAfterSplit)))
+                // Smooth overlay cross-fade curve in identical orientation:
+                // At s = 0.0 (Before): baseline is 100% solid, working layout is hidden
+                // At s = 0.5 (Overlay): working is 100% solid, baseline is a 55% ghosted overlay trace!
+                // At s = 1.0 (After): working is 100% solid, baseline ghost fades out to 0%
+                let workingOpacity: Float = s <= 0.5 ? (s * 2.0) : 1.0
+                let baselineOpacity: Float = s >= 0.5 ? ((1.0 - s) * 1.1) : (1.0 - s * 0.9)
 
-                // 1. Working Layout Entities (After side -> Visible to the RIGHT of splitScreenX)
+                ghostGroup?.isEnabled = baselineOpacity > 0.02
+
+                // 1. Working Layout Entities (Optimized Room)
                 for item in layout.furnitures {
                     var entity = group.children.first(where: { $0.name == "Furniture_\(item.id.uuidString)" })
                     if entity == nil {
@@ -611,19 +621,17 @@ public struct Studio3DViewport: UIViewRepresentable {
                     entity.position = SIMD3<Float>(Float(item.positionX), Float(item.positionY), Float(item.positionZ))
                     entity.orientation = simd_quatf(angle: Float(item.rotationYaw), axis: SIMD3<Float>(0, 1, 0))
                     entity.scale = SIMD3<Float>(1, 1, 1)
-                    applyGhostAppearance(to: entity, isGhost: false)
 
-                    if item.isArchived {
+                    if item.isArchived || workingOpacity <= 0.02 {
                         entity.isEnabled = false
-                    } else if let arView = arView, let screenPos = arView.project(entity.position) {
-                        entity.isEnabled = Float(screenPos.x) >= splitScreenX
                     } else {
                         entity.isEnabled = true
+                        applyOpacity(workingOpacity, to: entity)
                     }
                 }
 
-                // 2. Baseline Layout Entities (Before side -> Visible to the LEFT of splitScreenX)
-                if let ghostGroup {
+                // 2. Baseline Layout Entities (Original Baseline Overlay in identical orientation)
+                if let ghostGroup, baselineOpacity > 0.02 {
                     for baseItem in baselineItems {
                         var ghostEntity = ghostGroup.children.first(where: { $0.name == "Ghost_\(baseItem.id.uuidString)" })
                         if ghostEntity == nil {
@@ -637,14 +645,12 @@ public struct Studio3DViewport: UIViewRepresentable {
                         ghostEntity.position = SIMD3<Float>(Float(baseItem.positionX), Float(baseItem.positionY), Float(baseItem.positionZ))
                         ghostEntity.orientation = simd_quatf(angle: Float(baseItem.rotationYaw), axis: SIMD3<Float>(0, 1, 0))
                         ghostEntity.scale = SIMD3<Float>(1, 1, 1)
-                        applyGhostAppearance(to: ghostEntity, isGhost: false)
 
                         if baseItem.isArchived {
                             ghostEntity.isEnabled = false
-                        } else if let arView = arView, let screenPos = arView.project(ghostEntity.position) {
-                            ghostEntity.isEnabled = Float(screenPos.x) <= splitScreenX
                         } else {
                             ghostEntity.isEnabled = true
+                            applyOpacity(baselineOpacity, to: ghostEntity)
                         }
                     }
                 }
