@@ -4,61 +4,113 @@ set -e
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CHANGELOG_FILE="${1:-$PROJECT_DIR/CHANGELOG.md}"
 
-echo "Inspecting git commits for Conventional Commits in Alcove..."
+echo "Generating Keep a Changelog 1.1.0 compliant changelog for Alcove..."
 
-FEAT=$(git -C "$PROJECT_DIR" log --no-merges --pretty=format:"- %s (%h)" --grep="^feat" 2>/dev/null || true)
-CHANGED=$(git -C "$PROJECT_DIR" log --no-merges --pretty=format:"- %s (%h)" --grep="^refactor" 2>/dev/null || true)
-FIX=$(git -C "$PROJECT_DIR" log --no-merges --pretty=format:"- %s (%h)" --grep="^fix" 2>/dev/null || true)
-PERFORMANCE=$(git -C "$PROJECT_DIR" log --no-merges --pretty=format:"- %s (%h)" --grep="^perf" 2>/dev/null || true)
-DOCS=$(git -C "$PROJECT_DIR" log --no-merges --pretty=format:"- %s (%h)" --grep="^docs" 2>/dev/null || true)
-CHORE=$(git -C "$PROJECT_DIR" log --no-merges --pretty=format:"- %s (%h)" --grep="^chore\|^build\|^test\|^ci\|^style" 2>/dev/null || true)
+/usr/bin/env python3 - <<EOF
+import subprocess
+import re
+import sys
+import os
 
-cat <<EOF > "$CHANGELOG_FILE"
-# Changelog
+project_dir = "$PROJECT_DIR"
+changelog_file = "$CHANGELOG_FILE"
 
-All notable changes to **Alcove** will be documented in this file.
+try:
+    git_log = subprocess.check_output(
+        ["git", "-C", project_dir, "log", "--no-merges", "--pretty=format:%s"],
+        text=True
+    ).splitlines()
+except Exception as e:
+    git_log = []
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+categories = {
+    "Added": [],
+    "Changed": [],
+    "Deprecated": [],
+    "Removed": [],
+    "Fixed": [],
+    "Security": []
+}
 
-## [Unreleased]
+pattern = re.compile(r"^(feat|refactor|perf|fix|chore|docs|ci|test|style|revert|sec|security)(?:\(([^)]+)\))?!?:\s*(.+)$")
 
+# Deduplication set to avoid repeated entries
+seen = set()
+
+for line in git_log:
+    m = pattern.match(line.strip())
+    if not m:
+        continue
+    ctype, scope, desc = m.groups()
+
+    # Exclude internal maintenance, CI, tests, and changelog meta-commits
+    if ctype in ("docs", "ci", "test", "chore", "style"):
+        continue
+    if "changelog" in line.lower() or "release notes" in line.lower():
+        continue
+
+    clean_desc = desc.strip()
+    if clean_desc:
+        clean_desc = clean_desc[0].upper() + clean_desc[1:]
+        if not clean_desc.endswith("."):
+            clean_desc += "."
+
+    if clean_desc in seen:
+        continue
+    seen.add(clean_desc)
+
+    if ctype == "feat":
+        categories["Added"].append(clean_desc)
+    elif ctype in ("refactor", "perf"):
+        categories["Changed"].append(clean_desc)
+    elif ctype == "fix":
+        categories["Fixed"].append(clean_desc)
+    elif ctype in ("sec", "security"):
+        categories["Security"].append(clean_desc)
+    elif ctype == "revert":
+        categories["Removed"].append(clean_desc)
+
+# Read existing released sections if present to preserve history
+existing_releases = ""
+existing_links = []
+if os.path.exists(changelog_file):
+    with open(changelog_file, "r", encoding="utf-8") as f:
+        existing_text = f.read()
+    match = re.search(r"\n(## \[\d+\.\d+\.\d+\].*)", existing_text, re.DOTALL)
+    if match:
+        existing_releases = match.group(1).strip()
+
+content = [
+    "# Changelog",
+    "",
+    "All notable changes to this project will be documented in this file.",
+    "",
+    "The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),",
+    "and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).",
+    "",
+    "## [Unreleased]",
+    ""
+]
+
+for cat in ["Added", "Changed", "Deprecated", "Removed", "Fixed", "Security"]:
+    items = categories[cat]
+    if items:
+        content.append(f"### {cat}")
+        content.append("")
+        for item in items:
+            content.append(f"- {item}")
+        content.append("")
+
+if existing_releases:
+    content.append(existing_releases)
+    content.append("")
+
+# Link reference definitions
+content.append("[Unreleased]: https://github.com/M7-C5/Alcove/tree/dev")
+content.append("")
+
+with open(changelog_file, "w", encoding="utf-8") as f:
+    f.write("\n".join(content))
 EOF
 
-if [ -n "$FEAT" ]; then
-    echo "### Added" >> "$CHANGELOG_FILE"
-    echo "$FEAT" >> "$CHANGELOG_FILE"
-    echo "" >> "$CHANGELOG_FILE"
-fi
-
-if [ -n "$CHANGED" ]; then
-    echo "### Changed" >> "$CHANGELOG_FILE"
-    echo "$CHANGED" >> "$CHANGELOG_FILE"
-    echo "" >> "$CHANGELOG_FILE"
-fi
-
-if [ -n "$FIX" ]; then
-    echo "### Fixed" >> "$CHANGELOG_FILE"
-    echo "$FIX" >> "$CHANGELOG_FILE"
-    echo "" >> "$CHANGELOG_FILE"
-fi
-
-if [ -n "$PERFORMANCE" ]; then
-    echo "### Performance" >> "$CHANGELOG_FILE"
-    echo "$PERFORMANCE" >> "$CHANGELOG_FILE"
-    echo "" >> "$CHANGELOG_FILE"
-fi
-
-if [ -n "$DOCS" ]; then
-    echo "### Documentation" >> "$CHANGELOG_FILE"
-    echo "$DOCS" >> "$CHANGELOG_FILE"
-    echo "" >> "$CHANGELOG_FILE"
-fi
-
-if [ -n "$CHORE" ]; then
-    echo "### Tooling & Maintenance" >> "$CHANGELOG_FILE"
-    echo "$CHORE" >> "$CHANGELOG_FILE"
-    echo "" >> "$CHANGELOG_FILE"
-fi
-
-echo "✅ Successfully updated CHANGELOG.md"
+echo "✅ Successfully updated CHANGELOG.md adhering strictly to Keep a Changelog 1.1.0"
