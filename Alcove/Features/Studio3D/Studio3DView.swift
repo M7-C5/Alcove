@@ -16,6 +16,7 @@ public struct Studio3DView: View {
     @State private var wasSnapped: Bool = false
     @State private var ghostFurnitureID: UUID? = nil
     @State private var ghostFloorPosition: SIMD3<Float>? = nil
+    @State private var isARWalkthroughPresented: Bool = false
 
     public init(room: Room, stage: StageType = .rearrangement) {
         self.room = room
@@ -28,32 +29,34 @@ public struct Studio3DView: View {
 
         GeometryReader { geometry in
             ZStack(alignment: .topLeading) {
-                // Interactive 3D RealityKit Viewport
-                Studio3DViewport(
-                    room: room,
-                    selectedFurnitureID: $bindableVM.selectedFurnitureID,
-                    selectedFurnitureScreenPosition: $selectedFurnitureScreenPosition,
-                    viewportSize: geometry.size,
-                    ghostFurnitureID: ghostFurnitureID,
-                    ghostFloorPosition: ghostFloorPosition,
-                    onFurnitureMoved: { event in
-                        viewModel.handleFurnitureMoved(event)
-                    },
-                    onFloorRaycasterResolved: { raycaster in
-                        viewModel.floorRaycaster = raycaster
-                    },
-                    onSnapToViewportResolved: { snapper in
-                        viewModel.snapToViewport = snapper
-                    },
-                    onTapBackground: {
-                        if viewModel.isArchiveListPresented {
-                            withAnimation(.spring(response: 0.35, dampingFraction: 0.78)) {
-                                viewModel.isArchiveListPresented = false
+                // Interactive 3D RealityKit Viewport (unmounted during AR Walkthrough to prevent camera/Metal device contention)
+                if !isARWalkthroughPresented {
+                    Studio3DViewport(
+                        room: room,
+                        selectedFurnitureID: $bindableVM.selectedFurnitureID,
+                        selectedFurnitureScreenPosition: $selectedFurnitureScreenPosition,
+                        viewportSize: geometry.size,
+                        ghostFurnitureID: ghostFurnitureID,
+                        ghostFloorPosition: ghostFloorPosition,
+                        onFurnitureMoved: { event in
+                            viewModel.handleFurnitureMoved(event)
+                        },
+                        onFloorRaycasterResolved: { raycaster in
+                            viewModel.floorRaycaster = raycaster
+                        },
+                        onSnapToViewportResolved: { snapper in
+                            viewModel.snapToViewport = snapper
+                        },
+                        onTapBackground: {
+                            if viewModel.isArchiveListPresented {
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.78)) {
+                                    viewModel.isArchiveListPresented = false
+                                }
+                                playSnapFeedback()
                             }
-                            playSnapFeedback()
                         }
-                    }
-                )
+                    )
+                }
 
                 // Resign-style Circular Sims Action HUD projected over selected furniture
                 if let furniture = viewModel.selectedFurniture,
@@ -158,6 +161,28 @@ public struct Studio3DView: View {
                         .buttonStyle(.plain)
                         .accessibilityLabel("Point of View")
 
+                        // 1:1 Life-Size AR Walkthrough Button
+                        Button {
+                            isARWalkthroughPresented = true
+                            playSnapFeedback()
+                        } label: {
+                            Image(systemName: "arkit")
+                                .font(.body.weight(.semibold))
+                                .foregroundStyle(.primary)
+                                .frame(width: 44, height: 44)
+                                .background(.regularMaterial, in: Circle())
+                                .overlay(
+                                    Circle().stroke(Color.primary.opacity(0.08), lineWidth: 1)
+                                )
+                                .shadow(
+                                    color: Color.black.opacity(0.04),
+                                    radius: 8,
+                                    y: 2
+                                )
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Launch 1:1 Life-Size AR Walkthrough")
+
                         // Circular Archive Button (Icon + number badge pinned on top right)
                         Button {
                             withAnimation(.spring(response: 0.35, dampingFraction: 0.78)) {
@@ -252,6 +277,9 @@ public struct Studio3DView: View {
         }
         .ignoresSafeArea()
         .navigationBarBackButtonHidden(true)
+        .fullScreenCover(isPresented: $isARWalkthroughPresented) {
+            ARWalkthroughView(room: room)
+        }
     }
 
     private func handleStepRotate(for furniture: Furniture) {
