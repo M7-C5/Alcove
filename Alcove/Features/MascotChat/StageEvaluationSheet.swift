@@ -7,17 +7,20 @@ public struct StageEvaluationSheet: View {
     let stage: StageType
     let onProceedAnyway: () -> Void
     let onKeepRefining: () -> Void
+    let onReevaluate: (() -> Void)?
 
     public init(
         result: StageEvaluationResult,
         stage: StageType,
         onProceedAnyway: @escaping () -> Void,
-        onKeepRefining: @escaping () -> Void
+        onKeepRefining: @escaping () -> Void,
+        onReevaluate: (() -> Void)? = nil
     ) {
         self.result = result
         self.stage = stage
         self.onProceedAnyway = onProceedAnyway
         self.onKeepRefining = onKeepRefining
+        self.onReevaluate = onReevaluate
     }
 
     private var scoreColor: Color {
@@ -192,6 +195,15 @@ public struct StageEvaluationSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") { dismiss() }
+                }
+                if let onReevaluate {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button {
+                            onReevaluate()
+                        } label: {
+                            Label("Re-evaluate", systemImage: "arrow.clockwise")
+                        }
+                    }
                 }
             }
         }

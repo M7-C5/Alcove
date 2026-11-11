@@ -74,6 +74,38 @@ struct Studio3DViewModelTests {
         #expect(vm.currentStage == .rearrangement)
     }
 
+    @Test func evaluationCachingReusesResultUntilLayoutChanges() async {
+        let room = SampleData.createStarterRoom()
+        let vm = Studio3DViewModel(room: room, stage: .audit)
+
+        #expect(vm.hasPendingLayoutChanges == true)
+        #expect(vm.evaluationResult == nil)
+
+        // 1. Initial evaluation
+        let result1 = await vm.evaluateCurrentStage()
+
+        #expect(result1 != nil)
+        #expect(vm.evaluationResult != nil)
+        #expect(vm.hasPendingLayoutChanges == false)
+        let initialTitle = vm.evaluationResult?.title
+
+        // 2. Trigger again without changes -> reuses existing evaluation without re-evaluating
+        let result2 = await vm.evaluateCurrentStage()
+        #expect(result2?.title == initialTitle)
+        #expect(vm.hasPendingLayoutChanges == false)
+
+        // 3. Move a furniture piece -> marks layout dirty
+        let moveEvent = FurnitureMoveEvent(
+            furnitureName: "Queen Bed",
+            category: .bed,
+            oldPosition: (x: -1.2, z: -1.5),
+            newPosition: (x: -1.0, z: -1.5),
+            rotationYaw: 0.0
+        )
+        vm.handleFurnitureMoved(moveEvent)
+        #expect(vm.hasPendingLayoutChanges == true)
+    }
+
     @Test func furnitureMoveTriggersMicroReactionAndBoldRearrangement() {
         let room = SampleData.createStarterRoom()
         let vm = Studio3DViewModel(room: room, stage: .rearrangement)
