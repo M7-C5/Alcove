@@ -40,6 +40,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Anchor sunlight to window opening and preserve shadows during wall cutaways.
+- Replace solid window border with hollow casing and transparent glass.
+- Update top architectural pov preset icon to horizontal top press.
 - Replace arkit symbol with text label on top toolbar ar button.
 - Update orbit hud icons to use clockwise rotate and archivebox.
 - Configure camera usage description for arkit world tracking.
