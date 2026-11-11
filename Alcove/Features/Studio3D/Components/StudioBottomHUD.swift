@@ -55,14 +55,14 @@ public struct StudioBottomHUD: View {
                     Text(attributed)
                         .font(.footnote)
                         .foregroundStyle(.primary)
-                        .lineLimit(2)
+                        .lineLimit(3)
                         .minimumScaleFactor(0.85)
                         .animation(.easeInOut, value: mascotMessage)
                 } else {
                     Text(mascotMessage)
                         .font(.footnote)
                         .foregroundStyle(.primary)
-                        .lineLimit(2)
+                        .lineLimit(3)
                         .minimumScaleFactor(0.85)
                         .animation(.easeInOut, value: mascotMessage)
                 }
@@ -106,7 +106,7 @@ public struct StudioBottomHUD: View {
                 .fill(.regularMaterial)
                 .shadow(color: .black.opacity(0.10), radius: 10, x: 0, y: 4)
         )
-        .frame(maxWidth: 560)
+        .frame(maxWidth: 620)
         .padding(.leading, 20)
         .padding(.bottom, 12)
     }
