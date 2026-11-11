@@ -96,6 +96,11 @@ public struct AIModelConfigSheet: View {
                     Button("Done") { dismiss() }
                 }
             }
+            .onAppear {
+                if apiKeyInput.isEmpty && !LLMMascotAIService.shared.apiKey.isEmpty {
+                    apiKeyInput = LLMMascotAIService.shared.apiKey
+                }
+            }
             .overlay(alignment: .bottom) {
                 if showingSavedToast {
                     Text("Settings Saved Successfully")
