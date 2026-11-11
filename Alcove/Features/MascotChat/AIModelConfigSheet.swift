@@ -1,12 +1,11 @@
 import SwiftUI
 
-/// Settings sheet to configure Claude / GPT-4o API keys and inspect live spatial context
+/// Settings sheet to configure Google Gemini API credentials and inspect live spatial context
 public struct AIModelConfigSheet: View {
     @Environment(\.dismiss) private var dismiss
     let room: Room
     let currentStage: StageType
 
-    @State private var selectedProvider: LLMProvider
     @State private var apiKeyInput: String
     @State private var showingSavedToast: Bool = false
 
@@ -15,40 +14,27 @@ public struct AIModelConfigSheet: View {
     public init(room: Room, currentStage: StageType) {
         self.room = room
         self.currentStage = currentStage
-        self._selectedProvider = State(initialValue: LLMMascotAIService.shared.provider)
         self._apiKeyInput = State(initialValue: LLMMascotAIService.shared.apiKey)
     }
 
     public var body: some View {
         NavigationStack {
             Form {
-                // Section 1: Provider & Credentials
-                Section("AI Companion Engine") {
-                    Picker("Model Provider", selection: $selectedProvider) {
-                        ForEach(LLMProvider.allCases, id: \.self) { p in
-                            Text(p.rawValue).tag(p)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .onChange(of: selectedProvider) { _, newValue in
-                        LLMMascotAIService.shared.provider = newValue
-                    }
-
+                // Section 1: Google Gemini Credentials
+                Section("Google Gemini AI Companion") {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text(providerKeyLabel)
+                        Label("Google Gemini API Key(s)", systemImage: "sparkles")
                             .font(.caption.bold())
                             .foregroundStyle(.secondary)
 
-                        SecureField(providerPlaceholder, text: $apiKeyInput)
+                        SecureField("Enter Gemini API Key(s)...", text: $apiKeyInput)
                             .textFieldStyle(.roundedBorder)
                             .autocorrectionDisabled()
                             .textInputAutocapitalization(.never)
 
-                        if selectedProvider == .gemini {
-                            Text("💡 Tip: Paste 1 or multiple keys (separated by commas) to automatically rotate between accounts when daily limits are reached! (1,500 free requests/day per account at aistudio.google.com)")
-                                .font(.caption2)
-                                .foregroundStyle(.blue)
-                        }
+                        Text("💡 Tip: Paste 1 or multiple keys (separated by commas) to automatically rotate between accounts when daily limits are reached! (1,500 free requests/day per account at aistudio.google.com)")
+                            .font(.caption2)
+                            .foregroundStyle(.blue)
 
                         HStack {
                             Button("Save API Key") {
@@ -73,7 +59,7 @@ public struct AIModelConfigSheet: View {
                     HStack {
                         Image(systemName: LLMMascotAIService.shared.apiKey.isEmpty ? "bolt.slash.fill" : "checkmark.seal.fill")
                             .foregroundStyle(LLMMascotAIService.shared.apiKey.isEmpty ? .orange : .green)
-                        Text(LLMMascotAIService.shared.apiKey.isEmpty ? "Offline Heuristics (Panero & Zelnik + Ramstedt active)" : "Connected to \(selectedProvider.rawValue)")
+                        Text(LLMMascotAIService.shared.apiKey.isEmpty ? "Offline Heuristic Fallback" : "Connected (Google Gemini Cloud Brain Active)")
                             .font(.caption)
                     }
                 }
@@ -126,22 +112,6 @@ public struct AIModelConfigSheet: View {
                         }
                 }
             }
-        }
-    }
-
-    private var providerKeyLabel: String {
-        switch selectedProvider {
-        case .gemini: return "Google Gemini API Key (Free Tier)"
-        case .claude: return "Anthropic Claude API Key"
-        case .openai: return "OpenAI API Key"
-        }
-    }
-
-    private var providerPlaceholder: String {
-        switch selectedProvider {
-        case .gemini: return "Enter Gemini API Key(s)..."
-        case .claude: return "Enter Claude API Key..."
-        case .openai: return "Enter OpenAI API Key..."
         }
     }
 }
