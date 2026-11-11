@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add ar walkthrough button to top toolbar and wire full screen presentation.
+- Implement 1:1 life-size spatial walkthrough viewport and view model.
+- Add ceiling cutaway evaluator and placement coordinate engine.
 - Add point of view snap menu to top toolbar beside archive dock button.
 - Implement ease-in-out orbit camera snapping and dynamic cutaway updates in viewport.
 - Add architectural viewport presets for top, elevations, and reset angles.
@@ -32,10 +35,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Extract procedural room shell builder for multi-viewport reuse.
 - Structure autonomous vertical slices with dedicated view models and components.
 
 ### Fixed
 
+- Configure camera usage description for arkit world tracking.
 - Annotate MascotAIService and test suites with @MainActor for Swift 6.
 - Resolve iPad interface orientations, bundle id, and app icon assets.
 
