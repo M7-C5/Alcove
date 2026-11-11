@@ -9,14 +9,19 @@ struct LLMMascotAIServiceTests {
         let room = SampleData.createStarterRoom()
         let serializer = RoomSpatialContextSerializer()
 
-        let context = serializer.serialize(room: room, stage: .audit)
+        let auditContext = serializer.serialize(room: room, stage: .audit)
 
-        #expect(context.contains("CURRENT ROOM STATE"))
-        #expect(context.contains("Stage: 1"))
-        #expect(context.contains("Queen Bed"))
-        #expect(context.contains("Work Desk"))
-        #expect(context.contains("PANERO & ZELNIK CLEARANCE AUDIT"))
-        #expect(context.contains("LIGHTING & FIXTURE AUDIT"))
+        #expect(auditContext.contains("CURRENT ROOM STATE"))
+        #expect(auditContext.contains("Stage: 1"))
+        #expect(auditContext.contains("Queen Bed"))
+        #expect(auditContext.contains("Work Desk"))
+        #expect(auditContext.contains("PANERO & ZELNIK CLEARANCE AUDIT"))
+        #expect(auditContext.contains("STAGE 1 CURRENT SITUATION & INTAKE"))
+        #expect(!auditContext.contains("LIGHTING & FIXTURE AUDIT"))
+
+        // Lighting audit only active in Stages 3 & 4
+        let illuminationContext = serializer.serialize(room: room, stage: .illumination)
+        #expect(illuminationContext.contains("LIGHTING & FIXTURE AUDIT"))
     }
 
     @Test @MainActor func llmMascotAsksWithoutApiKeyFallsBackToHeuristics() async {
@@ -43,14 +48,21 @@ struct LLMMascotAIServiceTests {
     }
 
     @Test @MainActor func multiKeyParsingAndRotation() {
-        let service = LLMMascotAIService()
         let originalDevKey = LLMMascotAIService.hardcodedDeveloperKey
         let originalBypass = LLMMascotAIService.bypassFileSecretLoading
+        let originalUserKey = UserDefaults.standard.string(forKey: "alcove_llm_api_key")
         defer {
             LLMMascotAIService.hardcodedDeveloperKey = originalDevKey
             LLMMascotAIService.bypassFileSecretLoading = originalBypass
+            if let originalUserKey {
+                UserDefaults.standard.set(originalUserKey, forKey: "alcove_llm_api_key")
+            } else {
+                UserDefaults.standard.removeObject(forKey: "alcove_llm_api_key")
+            }
         }
+        UserDefaults.standard.removeObject(forKey: "alcove_llm_api_key")
         LLMMascotAIService.bypassFileSecretLoading = true
+        let service = LLMMascotAIService()
 
         // Test comma separated keys
         LLMMascotAIService.hardcodedDeveloperKey = "key_alpha_1, key_beta_2 , key_gamma_3"

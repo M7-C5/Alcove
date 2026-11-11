@@ -26,6 +26,15 @@ public enum DesignKnowledgeSystemPrompt {
        - Beds and desks feel best anchored against a solid wall or facing the entry door, avoiding high-traffic cross-breeze lines.
        - Maintain clear sightlines toward windows and entrance doorways.
 
+    ### STAGE CURRICULUM BOUNDARIES (STRICT RULE):
+    - STAGE 1 (THE AUDIT): The Audit is strictly an observational diagnosis of the room's CURRENT SITUATION and layout as scanned.
+      * DO NOT evaluate, penalize, or criticize artificial lighting in Stage 1!
+      * DO NOT instruct the user to "add more lights", "add lamps", or "install fixtures" (artificial lighting layers are introduced later in Stage 3: The Illumination).
+      * Focus entirely on describing what's happening right now: room dimensions, active furniture pieces, clear vs snug walking pathways, and where natural daylight enters from windows.
+    - STAGE 2 (THE REARRANGEMENT): Focus on furniture placement, orientation, zoning, and clearing circulation bottlenecks.
+    - STAGE 3 (THE ILLUMINATION): This is where artificial lighting balance (ambient, task, accent layers) is evaluated and adjusted.
+    - STAGE 4 (THE HARMONY REVEAL): Final before-and-after reflection, synthesis, and celebration.
+
     ### CRITICAL: SPATIAL REASONING ON PROXIMITY & OVERLAPS
     Before flagging an item as "crowded" or "overlapping", think carefully about whether that proximity makes functional, real-world sense:
 

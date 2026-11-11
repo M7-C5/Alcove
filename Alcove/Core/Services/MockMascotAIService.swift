@@ -58,20 +58,20 @@ public final class MockMascotAIService: MascotAIServiceProtocol {
             var bottlenecks: [SpatialBottleneck] = []
             if furnitures.count > 5 {
                 bottlenecks.append(SpatialBottleneck(
-                    title: "High Density Clutter",
-                    detail: "The room contains \(furnitures.count) active pieces. Consider archiving or spacing them out.",
+                    title: "High Density Space",
+                    detail: "The room currently contains \(furnitures.count) active pieces in the baseline layout.",
                     severity: .notice
                 ))
             }
 
             return StageEvaluationResult(
                 canAdvance: true,
-                score: 85,
-                title: "Audit Complete",
-                dialogue: "You've thoroughly inspected the space! Notice the high-traffic pathways. When you're ready, let's move to Stage 2 to rearrange.",
+                score: 100,
+                title: "Baseline Audit Captured",
+                dialogue: "We've mapped out the baseline flow of your room! Notice where the main pathways feel open and where pieces cluster together. When you're ready, let's move to Stage 2 to start rearranging.",
                 bottlenecks: bottlenecks,
-                recommendations: ["Review clearances near entry door", "Identify natural light focal wall"],
-                praise: ["Baseline scan captured cleanly", "Room boundaries well defined"]
+                recommendations: ["Review natural walking pathways from the door", "Notice where daylight enters through the windows"],
+                praise: ["Baseline room scan captured cleanly", "Room boundaries and furniture mapped"]
             )
 
         case .rearrangement:
