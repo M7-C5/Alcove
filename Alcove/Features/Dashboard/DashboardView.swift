@@ -14,6 +14,7 @@ public struct DashboardView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
                     headerSection
+                    lightingTestShortcut
 
                     if rooms.isEmpty {
                         emptyStateSection
@@ -62,8 +63,50 @@ public struct DashboardView: View {
                     viewModel.addScannedRoom(scannedRoom, modelContext: modelContext)
                 }
             }
+            .fullScreenCover(item: $viewModel.lightingTestSession) { session in
+                NavigationStack {
+                    Studio3DView(room: session.room, stage: .illumination)
+                }
+                .environment(session.router)
+                .modelContainer(session.container)
+            }
+            .alert("Could not open lighting test", isPresented: Binding(
+                get: { viewModel.lightingTestError != nil },
+                set: { if !$0 { viewModel.lightingTestError = nil } }
+            )) {
+                Button("OK", role: .cancel) { viewModel.lightingTestError = nil }
+            } message: {
+                Text(viewModel.lightingTestError ?? "Please try again.")
+            }
         }
         .environment(router)
+    }
+
+    private var lightingTestShortcut: some View {
+        Button { viewModel.startLightingTest() } label: {
+            HStack(spacing: 16) {
+                Image(systemName: "lightbulb.fill")
+                    .font(.title2)
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(.tint)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Test Lighting").font(.headline)
+                    Text("Add lights and try the simulation in a temporary mock bedroom layout.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.leading)
+                }
+                Spacer(minLength: 8)
+                Image(systemName: "chevron.right").foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+            .padding(24)
+            .background(Color(uiColor: .secondarySystemGroupedBackground),
+                        in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint("Opens the lighting workspace without completing earlier stages.")
     }
 
     private var headerSection: some View {
