@@ -19,7 +19,11 @@ public final class Studio3DViewModel {
     public var cameraState = SpatialViewportCameraState()
 
     // Stage 3 Illumination state & contracts (Area 1)
-    public var daylightHour: Double = 12.0 // 12 PM noon
+    var lightingSettings = LightingSimulationSettings()
+    public var daylightHour: Double {
+        get { lightingSettings.hourOfDay }
+        set { lightingSettings.minuteOfDay = newValue.isFinite ? Int(min(1439, max(0, (newValue * 60).rounded()))) : 720 }
+    }
     public let illuminationEngine = IlluminationSimulationEngine()
 
     // Stage 4 Harmony Reveal state & contracts (Area 2)
