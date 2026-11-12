@@ -110,5 +110,16 @@ struct LLMMascotAIServiceTests {
         vm.completeWalkthrough()
         #expect(vm.isWalkthroughActive == false)
     }
+
+    @Test @MainActor func bookshelfAndWardrobeOrientationSerialization() {
+        let room = SampleData.createStarterRoom()
+        let serializer = RoomSpatialContextSerializer()
+        let context = serializer.serialize(room: room, stage: .audit)
+
+        // Bookshelf is at x = -1.8, yaw = 90° -> must be recognized as facing inward into the room
+        #expect(context.contains("Bookshelf"))
+        #expect(context.contains("Facing: INWARD into the room (toward center)"))
+        #expect(context.contains("Anchored at Left Wall"))
+    }
 }
 

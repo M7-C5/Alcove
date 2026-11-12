@@ -144,6 +144,7 @@ public final class LLMMascotAIService: MascotAIServiceProtocol {
                 - DO NOT mention, score, or criticize artificial lighting, lamps, or fixtures! DO NOT tell the user to "add more lights" or "add lamps" (artificial lighting belongs strictly to Stage 3: The Illumination).
                 - There is NO score penalty in Stage 1. Return "score": 100 and "canAdvance": true.
                 - Describe what is happening right now in the room based on the layout data: room scale, current active furniture pieces, natural walking pathways (roomy vs snug), and where daylight enters.
+                - Note furniture facing: Pieces marked 'Facing: INWARD into the room (toward center)' are ALREADY properly facing the room. DO NOT tell the user to make them face the room.
                 - Mascot voice: warm, perceptive interior design buddy diagnosing what's currently here (under 35 words).
 
                 Return ONLY a raw JSON object (no markdown quotes, no explanation) with this exact schema:
@@ -159,6 +160,9 @@ public final class LLMMascotAIService: MascotAIServiceProtocol {
             } else {
                 evaluationPrompt = """
                 Perform a formal stage completion evaluation for \(stage.title) (Stage \(stage.stageNumber)).
+                CRITICAL CURRICULUM & ORIENTATION RULES:
+                - The spatial context explicitly calculates whether each furniture piece is facing inward toward the center of the room (e.g. 'Facing: INWARD into the room (toward center)').
+                - When a Bookshelf, Wardrobe, Desk, Bed, or storage unit is marked as 'Facing: INWARD into the room (toward center)', it is ALREADY properly facing into the room. NEVER tell the user to "rotate it to face the room", "turn it toward the room", or "face into the room".
                 Return ONLY a raw JSON object (no markdown quotes, no explanation) with this exact schema:
                 {
                   "canAdvance": true/false,
@@ -185,8 +189,42 @@ public final class LLMMascotAIService: MascotAIServiceProtocol {
                 let score = parsed["score"] as? Int ?? baseline.score
                 let title = parsed["title"] as? String ?? baseline.title
                 let dialogue = parsed["dialogue"] as? String ?? baseline.dialogue
-                let recs = parsed["recommendations"] as? [String] ?? baseline.recommendations
+                let rawRecs = parsed["recommendations"] as? [String] ?? baseline.recommendations
                 let praise = parsed["praise"] as? [String] ?? baseline.praise
+
+                let furnitures = room.workingLayout?.furnitures.filter { !$0.isArchived } ?? []
+                var filteredRecs: [String] = []
+                for rec in rawRecs {
+                    let lower = rec.lowercased()
+                    // Filter out hallucinated "face the room" tips for items that are already facing inward into the room
+                    if lower.contains("face") && (lower.contains("room") || lower.contains("inward") || lower.contains("center") || lower.contains("door")) {
+                        let mentionsBookshelf = lower.contains("bookshelf") || lower.contains("shelf")
+                        let mentionsWardrobe = lower.contains("wardrobe") || lower.contains("cupboard") || lower.contains("storage")
+                        let mentionsDesk = lower.contains("desk")
+                        let mentionsBed = lower.contains("bed")
+
+                        let isItemAlreadyFacingRoom = furnitures.contains { f in
+                            let matches = (mentionsBookshelf && (f.name.localizedCaseInsensitiveContains("bookshelf") || f.name.localizedCaseInsensitiveContains("shelf"))) ||
+                                          (mentionsWardrobe && (f.name.localizedCaseInsensitiveContains("wardrobe") || f.category == .storage)) ||
+                                          (mentionsDesk && (f.name.localizedCaseInsensitiveContains("desk") || f.category == .table)) ||
+                                          (mentionsBed && (f.name.localizedCaseInsensitiveContains("bed") || f.category == .bed))
+                            guard matches else { return false }
+                            let facingX = sin(f.rotationYaw)
+                            let facingZ = cos(f.rotationYaw)
+                            let dot = facingX * (-f.positionX) + facingZ * (-f.positionZ)
+                            return dot > 0.05 // Already facing inward into the room!
+                        }
+
+                        if isItemAlreadyFacingRoom {
+                            continue
+                        }
+                    }
+                    filteredRecs.append(rec)
+                }
+
+                if filteredRecs.isEmpty {
+                    filteredRecs = baseline.recommendations
+                }
 
                 return StageEvaluationResult(
                     canAdvance: canAdvance && baseline.canAdvance, // Safety: cannot advance if critical physical collision exists
@@ -194,7 +232,7 @@ public final class LLMMascotAIService: MascotAIServiceProtocol {
                     title: title,
                     dialogue: dialogue,
                     bottlenecks: baseline.bottlenecks,
-                    recommendations: recs,
+                    recommendations: filteredRecs,
                     praise: praise
                 )
             }
