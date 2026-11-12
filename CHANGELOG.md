@@ -50,6 +50,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Compute wall proximity from outer boundary extents to prevent false center-room placement.
+- Generate room-aware dynamic recommendations naming active furniture and sanitize awkward placement wording.
+- Replace textbook recommendations section header with friendly design tips.
 - Serialize inward facing vectors and filter hallucinated orientation tips for storage furniture.
 - Recognize task lighting companion pairs and exempt from walkway circulation bottlenecks.
 - Anchor sunlight to window opening and preserve shadows during wall cutaways.
