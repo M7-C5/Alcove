@@ -10,6 +10,7 @@ public enum LLMProvider: String, CaseIterable, Codable, Sendable {
 public final class LLMMascotAIService: MascotAIServiceProtocol {
     private let fallbackService = MockMascotAIService()
     private let contextSerializer = RoomSpatialContextSerializer()
+    private let factVerifier = SpatialFactVerifier()
 
     public static let shared = LLMMascotAIService()
 
@@ -193,74 +194,26 @@ public final class LLMMascotAIService: MascotAIServiceProtocol {
                 let canAdvance = parsed["canAdvance"] as? Bool ?? baseline.canAdvance
                 let score = parsed["score"] as? Int ?? baseline.score
                 let title = parsed["title"] as? String ?? baseline.title
-                let dialogue = parsed["dialogue"] as? String ?? baseline.dialogue
+                let rawDialogue = parsed["dialogue"] as? String ?? baseline.dialogue
                 let rawRecs = parsed["recommendations"] as? [String] ?? baseline.recommendations
                 let praise = parsed["praise"] as? [String] ?? baseline.praise
 
-                let furnitures = room.workingLayout?.furnitures.filter { !$0.isArchived } ?? []
-
-                var cleanDialogue = dialogue
-                // Sanitize awkward "floating comfortably" or "in the center" hallucinations if bed is near wall
-                let hasBedNearWall = furnitures.contains { $0.category == .bed && (abs($0.positionX) > 0.6 || abs($0.positionZ) > 0.6) }
-                if hasBedNearWall {
-                    cleanDialogue = cleanDialogue
-                        .replacingOccurrences(of: "floating comfortably", with: "anchored neatly against the wall", options: .caseInsensitive)
-                        .replacingOccurrences(of: "floating", with: "placed", options: .caseInsensitive)
-                        .replacingOccurrences(of: "in the center", with: "along the wall", options: .caseInsensitive)
-                }
-
-                var filteredRecs: [String] = []
-                for rec in rawRecs {
-                    let lower = rec.lowercased()
-                    // Filter out hallucinated "face the room" tips for items that are already facing inward into the room
-                    if lower.contains("face") && (lower.contains("room") || lower.contains("inward") || lower.contains("center") || lower.contains("door")) {
-                        let mentionsBookshelf = lower.contains("bookshelf") || lower.contains("shelf")
-                        let mentionsWardrobe = lower.contains("wardrobe") || lower.contains("cupboard") || lower.contains("storage")
-                        let mentionsDesk = lower.contains("desk")
-                        let mentionsBed = lower.contains("bed")
-
-                        let isItemAlreadyFacingRoom = furnitures.contains { f in
-                            let matches = (mentionsBookshelf && (f.name.localizedCaseInsensitiveContains("bookshelf") || f.name.localizedCaseInsensitiveContains("shelf"))) ||
-                                          (mentionsWardrobe && (f.name.localizedCaseInsensitiveContains("wardrobe") || f.category == .storage)) ||
-                                          (mentionsDesk && (f.name.localizedCaseInsensitiveContains("desk") || f.category == .table)) ||
-                                          (mentionsBed && (f.name.localizedCaseInsensitiveContains("bed") || f.category == .bed))
-                            guard matches else { return false }
-                            let facingX = sin(f.rotationYaw)
-                            let facingZ = cos(f.rotationYaw)
-                            let dot = facingX * (-f.positionX) + facingZ * (-f.positionZ)
-                            return dot > 0.05 // Already facing inward into the room!
-                        }
-
-                        if isItemAlreadyFacingRoom {
-                            continue
-                        }
-                    }
-
-                    // Filter out hallucinated "center" or "floating" tips for pieces placed along walls
-                    if (lower.contains("center") || lower.contains("floating") || lower.contains("middle")) && (lower.contains("bed") || lower.contains("desk")) {
-                        let isWallBound = furnitures.contains { f in
-                            guard f.category == .bed || f.category == .table else { return false }
-                            return abs(f.positionX) > 0.6 || abs(f.positionZ) > 0.6
-                        }
-                        if isWallBound {
-                            continue
-                        }
-                    }
-
-                    filteredRecs.append(rec)
-                }
-
-                if filteredRecs.isEmpty {
-                    filteredRecs = baseline.recommendations
-                }
+                // Enforce deterministic spatial truth through the fact verifier pipeline
+                let verified = factVerifier.verifyAndSanitize(
+                    dialogue: rawDialogue,
+                    recommendations: rawRecs,
+                    room: room,
+                    stage: stage,
+                    baseline: baseline
+                )
 
                 return StageEvaluationResult(
                     canAdvance: canAdvance && baseline.canAdvance, // Safety: cannot advance if critical physical collision exists
                     score: score,
                     title: title,
-                    dialogue: cleanDialogue,
+                    dialogue: verified.dialogue,
                     bottlenecks: baseline.bottlenecks,
-                    recommendations: filteredRecs,
+                    recommendations: verified.recommendations,
                     praise: praise
                 )
             }
@@ -326,7 +279,16 @@ public final class LLMMascotAIService: MascotAIServiceProtocol {
             let spatialContext = contextSerializer.serialize(room: room, stage: currentStage)
             let answer = try await callGeminiAPI(question: question, context: spatialContext)
             self.isQuotaExhausted = false
-            return answer
+
+            // Validate against spatial hallucinations via deterministic SpatialFactVerifier
+            let fallbackAnswer = await fallbackService.askMascot(question: question, currentStage: currentStage, room: room)
+            let verifiedAnswer = factVerifier.verifyChatAnswer(
+                answer: answer,
+                room: room,
+                stage: currentStage,
+                fallbackAnswer: fallbackAnswer
+            )
+            return verifiedAnswer
         } catch {
             print("❌ [Alcove AI] Cloud request failed: \(error.localizedDescription). Falling back to local engine.")
             let isQuota = (error as NSError).code == 429 ||
