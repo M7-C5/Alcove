@@ -6,6 +6,44 @@ import simd
 
 @Suite("Lighting fixture models") @MainActor
 struct LightingFixtureModelTests {
+    @Test func previewUsesSharedShellAndDetailedFurnitureWithoutRebuildingOnFixtureEdits() throws {
+        let room = MockRoomGenerator.generateBedroomOfficeCombo()
+        let snapshot = LightingRoomSnapshot(room: room)
+        let scene = LightingRoomScene(snapshot: snapshot)
+        let shell = try #require(scene.root.findEntity(named: "RoomShell"))
+        #expect(shell.findEntity(named: "WindowFrameCasing") != nil)
+        #expect(shell.findEntity(named: "Ceiling") == nil)
+        for name in ["FrontWallGroup", "BackWallGroup", "LeftWallGroup", "RightWallGroup"] {
+            #expect(shell.findEntity(named: name) != nil)
+        }
+        let desk = try #require(snapshot.furnishings.first { $0.category == .table })
+        let model = try #require(scene.root.findEntity(named: "Furniture-\(desk.id)"))
+        #expect(!model.children.isEmpty)
+        #expect(abs(model.position.y - (desk.position.y - desk.dimensions.y / 2)) < 0.001)
+        #expect(simd_distance(model.orientation.act([0, 0, 1]), simd_quatf(angle: desk.yaw, axis: [0, 1, 0]).act([0, 0, 1])) < 0.001)
+        scene.updateFixtures([LightFixture(name: "New lamp", layer: .task, kind: .deskLamp)])
+        #expect(scene.root.findEntity(named: "RoomShell") === shell)
+        #expect(scene.root.findEntity(named: model.name) === model)
+    }
+
+    @Test func cutawayWallsStayEnabledAndRestoreOpacityWhenCameraChanges() throws {
+        guard #available(iOS 18.0, *) else { return }
+        let scene = LightingRoomScene(snapshot: LightingRoomSnapshot(room: MockRoomGenerator.generateBedroomOfficeCombo()))
+        let view = ARView(frame: .zero, cameraMode: .nonAR, automaticallyConfigureSession: false)
+        defer { view.scene.anchors.removeAll() }
+        view.scene.addAnchor(scene.root)
+        let front = try #require(scene.root.findEntity(named: "FrontWallGroup"))
+        let back = try #require(scene.root.findEntity(named: "BackWallGroup"))
+        scene.apply(LightingSimulationSettings(), preset: .front, in: view)
+        #expect(front.isEnabled && back.isEnabled)
+        #expect(front.components[OpacityComponent.self]?.opacity == 0)
+        #expect(back.components[OpacityComponent.self] == nil)
+        scene.apply(LightingSimulationSettings(), preset: .back, in: view)
+        #expect(front.isEnabled && back.isEnabled)
+        #expect(front.components[OpacityComponent.self] == nil)
+        #expect(back.components[OpacityComponent.self]?.opacity == 0)
+    }
+
     @Test(arguments: LightKind.allCases)
     func eachTypeHasRecognizableGeometryAndItsOwnEmitter(kind: LightKind) throws {
         let parts: [LightKind: String] = [.deskLamp: "LowerArm", .standingLamp: "FloorPole",

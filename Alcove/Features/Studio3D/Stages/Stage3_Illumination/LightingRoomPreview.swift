@@ -6,6 +6,8 @@ import simd
 /// Immutable input: changing the clock never re-reads SwiftData or rebuilds furniture meshes.
 struct LightingRoomSnapshot: Sendable {
     struct Furnishing: Sendable {
+        let id: UUID
+        let name: String
         let category: FurnitureCategory
         let position: SIMD3<Float>
         let dimensions: SIMD3<Float>
@@ -22,7 +24,7 @@ struct LightingRoomSnapshot: Sendable {
         let layout = room.workingLayout ?? room.baselineLayout
         fixtures = (draftFixtures ?? layout?.lightFixtures ?? []).map { bounds.clamped($0) }
         furnishings = (layout?.furnitures ?? []).filter { !$0.isArchived }.map {
-            Furnishing(category: $0.category, position: [Float($0.positionX), Float(max(0, $0.positionY) + $0.height / 2), Float($0.positionZ)],
+            Furnishing(id: $0.id, name: $0.name, category: $0.category, position: [Float($0.positionX), Float(max(0, $0.positionY) + $0.height / 2), Float($0.positionZ)],
                        dimensions: [Float(max(0.05, $0.width)), Float(max(0.05, $0.height)), Float(max(0.05, $0.length))],
                        yaw: Float($0.rotationYaw))
         }
@@ -96,7 +98,7 @@ final class LightingRoomScene: NSObject {
     private var previousSettings: LightingSimulationSettings?
     private var previousPreset: ViewportPreset?
     private var navigation = LightingCameraNavigation()
-    private var walls: [(entity: ModelEntity, normal: SIMD3<Float>)] = []
+    private var walls: [(entity: Entity, normal: SIMD3<Float>)] = []
     private var fixtureDefinitions: [LightFixture] = []
     let placementOverlay = ModelEntity()
     private(set) var isPlacementMode = false
@@ -186,27 +188,28 @@ final class LightingRoomScene: NSObject {
     }
 
     private func buildRoom() {
-        let width = Float(snapshot.geometry.width)
-        let length = Float(snapshot.geometry.length)
-        let height = Float(snapshot.geometry.height)
-        addBox(size: [width, 0.1, length], position: [0, -0.05, 0], color: .init(white: 0.65, alpha: 1))
-        // Reuse the studio's cutaway policy when viewing these walls from the back or left.
-        let back = addBox(size: [width, height, 0.1], position: [0, height / 2, -length / 2], color: .init(white: 0.8, alpha: 1))
-        let left = addBox(size: [0.1, height, length], position: [-width / 2, height / 2, 0], color: .init(white: 0.75, alpha: 1))
-        walls = [(back, WallCutawayEvaluator.backNormal), (left, WallCutawayEvaluator.leftNormal)]
-        for item in snapshot.furnishings {
-            addBox(size: item.dimensions, position: item.position, yaw: item.yaw,
-                   color: .init(red: 0.36, green: 0.42, blue: 0.53, alpha: 1))
+        let geometry = snapshot.geometry
+        let shell = ProceduralRoomShellBuilder.buildShell(width: geometry.width, length: geometry.length,
+                                                        height: geometry.height, includeCeiling: false)
+        root.addChild(shell)
+        let wallGroups: [(String, SIMD3<Float>)] = [
+            ("FrontWallGroup", WallCutawayEvaluator.frontNormal),
+            ("BackWallGroup", WallCutawayEvaluator.backNormal),
+            ("LeftWallGroup", WallCutawayEvaluator.leftNormal),
+            ("RightWallGroup", WallCutawayEvaluator.rightNormal)
+        ]
+        walls = wallGroups.compactMap { name, normal in
+            shell.findEntity(named: name).map { (entity: $0, normal: normal) }
         }
-    }
-
-    @discardableResult
-    private func addBox(size: SIMD3<Float>, position: SIMD3<Float>, yaw: Float = 0, color: UIColor) -> ModelEntity {
-        let box = ModelEntity(mesh: .generateBox(size: size), materials: [SimpleMaterial(color: color, roughness: 0.8, isMetallic: false)])
-        box.position = position
-        box.orientation = simd_quatf(angle: yaw, axis: [0, 1, 0])
-        root.addChild(box)
-        return box
+        for item in snapshot.furnishings {
+            let model = ProceduralFurnitureBuilder.buildDetailedEntity(name: item.name, category: item.category,
+                                                                      dimensions: item.dimensions)
+            model.name = "Furniture-\(item.id)"
+            // Snapshot positions describe the bounding-box center; shared models start at the feet.
+            model.position = item.position - SIMD3<Float>(0, item.dimensions.y / 2, 0)
+            model.orientation = simd_quatf(angle: item.yaw, axis: [0, 1, 0])
+            root.addChild(model)
+        }
     }
 
     /// Reconcile fixtures while retaining the room meshes, camera and unchanged light identities.
@@ -256,8 +259,19 @@ final class LightingRoomScene: NSObject {
         let pitch = atan2(offset.y, hypot(offset.x, offset.z))
         let orientation = simd_quatf(angle: pitch, axis: [1, 0, 0]) * simd_quatf(angle: -yaw, axis: [0, 1, 0])
         for wall in walls {
-            wall.entity.isEnabled = !WallCutawayEvaluator.isWallHidden(wallNormal: wall.normal,
-                                                                       orientation: orientation, pitch: pitch)
+            let hidden = WallCutawayEvaluator.isWallHidden(wallNormal: wall.normal,
+                                                           orientation: orientation, pitch: pitch)
+            if #available(iOS 18.0, *) {
+                // Keep the complete wall group active for the shadow depth pass.
+                wall.entity.isEnabled = true
+                if hidden {
+                    wall.entity.components.set(OpacityComponent(opacity: 0))
+                } else {
+                    wall.entity.components.remove(OpacityComponent.self)
+                }
+            } else {
+                wall.entity.isEnabled = !hidden
+            }
         }
     }
 

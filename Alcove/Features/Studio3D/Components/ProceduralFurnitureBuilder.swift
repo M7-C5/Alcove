@@ -76,18 +76,25 @@ public struct ProceduralFurnitureBuilder {
 
     /// Builds a detailed multi-part Entity corresponding to the furniture item.
     public static func buildDetailedEntity(for item: Furniture) -> Entity {
+        buildDetailedEntity(name: item.name, category: item.category,
+                            dimensions: [Float(item.width), Float(item.height), Float(item.length)])
+    }
+
+    /// Builds the same geometry from a value snapshot without retaining SwiftData models.
+    public static func buildDetailedEntity(name: String, category: FurnitureCategory,
+                                          dimensions: SIMD3<Float>) -> Entity {
         let root = Entity()
         root.name = "DetailedModel"
 
-        let w = Float(item.width)
-        let l = Float(item.length)
-        let h = Float(item.height)
+        let w = dimensions.x
+        let l = dimensions.z
+        let h = dimensions.y
 
-        switch item.category {
+        switch category {
         case .bed:
             root.addChild(buildBed(width: w, length: l, height: h))
         case .table:
-            if item.name.localizedCaseInsensitiveContains("nightstand") || l < 0.6 {
+            if name.localizedCaseInsensitiveContains("nightstand") || l < 0.6 {
                 root.addChild(buildNightstand(width: w, length: l, height: h))
             } else {
                 root.addChild(buildDesk(width: w, length: l, height: h))

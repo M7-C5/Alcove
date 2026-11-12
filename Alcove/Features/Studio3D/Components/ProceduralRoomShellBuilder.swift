@@ -8,12 +8,19 @@ public struct ProceduralRoomShellBuilder {
     /// Constructs a 3D procedural room shell entity containing floor, perimeter walls,
     /// trim, openings, and optional ceiling plane.
     public static func buildShell(for room: Room, includeCeiling: Bool = false) -> Entity {
+        buildShell(width: room.dimensionsWidth, length: room.dimensionsLength,
+                   height: room.dimensionsHeight, includeCeiling: includeCeiling)
+    }
+
+    /// Value-based entry point for immutable viewport snapshots.
+    public static func buildShell(width: Double, length: Double, height: Double,
+                                  includeCeiling: Bool = false) -> Entity {
         let shell = Entity()
         shell.name = "RoomShell"
 
-        let roomW = Float(room.dimensionsWidth)
-        let roomL = Float(room.dimensionsLength)
-        let roomH = Float(room.dimensionsHeight)
+        let roomW = Float(width)
+        let roomL = Float(length)
+        let roomH = Float(height)
         let wallThickness: Float = 0.12
         let halfW = roomW / 2.0
         let halfL = roomL / 2.0
