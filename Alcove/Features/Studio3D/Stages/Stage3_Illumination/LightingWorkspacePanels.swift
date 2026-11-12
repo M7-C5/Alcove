@@ -79,6 +79,8 @@ struct LightingSourcePanel: View {
         return Button { editor.select(fixture.id) } label: {
             HStack(spacing: 8) {
                 Image(systemName: fixture.resolvedKind.icon)
+                    .font(.subheadline.weight(.semibold))
+                    .frame(width: 24)
                     .opacity(fixture.isOn ? 1 : 0.5)
                 Text(fixture.name)
                     .font(.system(.subheadline, design: .rounded, weight: .bold))
@@ -156,7 +158,7 @@ struct LightingEditPanel: View {
     let onDelete: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 16) {
             HStack {
                 Label("Light settings", systemImage: "lamp.desk.fill")
                     .font(.system(.headline, design: .rounded, weight: .heavy))
@@ -178,8 +180,8 @@ struct LightingEditPanel: View {
                     .padding(.bottom, 16)
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 24)
+        .padding(.vertical, 16)
         .lightingPanel()
     }
 
@@ -217,7 +219,7 @@ struct LightingEditPanel: View {
     private func fixtureControls(_ fixture: LightFixture) -> some View {
         let colorValue = editor.commonTemperature.map { "\($0) K" } ?? "Mixed"
         let brightnessValue = editor.commonBrightness.map { "\(Int($0)) lm" } ?? "Mixed"
-        return VStack(alignment: .leading, spacing: 8) {
+        return VStack(alignment: .leading, spacing: 16) {
             VStack(spacing: 0) {
                 HStack {
                     Text("Light color").font(.subheadline.bold())

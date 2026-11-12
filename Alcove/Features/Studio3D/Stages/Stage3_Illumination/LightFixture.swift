@@ -19,12 +19,12 @@ public enum LightKind: String, Codable, CaseIterable, Sendable, Identifiable {
 
     public var icon: String {
         switch self {
-        case .ceilingLight: return "light.ceiling.fill"
-        case .pendantLight: return "light.pendant.fill"
+        case .ceilingLight: return "lamp.ceiling.fill"
+        case .pendantLight: return "chandelier.fill"
         case .deskLamp: return "lamp.desk.fill"
         case .standingLamp: return "lamp.floor.fill"
         case .tableLamp: return "lamp.table.fill"
-        case .wallLight: return "light.wall.fill"
+        case .wallLight: return "lightbulb.fill"
         }
     }
 

@@ -13,6 +13,7 @@ struct LightingWorkspaceView: View {
     @State private var placement = LightingPlacementState()
     @State private var showingDelete = false
     @State private var saveError: String?
+    @State private var showingARWalkthrough = false
 
     init(room: Room, settings: Binding<LightingSimulationSettings>, onBack: @escaping () -> Void) {
         self.room = room
@@ -51,6 +52,9 @@ struct LightingWorkspaceView: View {
         )) {
             Button("OK", role: .cancel) { saveError = nil }
         } message: { Text(saveError ?? "Please try again.") }
+        .fullScreenCover(isPresented: $showingARWalkthrough) {
+            ARWalkthroughView(room: room)
+        }
         .sensoryFeedback(.impact(weight: .light), trigger: editor.drafts.count)
     }
 
@@ -81,6 +85,15 @@ struct LightingWorkspaceView: View {
             .buttonStyle(.plain)
             .disabled(!editor.hasUnsavedChanges)
             .opacity(editor.hasUnsavedChanges ? 1 : 0.55)
+            Button { showingARWalkthrough = true } label: {
+                Label("AR", systemImage: "arkit")
+                    .font(.subheadline.bold())
+                    .padding(.horizontal, 16)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .background(LightingTheme.row, in: Capsule())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Life-size AR walkthrough")
             cameraMenu
         }
     }
@@ -178,16 +191,11 @@ struct LightingWorkspaceView: View {
                 .font(.subheadline)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
-            LightingRoomPreview(
-                snapshot: LightingRoomSnapshot(room: room, fixtures: editor.drafts),
-                settings: settings,
-                preset: preset,
-                backgroundColor: UIColor(LightingTheme.canvas),
-                onPlaceLight: { point in editor.place(unitX: Double(point.x), unitZ: Double(point.y)) },
-                onSelectLight: { editor.select($0) },
-                isPlacementMode: placement.isActive,
-                selectedFixtureIDs: editor.selectedIDs
-            )
+            Group {
+                if !showingARWalkthrough {
+                    lightingPreview
+                }
+            }
             .frame(height: previewHeight.map { CGFloat($0) })
             .clipShape(RoundedRectangle(cornerRadius: 20))
             .padding(12)
@@ -203,6 +211,19 @@ struct LightingWorkspaceView: View {
                 .font(.caption)
                 .foregroundStyle(LightingTheme.ink.opacity(0.85))
         }
+    }
+
+    private var lightingPreview: some View {
+        LightingRoomPreview(
+            snapshot: LightingRoomSnapshot(room: room, fixtures: editor.drafts),
+            settings: settings,
+            preset: preset,
+            backgroundColor: UIColor(LightingTheme.canvas),
+            onPlaceLight: { point in editor.place(unitX: Double(point.x), unitZ: Double(point.y)) },
+            onSelectLight: { editor.select($0) },
+            isPlacementMode: placement.isActive,
+            selectedFixtureIDs: editor.selectedIDs
+        )
     }
 
     @ViewBuilder private var viewportControls: some View {
