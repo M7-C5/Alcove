@@ -69,10 +69,13 @@ Alcove/
 - Local branch flow: `dev` (feature development) $\rightarrow$ `staging` (pre-release validation) $\rightarrow$ `main` (production).
 
 ### Verification & Thermal Management
-- Always verify builds and tests locally using:
+- Run verification locally using:
   ```bash
   ./scripts/verify.sh
   ```
+- **Execution Scoping**:
+  - **Required**: Run `./scripts/verify.sh` strictly after authoring or modifying Swift source code (`Alcove/`, `AlcoveTests/`, project config) prior to declaring task completion.
+  - **Prohibited**: Do NOT run `./scripts/verify.sh` on markdown/docs updates, clean `git pull` operations, planning, or general queries.
 - Always shut down simulators after test runs to preserve battery and thermal headroom:
   ```bash
   xcrun simctl shutdown all 2>/dev/null || true
