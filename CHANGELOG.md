@@ -50,9 +50,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Constrain hero bounds, refine tactile pill shading, and add accessibility.
-- Deduplicate font registration and release CoreText errors.
-- Unify viewport geometry and restore AR access.
+- Serialize inward facing vectors and filter hallucinated orientation tips for storage furniture.
+- Recognize task lighting companion pairs and exempt from walkway circulation bottlenecks.
 - Anchor sunlight to window opening and preserve shadows during wall cutaways.
 - Replace solid window border with hollow casing and transparent glass.
 - Update top architectural pov preset icon to horizontal top press.
