@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Implement mascot landing home screen and tactile pill button.
+- Add dashboard route and decouple dashboard stack embedding.
+- Import optimized home background art and cleanow font resources.
+- Add temporary lighting playground shortcut.
+- Add inline placement and interactive room simulation.
 - Add ar walkthrough button to top toolbar and wire full screen presentation.
 - Implement 1:1 life-size spatial walkthrough viewport and view model.
 - Add ceiling cutaway evaluator and placement coordinate engine.
@@ -40,6 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Unify viewport geometry and restore AR access.
 - Anchor sunlight to window opening and preserve shadows during wall cutaways.
 - Replace solid window border with hollow casing and transparent glass.
 - Update top architectural pov preset icon to horizontal top press.
