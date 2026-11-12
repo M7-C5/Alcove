@@ -5,6 +5,7 @@ import SwiftData
 public enum AlcoveRoute: Hashable, Sendable {
     case stageList(Room)
     case studio(room: Room, stage: StageType)
+    case dashboard
 
     public static func == (lhs: AlcoveRoute, rhs: AlcoveRoute) -> Bool {
         switch (lhs, rhs) {
@@ -12,6 +13,8 @@ public enum AlcoveRoute: Hashable, Sendable {
             return lhsRoom.id == rhsRoom.id
         case let (.studio(lhsRoom, lhsStage), .studio(rhsRoom, rhsStage)):
             return lhsRoom.id == rhsRoom.id && lhsStage == rhsStage
+        case (.dashboard, .dashboard):
+            return true
         default:
             return false
         }
@@ -26,6 +29,8 @@ public enum AlcoveRoute: Hashable, Sendable {
             hasher.combine(1)
             hasher.combine(room.id)
             hasher.combine(stage)
+        case .dashboard:
+            hasher.combine(2)
         }
     }
 }

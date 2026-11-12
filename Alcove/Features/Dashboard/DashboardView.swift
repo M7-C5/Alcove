@@ -3,83 +3,94 @@ import SwiftData
 
 public struct DashboardView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(NavigationRouter.self) private var environmentRouter: NavigationRouter?
     @Query(sort: \Room.createdAt, order: .reverse) private var rooms: [Room]
     @State private var viewModel = DashboardViewModel()
-    @State private var router = NavigationRouter()
+    @State private var localRouter = NavigationRouter()
 
     public init() {}
 
     public var body: some View {
-        NavigationStack(path: $router.path) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    headerSection
-                    lightingTestShortcut
-
-                    if rooms.isEmpty {
-                        emptyStateSection
-                    } else {
-                        roomGridSection
-                    }
-                }
-                .padding(32)
-            }
-            .background(Color(uiColor: .systemGroupedBackground))
-            .navigationTitle("Alcove")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    HStack(spacing: 12) {
-                        Button {
-                            viewModel.seedBedroomOfficeCombo(modelContext: modelContext)
-                        } label: {
-                            Label("Add Mock Bedroom", systemImage: "plus.square.dashed")
+        if environmentRouter != nil {
+            dashboardContent
+        } else {
+            NavigationStack(path: $localRouter.path) {
+                dashboardContent
+                    .navigationDestination(for: AlcoveRoute.self) { route in
+                        switch route {
+                        case .stageList(let room):
+                            StageListView(room: room)
+                        case .studio(let room, let stage):
+                            Studio3DView(room: room, stage: stage)
+                        case .dashboard:
+                            DashboardView()
                         }
-
-                        Button {
-                            viewModel.showingScanSheet = true
-                        } label: {
-                            Label("Scan Room", systemImage: "camera.viewfinder")
-                                .font(.headline)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(.indigo)
                     }
+            }
+            .environment(localRouter)
+        }
+    }
+
+    private var dashboardContent: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                headerSection
+                lightingTestShortcut
+
+                if rooms.isEmpty {
+                    emptyStateSection
+                } else {
+                    roomGridSection
                 }
             }
-            .navigationDestination(for: AlcoveRoute.self) { route in
-                switch route {
-                case .stageList(let room):
-                    StageListView(room: room)
-                case .studio(let room, let stage):
-                    Studio3DView(room: room, stage: stage)
+            .padding(32)
+        }
+        .background(Color(uiColor: .systemGroupedBackground))
+        .navigationTitle("Alcove")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                HStack(spacing: 12) {
+                    Button {
+                        viewModel.seedBedroomOfficeCombo(modelContext: modelContext)
+                    } label: {
+                        Label("Add Mock Bedroom", systemImage: "plus.square.dashed")
+                    }
+
+                    Button {
+                        viewModel.showingScanSheet = true
+                    } label: {
+                        Label("Scan Room", systemImage: "camera.viewfinder")
+                            .font(.headline)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.indigo)
                 }
-            }
-            .onAppear {
-                viewModel.seedInitialDataIfNeeded(rooms: rooms, modelContext: modelContext)
-            }
-            .sheet(isPresented: $viewModel.showingScanSheet) {
-                RoomScanSheet { scannedRoom in
-                    viewModel.addScannedRoom(scannedRoom, modelContext: modelContext)
-                }
-            }
-            .fullScreenCover(item: $viewModel.lightingTestSession) { session in
-                NavigationStack {
-                    Studio3DView(room: session.room, stage: .illumination)
-                }
-                .environment(session.router)
-                .modelContainer(session.container)
-            }
-            .alert("Could not open lighting test", isPresented: Binding(
-                get: { viewModel.lightingTestError != nil },
-                set: { if !$0 { viewModel.lightingTestError = nil } }
-            )) {
-                Button("OK", role: .cancel) { viewModel.lightingTestError = nil }
-            } message: {
-                Text(viewModel.lightingTestError ?? "Please try again.")
             }
         }
-        .environment(router)
+        .onAppear {
+            viewModel.seedInitialDataIfNeeded(rooms: rooms, modelContext: modelContext)
+        }
+        .sheet(isPresented: $viewModel.showingScanSheet) {
+            RoomScanSheet { scannedRoom in
+                viewModel.addScannedRoom(scannedRoom, modelContext: modelContext)
+            }
+        }
+        .fullScreenCover(item: $viewModel.lightingTestSession) { session in
+            NavigationStack {
+                Studio3DView(room: session.room, stage: .illumination)
+            }
+            .environment(session.router)
+            .modelContainer(session.container)
+        }
+        .alert("Could not open lighting test", isPresented: Binding(
+            get: { viewModel.lightingTestError != nil },
+            set: { if !$0 { viewModel.lightingTestError = nil } }
+        )) {
+            Button("OK", role: .cancel) { viewModel.lightingTestError = nil }
+        } message: {
+            Text(viewModel.lightingTestError ?? "Please try again.")
+        }
     }
 
     private var lightingTestShortcut: some View {
