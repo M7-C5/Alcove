@@ -35,15 +35,14 @@ public struct RoomSpatialContextSerializer: Sendable {
                 let footprintRadiusSum = (a.width + a.length) / 4.0 + (b.width + b.length) / 4.0
                 let clearance = max(0.0, centerDist - footprintRadiusSum)
 
-                let isCompanionPair = (a.category == .bed && b.name.localizedCaseInsensitiveContains("nightstand")) ||
-                                      (b.category == .bed && a.name.localizedCaseInsensitiveContains("nightstand")) ||
-                                      (a.category == .table && b.category == .seating) ||
-                                      (b.category == .table && a.category == .seating) ||
-                                      (a.category == .seating && b.category == .table) ||
-                                      (b.category == .seating && a.category == .table)
-
-                if isCompanionPair {
-                    lines.append("• [FUNCTIONAL PAIR] '\(a.name)' & '\(b.name)' are adjacent (~\(Int(clearance * 100))cm) — Natural functional proximity (intentional companion pieces).")
+                if AnthropometricStandards.isFunctionalCompanionPair(a: a, b: b) {
+                    let isLighting = a.category == .lighting || b.category == .lighting ||
+                                     a.name.localizedCaseInsensitiveContains("lamp") || b.name.localizedCaseInsensitiveContains("lamp")
+                    if isLighting {
+                        lines.append("• [TASK LIGHTING] '\(a.name)' & '\(b.name)' are intentionally paired (~\(Int(clearance * 100))cm) — Focused task/reading illumination.")
+                    } else {
+                        lines.append("• [FUNCTIONAL PAIR] '\(a.name)' & '\(b.name)' are adjacent (~\(Int(clearance * 100))cm) — Natural functional proximity (intentional companion pieces).")
+                    }
                 } else if a.category == .bed && b.category == .bed && clearance < AnthropometricStandards.bedToBedClearanceMin {
                     bottlenecksFound += 1
                     lines.append("⚠️ [CRITICAL] Bed-to-Bed gap between '\(a.name)' & '\(b.name)': \(Int(clearance * 100))cm (Minimum required: 91.4cm)")

@@ -123,5 +123,77 @@ extension AnthropometricStandards {
             return .optimalComfort
         }
     }
+
+    // MARK: - Intentional & Functional Companion Pairs
+    /// Determines whether two furniture items constitute an intentional functional or companion pairing
+    /// (e.g. bed + nightstand, desk + chair, lamp + seating/desk/table) that should NOT be evaluated
+    /// as a pedestrian walkway circulation bottleneck.
+    public static func isFunctionalCompanionPair(
+        categoryA: FurnitureCategory,
+        nameA: String,
+        categoryB: FurnitureCategory,
+        nameB: String
+    ) -> Bool {
+        let isLightingA = categoryA == .lighting ||
+            nameA.localizedCaseInsensitiveContains("lamp") ||
+            nameA.localizedCaseInsensitiveContains("light") ||
+            nameA.localizedCaseInsensitiveContains("pendant") ||
+            nameA.localizedCaseInsensitiveContains("sconce")
+        let isLightingB = categoryB == .lighting ||
+            nameB.localizedCaseInsensitiveContains("lamp") ||
+            nameB.localizedCaseInsensitiveContains("light") ||
+            nameB.localizedCaseInsensitiveContains("pendant") ||
+            nameB.localizedCaseInsensitiveContains("sconce")
+
+        let isSurfaceA = categoryA == .table || categoryA == .storage ||
+            nameA.localizedCaseInsensitiveContains("table") ||
+            nameA.localizedCaseInsensitiveContains("desk") ||
+            nameA.localizedCaseInsensitiveContains("nightstand")
+        let isSurfaceB = categoryB == .table || categoryB == .storage ||
+            nameB.localizedCaseInsensitiveContains("table") ||
+            nameB.localizedCaseInsensitiveContains("desk") ||
+            nameB.localizedCaseInsensitiveContains("nightstand")
+
+        let isSeatingA = categoryA == .seating ||
+            nameA.localizedCaseInsensitiveContains("chair") ||
+            nameA.localizedCaseInsensitiveContains("sofa") ||
+            nameA.localizedCaseInsensitiveContains("seat")
+        let isSeatingB = categoryB == .seating ||
+            nameB.localizedCaseInsensitiveContains("chair") ||
+            nameB.localizedCaseInsensitiveContains("sofa") ||
+            nameB.localizedCaseInsensitiveContains("seat")
+
+        // 1. Task & Accent Lighting: Lamps standing beside seating (chairs, sofas) or resting on/beside surfaces (desks, tables, nightstands)
+        // Karlen & Benya (Lighting Design Basics): Task lighting belongs in direct proximity to visual tasks (reading by a chair, working at a desk).
+        if isLightingA && (isSurfaceB || isSeatingB) { return true }
+        if isLightingB && (isSurfaceA || isSeatingA) { return true }
+        if isLightingA && isLightingB { return true }
+
+        // 2. Bed + Nightstand
+        let isBedA = categoryA == .bed || nameA.localizedCaseInsensitiveContains("bed")
+        let isBedB = categoryB == .bed || nameB.localizedCaseInsensitiveContains("bed")
+        let isNightstandA = nameA.localizedCaseInsensitiveContains("nightstand") || nameA.localizedCaseInsensitiveContains("bedside")
+        let isNightstandB = nameB.localizedCaseInsensitiveContains("nightstand") || nameB.localizedCaseInsensitiveContains("bedside")
+        if (isBedA && isNightstandB) || (isBedB && isNightstandA) {
+            return true
+        }
+
+        // 3. Work/Dining Surface + Seating (Desk/Table + Chair/Sofa)
+        if (isSurfaceA && isSeatingB) || (isSurfaceB && isSeatingA) {
+            return true
+        }
+
+        return false
+    }
+
+    /// Convenience overload taking two Furniture model instances directly
+    public static func isFunctionalCompanionPair(a: Furniture, b: Furniture) -> Bool {
+        isFunctionalCompanionPair(
+            categoryA: a.category,
+            nameA: a.name,
+            categoryB: b.category,
+            nameB: b.name
+        )
+    }
 }
 

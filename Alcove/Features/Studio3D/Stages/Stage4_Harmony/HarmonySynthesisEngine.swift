@@ -105,6 +105,11 @@ public struct HarmonySynthesisEngine: Sendable {
                 for j in (i + 1)..<items.count {
                     let a = items[i]
                     let b = items[j]
+
+                    if AnthropometricStandards.isFunctionalCompanionPair(a: a, b: b) {
+                        continue
+                    }
+
                     let dx = a.positionX - b.positionX
                     let dz = a.positionZ - b.positionZ
                     let centerDist = sqrt(dx * dx + dz * dz)
@@ -147,6 +152,10 @@ public struct HarmonySynthesisEngine: Sendable {
             for j in (i + 1)..<items.count {
                 let a = items[i]
                 let b = items[j]
+
+                if AnthropometricStandards.isFunctionalCompanionPair(a: a, b: b) {
+                    continue
+                }
 
                 let dx = a.positionX - b.positionX
                 let dz = a.positionZ - b.positionZ

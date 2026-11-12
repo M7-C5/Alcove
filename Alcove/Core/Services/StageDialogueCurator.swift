@@ -80,17 +80,9 @@ public struct StageDialogueCurator: Sendable {
                     let a = furnitures[i]
                     let b = furnitures[j]
 
-                    let isLightingA = a.category == .lighting || a.name.localizedCaseInsensitiveContains("lamp") || a.name.localizedCaseInsensitiveContains("light") || a.name.localizedCaseInsensitiveContains("pendant")
-                    let isLightingB = b.category == .lighting || b.name.localizedCaseInsensitiveContains("lamp") || b.name.localizedCaseInsensitiveContains("light") || b.name.localizedCaseInsensitiveContains("pendant")
-                    let isSurfaceA = a.category == .table || a.category == .storage || a.name.localizedCaseInsensitiveContains("table") || a.name.localizedCaseInsensitiveContains("desk") || a.name.localizedCaseInsensitiveContains("nightstand")
-                    let isSurfaceB = b.category == .table || b.category == .storage || b.name.localizedCaseInsensitiveContains("table") || b.name.localizedCaseInsensitiveContains("desk") || b.name.localizedCaseInsensitiveContains("nightstand")
-                    if (isLightingA && isSurfaceB) || (isLightingB && isSurfaceA) { continue }
-
-                    let isCompanionPair = (a.category == .bed && b.name.localizedCaseInsensitiveContains("nightstand")) ||
-                                          (b.category == .bed && a.name.localizedCaseInsensitiveContains("nightstand")) ||
-                                          (a.category == .table && b.category == .seating) ||
-                                          (b.category == .table && a.category == .seating)
-                    if isCompanionPair { continue }
+                    if AnthropometricStandards.isFunctionalCompanionPair(a: a, b: b) {
+                        continue
+                    }
 
                     let dist = sqrt(pow(a.positionX - b.positionX, 2) + pow(a.positionZ - b.positionZ, 2))
                     let radiusSum = (a.width + a.length) / 4.0 + (b.width + b.length) / 4.0
@@ -127,17 +119,9 @@ public struct StageDialogueCurator: Sendable {
                     let a = furnitures[i]
                     let b = furnitures[j]
 
-                    let isLightingA = a.category == .lighting || a.name.localizedCaseInsensitiveContains("lamp") || a.name.localizedCaseInsensitiveContains("light") || a.name.localizedCaseInsensitiveContains("pendant")
-                    let isLightingB = b.category == .lighting || b.name.localizedCaseInsensitiveContains("lamp") || b.name.localizedCaseInsensitiveContains("light") || b.name.localizedCaseInsensitiveContains("pendant")
-                    let isSurfaceA = a.category == .table || a.category == .storage || a.name.localizedCaseInsensitiveContains("table") || a.name.localizedCaseInsensitiveContains("desk") || a.name.localizedCaseInsensitiveContains("nightstand")
-                    let isSurfaceB = b.category == .table || b.category == .storage || b.name.localizedCaseInsensitiveContains("table") || b.name.localizedCaseInsensitiveContains("desk") || b.name.localizedCaseInsensitiveContains("nightstand")
-                    if (isLightingA && isSurfaceB) || (isLightingB && isSurfaceA) { continue }
-
-                    let isCompanionPair = (a.category == .bed && b.name.localizedCaseInsensitiveContains("nightstand")) ||
-                                          (b.category == .bed && a.name.localizedCaseInsensitiveContains("nightstand")) ||
-                                          (a.category == .table && b.category == .seating) ||
-                                          (b.category == .table && a.category == .seating)
-                    if isCompanionPair { continue }
+                    if AnthropometricStandards.isFunctionalCompanionPair(a: a, b: b) {
+                        continue
+                    }
 
                     let dist = sqrt(pow(a.positionX - b.positionX, 2) + pow(a.positionZ - b.positionZ, 2))
                     let radiusSum = (a.width + a.length) / 4.0 + (b.width + b.length) / 4.0
