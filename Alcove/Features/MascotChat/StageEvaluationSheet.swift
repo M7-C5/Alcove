@@ -115,10 +115,10 @@ public struct StageEvaluationSheet: View {
                         }
                     }
 
-                    // Recommendations section (textbook-grounded improvements)
+                    // Recommendations section (grounded design improvements)
                     if !result.recommendations.isEmpty {
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("Textbook Recommendations")
+                            Text("Design Tips")
                                 .font(.headline)
 
                             ForEach(result.recommendations, id: \.self) { rec in
