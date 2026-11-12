@@ -3,6 +3,10 @@ import SwiftData
 
 @main
 struct MyApp: App {
+    init() {
+        FontRegistrar.registerCustomFonts()
+    }
+
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
             Room.self,
@@ -21,7 +25,7 @@ struct MyApp: App {
 
     var body: some Scene {
         WindowGroup {
-            DashboardView()
+            HomeView()
         }
         .modelContainer(sharedModelContainer)
     }
