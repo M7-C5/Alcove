@@ -144,6 +144,7 @@ public final class LLMMascotAIService: MascotAIServiceProtocol {
                 - DO NOT mention, score, or criticize artificial lighting, lamps, or fixtures! DO NOT tell the user to "add more lights" or "add lamps" (artificial lighting belongs strictly to Stage 3: The Illumination).
                 - There is NO score penalty in Stage 1. Return "score": 100 and "canAdvance": true.
                 - Describe what is happening right now in the room based on the layout data: room scale, current active furniture pieces, natural walking pathways (roomy vs snug), and where daylight enters.
+                - Ground recommendations in the ACTUAL room by directly naming real pieces (e.g. Work Desk, Queen Bed). DO NOT quote textbook rules or measurement thresholds (e.g. DO NOT say "Ensure 76.2cm circulation").
                 - Note furniture facing: Pieces marked 'Facing: INWARD into the room (toward center)' are ALREADY properly facing the room. DO NOT tell the user to make them face the room.
                 - Mascot voice: warm, perceptive interior design buddy diagnosing what's currently here (under 35 words).
 
@@ -153,7 +154,7 @@ public final class LLMMascotAIService: MascotAIServiceProtocol {
                   "score": 100,
                   "title": "Short punchy diagnosis title (2-4 words, e.g. 'Room Baseline Diagnosed')",
                   "dialogue": "1-2 short, punchy sentences describing what's happening right now in the room (under 35 words).",
-                  "recommendations": ["Observation on current pathways or layout", "Observation on natural light/window flow"],
+                  "recommendations": ["Concrete observation naming a specific furniture piece", "Observation on natural light or window flow"],
                   "praise": ["Baseline room scan captured", "Room footprint mapped"]
                 }
                 """
@@ -161,6 +162,8 @@ public final class LLMMascotAIService: MascotAIServiceProtocol {
                 evaluationPrompt = """
                 Perform a formal stage completion evaluation for \(stage.title) (Stage \(stage.stageNumber)).
                 CRITICAL CURRICULUM & ORIENTATION RULES:
+                - Ground every recommendation in the ACTUAL room by directly naming specific furniture pieces (e.g. "Work Desk", "Queen Bed", "Bookshelf").
+                - DO NOT write generic textbook rules or repeat measurement thresholds (e.g. NEVER say "Ensure 76.2cm circulation" or "Maintain 91.4cm clearance"). Instead give practical everyday advice: e.g. "Nudge the Queen Bed slightly left to widen the desk corridor" or "Your desk chair has generous pushback room".
                 - The spatial context explicitly calculates whether each furniture piece is facing inward toward the center of the room (e.g. 'Facing: INWARD into the room (toward center)').
                 - When a Bookshelf, Wardrobe, Desk, Bed, or storage unit is marked as 'Facing: INWARD into the room (toward center)', it is ALREADY properly facing into the room. NEVER tell the user to "rotate it to face the room", "turn it toward the room", or "face into the room".
                 Return ONLY a raw JSON object (no markdown quotes, no explanation) with this exact schema:
@@ -169,7 +172,7 @@ public final class LLMMascotAIService: MascotAIServiceProtocol {
                   "score": 0-100 integer,
                   "title": "Short punchy evaluation title (2-4 words)",
                   "dialogue": "1-2 short, punchy sentences from the Mascot evaluating the layout (under 35 words). Super easy to skim, no walls of text.",
-                  "recommendations": ["Short tip 1 (1 sentence)", "Short tip 2 (1 sentence)"],
+                  "recommendations": ["Room-specific tip naming an active piece (1 sentence)", "Room-specific tip on circulation or zoning (1 sentence)"],
                   "praise": ["What worked well 1", "What worked well 2"]
                 }
                 """

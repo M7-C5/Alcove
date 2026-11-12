@@ -64,13 +64,14 @@ public final class MockMascotAIService: MascotAIServiceProtocol {
                 ))
             }
 
+            let auditRecs = generateContextualRecommendations(stage: .audit, room: room, bottlenecks: bottlenecks)
             return StageEvaluationResult(
                 canAdvance: true,
                 score: 100,
                 title: "Baseline Audit Captured",
                 dialogue: "We've mapped out the baseline flow of your room! Notice where the main pathways feel open and where pieces cluster together. When you're ready, let's move to Stage 2 to start rearranging.",
                 bottlenecks: bottlenecks,
-                recommendations: ["Review natural walking pathways from the door", "Notice where daylight enters through the windows"],
+                recommendations: auditRecs,
                 praise: ["Baseline room scan captured cleanly", "Room boundaries and furniture mapped"]
             )
 
@@ -134,6 +135,7 @@ public final class MockMascotAIService: MascotAIServiceProtocol {
             }
 
             let canAdvance = bottlenecks.filter { $0.severity == .critical }.isEmpty
+            let rearrangeRecs = generateContextualRecommendations(stage: .rearrangement, room: room, bottlenecks: bottlenecks)
             return StageEvaluationResult(
                 canAdvance: canAdvance,
                 score: max(score, 50),
@@ -144,7 +146,7 @@ public final class MockMascotAIService: MascotAIServiceProtocol {
                         ? "Circulation meets baseline standards. You can tweak tighter spots or proceed to lighting!"
                         : "There are critical bottlenecks below 76.2cm that block natural 1-person passage. Please widen the pathways."),
                 bottlenecks: bottlenecks,
-                recommendations: ["Ensure minimum 76.2cm 1-person circulation", "Aim for 91.4cm comfortable passage", "Keep bed perimeter at 66-99cm for bed-making"],
+                recommendations: rearrangeRecs,
                 praise: ["Focal points established", "Proportions balanced"]
             )
 
@@ -180,6 +182,7 @@ public final class MockMascotAIService: MascotAIServiceProtocol {
 
         case .harmony:
             let metrics = harmonyEngine.synthesizeHarmony(room: room)
+            let harmonyRecs = generateContextualRecommendations(stage: .harmony, room: room, bottlenecks: [])
 
             return StageEvaluationResult(
                 canAdvance: true,
@@ -187,13 +190,72 @@ public final class MockMascotAIService: MascotAIServiceProtocol {
                 title: "Spatial Harmony Achieved!",
                 dialogue: "\(metrics.summaryVerdict) Walkway clearance improved by \(metrics.clearanceImprovementPercentage)% over baseline scan.",
                 bottlenecks: [],
-                recommendations: ["Export room summary report", "Test layout with real furniture placement"],
+                recommendations: harmonyRecs,
                 praise: [
                     "Floor space optimized at \(metrics.workingFloorUtilizationPercentage)% utilization",
                     "Clearance bottlenecks reduced to \(metrics.workingBottlenecksCount)"
                 ]
             )
         }
+    }
+
+    private func generateContextualRecommendations(
+        stage: StageType,
+        room: Room,
+        bottlenecks: [SpatialBottleneck]
+    ) -> [String] {
+        let furnitures = (room.workingLayout?.furnitures ?? []).filter { !$0.isArchived }
+        var recs: [String] = []
+
+        switch stage {
+        case .audit:
+            if let tight = bottlenecks.first {
+                let itemName = tight.affectedFurnitureName ?? "furniture"
+                recs.append("Notice the snug corridor by the \(itemName)—this will be your top priority to open up in Stage 2.")
+            } else {
+                recs.append("Your main walking pathways feel naturally open and uncluttered.")
+            }
+
+            if let desk = furnitures.first(where: { $0.category == .table || $0.name.localizedCaseInsensitiveContains("desk") }) {
+                recs.append("The \(desk.name) setup has clear sightlines; notice how daylight enters across its workspace.")
+            } else if let bed = furnitures.first(where: { $0.category == .bed }) {
+                recs.append("The \(bed.name) anchors the room; check that walking around it feels effortless.")
+            } else {
+                recs.append("Take note of where natural daylight creates the brightest zones across your floor.")
+            }
+
+        case .rearrangement:
+            if !bottlenecks.isEmpty {
+                for b in bottlenecks.prefix(2) {
+                    let itemName = b.affectedFurnitureName ?? "furniture"
+                    recs.append("Nudge the \(itemName) slightly to widen the pathway and give you comfortable walking clearance.")
+                }
+            } else {
+                if let mainItem = furnitures.first(where: { $0.category == .bed || $0.category == .table }) {
+                    recs.append("Circulation around the \(mainItem.name) is spacious and exceeds comfortable walking standards.")
+                }
+                if let chair = furnitures.first(where: { $0.category == .seating }),
+                   let desk = furnitures.first(where: { $0.category == .table }) {
+                    recs.append("Your \(chair.name) has plenty of pushback room behind the \(desk.name) for easy sit-to-stand movement.")
+                } else {
+                    recs.append("All primary pathways are wide and inviting—great spatial balance!")
+                }
+            }
+
+        case .illumination:
+            break
+
+        case .harmony:
+            let metrics = harmonyEngine.synthesizeHarmony(room: room)
+            if metrics.clearanceImprovementPercentage > 0 {
+                recs.append("Your rearrangement increased walkway clearance by +\(metrics.clearanceImprovementPercentage)% over the original room scan.")
+            } else {
+                recs.append("Your room layout maintains an open, clutter-free spatial flow.")
+            }
+            recs.append("Step into the 1:1 Life-Size AR Walkthrough to test your new pathways in physical space.")
+        }
+
+        return recs
     }
 
     public func askMascot(
