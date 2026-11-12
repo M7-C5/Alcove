@@ -9,16 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Add semantic color and shapestyle extensions.
-- Add global alcove color palette assets.
-- Implement mascot landing home screen and tactile pill button.
-- Add dashboard route and decouple dashboard stack embedding.
-- Import optimized home background art and cleanow font resources.
-- Add temporary lighting playground shortcut.
-- Add inline placement and interactive room simulation.
+- Implement SpatialFactVerifier to deterministically eliminate spatial hallucinations.
+- Add smooth feathered screen-space overlay slider.
+- Implement smooth 3D spatial overlay blend in identical orientation.
+- Implement screen-space split curtain divider for before-after comparison.
+- Add centered 3D before-after slider and room harmony scorecard.
 - Add ar walkthrough button to top toolbar and wire full screen presentation.
 - Implement 1:1 life-size spatial walkthrough viewport and view model.
 - Add ceiling cutaway evaluator and placement coordinate engine.
+- Cache stage evaluations until layout mutations occur with on-demand refresh.
+- Ground Stage 1 evaluation in AI spatial situation diagnosis without lighting penalties.
+- Expand companion chat window to responsive half-sheet.
+- Add interactive light editing and Stage 4 AR placeholder.
+- Streamline mascot companion bottom HUD and compact chat detents.
+- Add multi-key failover pool and optimize Gemini 2.5 token usage.
+- Add daylight-scrub micro-reactions and safe secret loader.
 - Add point of view snap menu to top toolbar beside archive dock button.
 - Implement ease-in-out orbit camera snapping and dynamic cutaway updates in viewport.
 - Add architectural viewport presets for top, elevations, and reset angles.
@@ -35,6 +40,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add procedural multi-part furniture mesh builder.
 - Add mock bedroom seed action to dashboard toolbar.
 - Introduce mock bedroom and office generator with dual layouts.
+- Implement two-phase static intro and dynamic need dialogue curator.
+- Add stage walkthrough overlay, markdown rendering, and model config sheet.
+- Integrate Google Gemini service with quota fallback and guardrails.
+- Implement anthropometric standards and fast-path circulation heuristics.
 - Implement value-based router and decoupled feature navigation.
 - Enhance spatial models with lighting fixtures and preview containers.
 - Add ipad landscape screen flow and mascot hud.
@@ -50,17 +59,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Compute wall proximity from outer boundary extents to prevent false center-room placement.
-- Generate room-aware dynamic recommendations naming active furniture and sanitize awkward placement wording.
-- Replace textbook recommendations section header with friendly design tips.
-- Serialize inward facing vectors and filter hallucinated orientation tips for storage furniture.
-- Recognize task lighting companion pairs and exempt from walkway circulation bottlenecks.
+- Compute wall proximity from boundary extents and sanitize flowery placement wording.
+- Generate room-aware dynamic recommendations naming active furniture.
+- Replace textbook recommendations header with design tips.
+- Serialize inward facing vectors and filter hallucinated orientation tips.
+- Recognize task lighting companion pairs and exempt from walkway bottlenecks.
 - Anchor sunlight to window opening and preserve shadows during wall cutaways.
 - Replace solid window border with hollow casing and transparent glass.
 - Update top architectural pov preset icon to horizontal top press.
 - Replace arkit symbol with text label on top toolbar ar button.
 - Update orbit hud icons to use clockwise rotate and archivebox.
 - Configure camera usage description for arkit world tracking.
+- Treat lamps and elevated lighting as natural surface companions without false bottlenecks.
 - Annotate MascotAIService and test suites with @MainActor for Swift 6.
 - Resolve iPad interface orientations, bundle id, and app icon assets.
 
