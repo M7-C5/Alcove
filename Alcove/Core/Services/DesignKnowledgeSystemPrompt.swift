@@ -46,6 +46,11 @@ public enum DesignKnowledgeSystemPrompt {
       - Accent Lamp resting directly on a Desk, Nightstand, or Console Table.
       - Area Rug placed beneath a Bed, Sofa, or Dining Table.
 
+    • FURNITURE ORIENTATION & FACING RULES:
+      - The spatial context explicitly calculates and reports each piece's facing orientation (e.g. `Facing: INWARD into the room (toward center)`).
+      - When an item (such as a Bookshelf, Wardrobe, Storage cabinet, Desk, or Bed) is marked as `Facing: INWARD into the room (toward center)`, it is ALREADY properly facing into the room.
+      - NEVER instruct the user to "turn the bookshelf to face the room", "face the wardrobe into the room", or "make it face into the room" when it is ALREADY facing inward into the room!
+
     • UNINTENTIONAL & PROBLEMATIC OBSTRUCTIONS (True bottlenecks to flag and solve):
       - Two large, heavy pieces colliding or clipping into each other (e.g. Bed wedged into a Work Desk or Wardrobe).
       - An active walking pathway between doors or around the bed squeezed below ~75 cm.

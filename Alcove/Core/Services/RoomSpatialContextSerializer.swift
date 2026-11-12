@@ -18,8 +18,42 @@ public struct RoomSpatialContextSerializer: Sendable {
         lines.append("- Daylight Orientation: South-facing window exposure (standard daylight simulation)")
 
         lines.append("\n### ACTIVE FURNITURE (\(furnitures.count) items):")
+        let halfW = room.dimensionsWidth / 2.0
+        let halfL = room.dimensionsLength / 2.0
+
         for f in furnitures {
-            lines.append("• \(f.name) [\(f.category.rawValue)]: Position(x: \(String(format: "%.2f", f.positionX))m, z: \(String(format: "%.2f", f.positionZ))m), Size(\(String(format: "%.2f", f.width))m × \(String(format: "%.2f", f.length))m), Rotation: \(Int(f.rotationYaw * 180 / .pi))°")
+            let facingX = sin(f.rotationYaw)
+            let facingZ = cos(f.rotationYaw)
+            let toCenterX = -f.positionX
+            let toCenterZ = -f.positionZ
+            let dotCenter = facingX * toCenterX + facingZ * toCenterZ
+
+            let facingDescription: String
+            if dotCenter > 0.15 {
+                facingDescription = "INWARD into the room (toward center)"
+            } else if dotCenter < -0.15 {
+                facingDescription = "OUTWARD toward perimeter wall"
+            } else {
+                facingDescription = "Parallel to wall"
+            }
+
+            var placementContext: [String] = []
+            if f.positionX < -halfW + 0.6 {
+                placementContext.append("Anchored at Left Wall")
+            } else if f.positionX > halfW - 0.6 {
+                placementContext.append("Anchored at Right Wall")
+            }
+            if f.positionZ < -halfL + 0.6 {
+                placementContext.append("Anchored at Back Wall")
+            } else if f.positionZ > halfL - 0.6 {
+                placementContext.append("Anchored at Front Wall")
+            }
+            if placementContext.isEmpty {
+                placementContext.append("Central room floor")
+            }
+
+            let wallStr = placementContext.joined(separator: ", ")
+            lines.append("• \(f.name) [\(f.category.rawValue)]: Position(x: \(String(format: "%.2f", f.positionX))m, z: \(String(format: "%.2f", f.positionZ))m), Size(\(String(format: "%.2f", f.width))m × \(String(format: "%.2f", f.length))m), Facing: \(facingDescription), Placement: \(wallStr)")
         }
 
         // Compute anthropometric clearances using Panero & Zelnik standards
