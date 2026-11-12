@@ -209,50 +209,62 @@ public final class MockMascotAIService: MascotAIServiceProtocol {
 
         switch stage {
         case .audit:
-            if let tight = bottlenecks.first {
-                let itemName = tight.affectedFurnitureName ?? "furniture"
-                recs.append("Notice the snug corridor by the \(itemName)—this will be your top priority to open up in Stage 2.")
+            // 1. Daylight & Workspace Orientation
+            if let desk = furnitures.first(where: { $0.category == .table || $0.name.localizedCaseInsensitiveContains("desk") }) {
+                recs.append("Position your \(desk.name) perpendicular to the window so daylight illuminates your workspace without harsh screen glare.")
             } else {
-                recs.append("Your main walking pathways feel naturally open and uncluttered.")
+                recs.append("Notice where natural south daylight reaches deepest into the room to guide your active daytime zoning.")
             }
 
-            if let desk = furnitures.first(where: { $0.category == .table || $0.name.localizedCaseInsensitiveContains("desk") }) {
-                recs.append("The \(desk.name) setup has clear sightlines; notice how daylight enters across its workspace.")
-            } else if let bed = furnitures.first(where: { $0.category == .bed }) {
-                recs.append("The \(bed.name) anchors the room; check that walking around it feels effortless.")
+            // 2. Bed Anchoring & Spatial Security
+            if let bed = furnitures.first(where: { $0.category == .bed }) {
+                let halfW = room.dimensionsWidth / 2.0
+                let halfL = room.dimensionsLength / 2.0
+                let isWallBound = (halfW - abs(bed.positionX) < 0.65) || (halfL - abs(bed.positionZ) < 0.65)
+                if isWallBound {
+                    recs.append("Anchoring the \(bed.name) against perimeter walls preserves open central floor area and defines a quiet, dedicated sleeping zone.")
+                } else {
+                    recs.append("Anchoring the \(bed.name)'s headboard against a solid perimeter wall will ground the room and open up continuous walking lanes.")
+                }
+            } else if let chair = furnitures.first(where: { $0.category == .seating }),
+                      let desk = furnitures.first(where: { $0.category == .table || $0.name.localizedCaseInsensitiveContains("desk") }) {
+                recs.append("Ensure at least 75 cm of pushback clearance behind the \(desk.name) so the \(chair.name) can slide back easily without clipping walkways.")
             } else {
-                recs.append("Take note of where natural daylight creates the brightest zones across your floor.")
+                recs.append("Primary walking paths comfortably meet the 76–90 cm clearance standard, keeping transit between zones fluid.")
             }
 
         case .rearrangement:
             if !bottlenecks.isEmpty {
                 for b in bottlenecks.prefix(2) {
                     let itemName = b.affectedFurnitureName ?? "furniture"
-                    recs.append("Nudge the \(itemName) slightly to widen the pathway and give you comfortable walking clearance.")
+                    recs.append("Scoot the \(itemName) slightly to widen the walkway to at least 76 cm so you can walk through without a squeeze.")
                 }
             } else {
-                if let mainItem = furnitures.first(where: { $0.category == .bed || $0.category == .table }) {
-                    recs.append("Circulation around the \(mainItem.name) is spacious and exceeds comfortable walking standards.")
-                }
                 if let chair = furnitures.first(where: { $0.category == .seating }),
-                   let desk = furnitures.first(where: { $0.category == .table }) {
-                    recs.append("Your \(chair.name) has plenty of pushback room behind the \(desk.name) for easy sit-to-stand movement.")
-                } else {
-                    recs.append("All primary pathways are wide and inviting—great spatial balance!")
+                   let desk = furnitures.first(where: { $0.category == .table || $0.name.localizedCaseInsensitiveContains("desk") }) {
+                    recs.append("Maintain at least 75 cm of pushback clearance behind the \(desk.name) so the \(chair.name) slides out smoothly without hitting walkways.")
+                } else if let mainItem = furnitures.first(where: { $0.category == .bed || $0.category == .table }) {
+                    recs.append("Circulation around the \(mainItem.name) is spacious and exceeds comfortable 76–90 cm walking standards.")
                 }
+                recs.append("Group sleeping and working areas into two distinct zones to keep your studio feeling balanced and uncluttered.")
             }
 
         case .illumination:
-            break
+            if let desk = furnitures.first(where: { $0.category == .table || $0.name.localizedCaseInsensitiveContains("desk") }) {
+                recs.append("Pair a targeted task lamp at the \(desk.name) to eliminate keyboard shadows and reduce evening eye strain.")
+            } else {
+                recs.append("Add dedicated task lamps beside your primary focus zones to reduce eye strain during evening activities.")
+            }
+            recs.append("Combine overhead ambient lighting with 2–3 eye-level lamps to eliminate harsh shadows and create warm vertical depth.")
 
         case .harmony:
             let metrics = harmonyEngine.synthesizeHarmony(room: room)
             if metrics.clearanceImprovementPercentage > 0 {
-                recs.append("Your rearrangement increased walkway clearance by +\(metrics.clearanceImprovementPercentage)% over the original room scan.")
+                recs.append("Your rearrangement expanded walkway clearance by +\(metrics.clearanceImprovementPercentage)% over the original room scan, clearing primary bottlenecks.")
             } else {
-                recs.append("Your room layout maintains an open, clutter-free spatial flow.")
+                recs.append("Your room layout maintains an open, clutter-free spatial flow adhering to 76–90 cm circulation standards.")
             }
-            recs.append("Step into the 1:1 Life-Size AR Walkthrough to test your new pathways in physical space.")
+            recs.append("Step into the 1:1 Life-Size AR Walkthrough to test your newly designed clearances and walkways in physical space.")
         }
 
         return recs

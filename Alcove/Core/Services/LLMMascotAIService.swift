@@ -145,37 +145,83 @@ public final class LLMMascotAIService: MascotAIServiceProtocol {
                 - DO NOT mention, score, or criticize artificial lighting, lamps, or fixtures! DO NOT tell the user to "add more lights" or "add lamps" (artificial lighting belongs strictly to Stage 3: The Illumination).
                 - There is NO score penalty in Stage 1. Return "score": 100 and "canAdvance": true.
                 - Location accuracy: Look at each piece's `Placement` tag. NEVER say a piece is "floating" or "in the center" when it is anchored against a wall or corner!
-                - Ground recommendations in the ACTUAL room by directly naming real pieces (e.g. Work Desk, Queen Bed). DO NOT quote textbook rules or measurement thresholds (e.g. DO NOT say "Ensure 76.2cm circulation").
-                - Note furniture facing: Pieces marked 'Facing: INWARD into the room (toward center)' are ALREADY properly facing the room. DO NOT tell the user to make them face the room.
-                - Mascot voice: casual, grounded interior designer friend. Avoid awkward flowery phrasing (NEVER use "floating comfortably", "lovely daylight", or "enjoys open breathing room in the center"). Keep under 35 words.
+                - Mascot voice: warm, insightful interior design companion. Avoid awkward real-estate brochure fluff (NEVER use "floating comfortably", "lovely daylight", or "enjoys open breathing room in the center"). Keep dialogue under 35 words.
+
+                EDUCATIONAL DESIGN KNOWLEDGE RULES FOR RECOMMENDATIONS ("Design Tips"):
+                Every recommendation MUST be an educational, actionable design tip teaching an interior design principle tailored to this room's real layout:
+                1. Daylight & Glare: Explain how window orientation benefits the work area (e.g. positioning the Work Desk perpendicular to the window illuminates the desk while preventing computer screen glare).
+                2. Bed Anchoring & Zoning: Explain how anchoring the Queen Bed against perimeter walls preserves open central floor area and creates a clear, quiet sleeping zone.
+                3. Circulation & Clearances: Note the primary walkway from the entrance (standard 76–90 cm) and highlight any snug paths to watch out for in Stage 2.
+                4. Chair Egress: Emphasize maintaining at least 75 cm behind the desk for chair slide-out.
+                DO NOT write passive empty observations (NEVER say "Notice how the desk sits by daylight" or "Bed enjoys open room"). Explain WHY the arrangement matters from a design perspective!
 
                 Return ONLY a raw JSON object (no markdown quotes, no explanation) with this exact schema:
                 {
                   "canAdvance": true,
                   "score": 100,
                   "title": "Short punchy diagnosis title (2-4 words, e.g. 'Room Baseline Diagnosed')",
-                  "dialogue": "1-2 short, punchy sentences describing what's happening right now in the room (under 35 words).",
-                  "recommendations": ["Concrete observation naming a specific furniture piece", "Observation on natural light or window flow"],
+                  "dialogue": "1-2 short, punchy sentences diagnosing the room's current flow and natural light, setting up Stage 2 rearranging (under 35 words).",
+                  "recommendations": ["Actionable design tip on desk daylight/glare or chair clearance (1 sentence)", "Actionable design tip on bed anchoring, zoning, or pathway flow (1 sentence)"],
                   "praise": ["Baseline room scan captured", "Room footprint mapped"]
+                }
+                """
+            } else if stage == .rearrangement {
+                evaluationPrompt = """
+                Perform a formal stage completion evaluation for Stage 2: The Rearrangement for "\(room.name)".
+                CRITICAL CURRICULUM & ORIENTATION RULES:
+                - Voice: Casual, grounded interior designer companion. Friendly and encouraging.
+                - Location accuracy: Look at each piece's `Placement` tag. NEVER say a piece is "floating" or "in the center" when it is anchored against a wall or corner!
+                - Pieces marked 'Facing: INWARD into the room (toward center)' are ALREADY properly facing the room. NEVER tell the user to rotate them to face the room.
+
+                EDUCATIONAL DESIGN KNOWLEDGE RULES FOR RECOMMENDATIONS ("Design Tips"):
+                Provide 2 concrete, educational design tips grounded in this room's layout:
+                1. Clearance & Walkways: Recommend maintaining at least 76 cm along main walking lanes to keep transit effortless.
+                2. Chair Pushback: Remind to keep 75 cm behind the desk for chair pushback without bumping into walls or walkways.
+                3. Zoning & Flow: Highlight grouping resting and working zones to maintain visual order in a studio.
+
+                Return ONLY a raw JSON object with this exact schema:
+                {
+                  "canAdvance": true/false,
+                  "score": 0-100 integer,
+                  "title": "Short punchy evaluation title (2-4 words, e.g. 'Layout & Flow Evaluated')",
+                  "dialogue": "1-2 short, punchy sentences evaluating the layout's walking flow and functional zones (under 35 words).",
+                  "recommendations": ["Specific tip on clearance or chair pushback naming real furniture (1 sentence)", "Specific tip on zoning or perimeter anchoring (1 sentence)"],
+                  "praise": ["What worked well 1", "What worked well 2"]
+                }
+                """
+            } else if stage == .illumination {
+                evaluationPrompt = """
+                Perform a formal stage completion evaluation for Stage 3: The Illumination for "\(room.name)".
+                EDUCATIONAL DESIGN KNOWLEDGE RULES FOR RECOMMENDATIONS ("Design Tips"):
+                Provide 2 concrete, educational lighting design tips based on Karlen & Benya / Frida Ramstedt principles:
+                1. Task Lighting: Emphasize focused task illumination at the desk or bedside to reduce eye strain and screen glare.
+                2. Layer Balance: Recommend combining overhead ambient fill with 2–3 localized lamps at varied heights for warmth and dimensional depth without harsh shadows.
+
+                Return ONLY a raw JSON object with this exact schema:
+                {
+                  "canAdvance": true/false,
+                  "score": 0-100 integer,
+                  "title": "Short punchy evaluation title (2-4 words, e.g. 'Lighting Layers Balanced')",
+                  "dialogue": "1-2 short, punchy sentences evaluating the room's lighting balance and daylight distribution (under 35 words).",
+                  "recommendations": ["Educational tip on task lighting or reducing screen glare (1 sentence)", "Educational tip on ambient/accent lighting layers (1 sentence)"],
+                  "praise": ["What worked well 1", "What worked well 2"]
                 }
                 """
             } else {
                 evaluationPrompt = """
-                Perform a formal stage completion evaluation for \(stage.title) (Stage \(stage.stageNumber)).
-                CRITICAL CURRICULUM & ORIENTATION RULES:
-                - Voice: Casual, grounded interior designer companion. Avoid awkward flowery phrasing.
-                - Location accuracy: Look at each piece's `Placement` tag. NEVER say a piece is "floating" or "in the center" when it is anchored against a wall or corner!
-                - Ground every recommendation in the ACTUAL room by directly naming specific furniture pieces (e.g. "Work Desk", "Queen Bed", "Bookshelf").
-                - DO NOT write generic textbook rules or repeat measurement thresholds (e.g. NEVER say "Ensure 76.2cm circulation" or "Maintain 91.4cm clearance"). Instead give practical everyday advice: e.g. "Nudge the Queen Bed slightly left to widen the desk corridor" or "Your desk chair has generous pushback room".
-                - The spatial context explicitly calculates whether each furniture piece is facing inward toward the center of the room (e.g. 'Facing: INWARD into the room (toward center)').
-                - When a Bookshelf, Wardrobe, Desk, Bed, or storage unit is marked as 'Facing: INWARD into the room (toward center)', it is ALREADY properly facing into the room. NEVER tell the user to "rotate it to face the room", "turn it toward the room", or "face into the room".
-                Return ONLY a raw JSON object (no markdown quotes, no explanation) with this exact schema:
+                Perform a formal stage completion evaluation for Stage 4: The Harmony Reveal for "\(room.name)".
+                EDUCATIONAL DESIGN KNOWLEDGE RULES FOR RECOMMENDATIONS ("Design Tips"):
+                Provide 2 celebratory, practical synthesis tips:
+                1. Flow & Clearance: Celebrate the percentage improvement in open circulation and elimination of bottlenecks.
+                2. Real-World AR Walkthrough: Encourage launching the 1:1 Life-Size AR Walkthrough to experience the newly designed clearances in physical space.
+
+                Return ONLY a raw JSON object with this exact schema:
                 {
                   "canAdvance": true/false,
                   "score": 0-100 integer,
-                  "title": "Short punchy evaluation title (2-4 words)",
-                  "dialogue": "1-2 short, punchy sentences from the Mascot evaluating the layout (under 35 words). Super easy to skim, no walls of text.",
-                  "recommendations": ["Room-specific tip naming an active piece (1 sentence)", "Room-specific tip on circulation or zoning (1 sentence)"],
+                  "title": "Short punchy evaluation title (2-4 words, e.g. 'Spatial Harmony Achieved')",
+                  "dialogue": "1-2 short, punchy sentences celebrating the spatial transformation and flow improvement (under 35 words).",
+                  "recommendations": ["Insight on improved walking clearance and zoning (1 sentence)", "Suggestion to test walkways with the 1:1 AR Walkthrough (1 sentence)"],
                   "praise": ["What worked well 1", "What worked well 2"]
                 }
                 """
