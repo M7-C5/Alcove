@@ -241,10 +241,7 @@ public final class LLMMascotAIService: MascotAIServiceProtocol {
                     let dist = sqrt(pow(a.positionX - b.positionX, 2) + pow(a.positionZ - b.positionZ, 2))
                     let radiusSum = (a.width + a.length) / 4.0 + (b.width + b.length) / 4.0
                     let clearance = max(0.0, dist - radiusSum)
-                    let isCompanionPair = (a.category == .bed && b.name.localizedCaseInsensitiveContains("nightstand")) ||
-                                          (b.category == .bed && a.name.localizedCaseInsensitiveContains("nightstand")) ||
-                                          (a.category == .table && b.category == .seating) ||
-                                          (b.category == .table && a.category == .seating)
+                    let isCompanionPair = AnthropometricStandards.isFunctionalCompanionPair(a: a, b: b)
                     if clearance < AnthropometricStandards.minimumCirculation && !isCompanionPair {
                         bottleneckNote = " Also, in \(room.name), \(a.name) and \(b.name) look a little too tight for walking comfortably. Try nudging one to open up the walkway!"
                         break

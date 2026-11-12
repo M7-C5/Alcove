@@ -61,5 +61,47 @@ struct AnthropometricStandardsTests {
         #expect(AnthropometricStandards.extendedVisitorSeatingMin == 0.762)
         #expect(AnthropometricStandards.extendedVisitorSeatingMax == 1.067)
     }
+
+    @Test func verifyFunctionalCompanionPairings() {
+        // Floor Lamp + Ergonomic Chair (seating task lighting)
+        #expect(AnthropometricStandards.isFunctionalCompanionPair(
+            categoryA: .lighting,
+            nameA: "Floor Lamp",
+            categoryB: .seating,
+            nameB: "Ergonomic Chair"
+        ))
+
+        // Floor Lamp + Work Desk (desk task lighting)
+        #expect(AnthropometricStandards.isFunctionalCompanionPair(
+            categoryA: .lighting,
+            nameA: "Floor Lamp",
+            categoryB: .table,
+            nameB: "Work Desk"
+        ))
+
+        // Bed + Nightstand
+        #expect(AnthropometricStandards.isFunctionalCompanionPair(
+            categoryA: .bed,
+            nameA: "Queen Bed",
+            categoryB: .storage,
+            nameB: "Nightstand"
+        ))
+
+        // Desk + Chair
+        #expect(AnthropometricStandards.isFunctionalCompanionPair(
+            categoryA: .table,
+            nameA: "Work Desk",
+            categoryB: .seating,
+            nameB: "Office Chair"
+        ))
+
+        // Unrelated heavy pieces (e.g. Bed + Desk) must NOT be companion pairs
+        #expect(!AnthropometricStandards.isFunctionalCompanionPair(
+            categoryA: .bed,
+            nameA: "Queen Bed",
+            categoryB: .table,
+            nameB: "Work Desk"
+        ))
+    }
 }
 

@@ -122,6 +122,53 @@ struct AlcoveCoreTests {
         #expect(reaction?.emotion != .warning)
     }
 
+    @Test func floorLampBesideChairAndDeskRecognizedAsTaskLighting() async {
+        let rulebook = FastPathRulebook()
+        let chair = Furniture(
+            name: "Ergonomic Chair",
+            category: .seating,
+            positionX: 1.3,
+            positionY: 0.0,
+            positionZ: -0.3,
+            width: 0.6,
+            length: 0.6
+        )
+
+        // Move a Floor Lamp right beside the chair (~40cm away)
+        let lampEvent = FurnitureMoveEvent(
+            furnitureName: "Floor Lamp",
+            category: .lighting,
+            oldPosition: (x: -1.8, z: -2.0),
+            newPosition: (x: 1.3, z: 0.1),
+            rotationYaw: 0.0
+        )
+
+        let reaction = rulebook.evaluateMicroMove(
+            event: lampEvent,
+            roomDimensions: (width: 4.5, length: 5.0),
+            allFurnitures: [chair]
+        )
+
+        // Must recognize intentional task lighting with happy emotion, never a warning
+        #expect(reaction?.emotion == .happy)
+        #expect(reaction?.message.contains("Task lighting") == true)
+
+        // Stage 1 Audit evaluation should NOT flag this pairing as a bottleneck
+        let service = MockMascotAIService()
+        let room = SampleData.createStarterRoom()
+        if let lamp = room.workingLayout?.furnitures.first(where: { $0.name == "Floor Lamp" }),
+           let deskChair = room.workingLayout?.furnitures.first(where: { $0.name == "Ergonomic Chair" }) {
+            lamp.positionX = deskChair.positionX
+            lamp.positionZ = deskChair.positionZ + 0.4
+        }
+
+        let evalResult = await service.evaluateStage(stage: .audit, room: room)
+        let lampChairBottleneck = evalResult.bottlenecks.first(where: {
+            $0.title.contains("Floor Lamp") && $0.title.contains("Ergonomic Chair")
+        })
+        #expect(lampChairBottleneck == nil)
+    }
+
     @Test func fastPathDaylightMicroReactions() {
         let rulebook = FastPathRulebook()
         let desk = Furniture(

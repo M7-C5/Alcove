@@ -39,6 +39,7 @@ public enum DesignKnowledgeSystemPrompt {
     Before flagging an item as "crowded" or "overlapping", think carefully about whether that proximity makes functional, real-world sense:
 
     • INTENTIONAL & FUNCTIONAL PAIRINGS (Completely normal — DO NOT flag as a bottleneck):
+      - Floor Lamp / Reading Lamp standing beside a Desk, Chair, Armchair, Sofa, or Bed (deliberate task and reading illumination).
       - Nightstand / Bedside Table right beside or touching a Bed (essential for placing a lamp, phone, or water glass).
       - Desk Chair placed directly at, touching, or tucked under a Desk (this is its natural home).
       - Coffee Table or Ottoman placed 35–45 cm in front of a Sofa (ideal reach distance without stretching).
