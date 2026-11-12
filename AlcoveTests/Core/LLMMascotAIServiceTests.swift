@@ -120,6 +120,11 @@ struct LLMMascotAIServiceTests {
         #expect(context.contains("Bookshelf"))
         #expect(context.contains("Facing: INWARD into the room (toward center)"))
         #expect(context.contains("Anchored at Left Wall"))
+
+        // Queen Bed is along the left/back walls, NEVER in the open center
+        #expect(context.contains("Queen Bed"))
+        #expect(context.contains("Anchored at Back Wall"))
+        #expect(!context.contains("Queen Bed") || !context.contains("Standing in open center of room"))
     }
 }
 

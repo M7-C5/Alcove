@@ -139,14 +139,14 @@ public final class LLMMascotAIService: MascotAIServiceProtocol {
             if stage == .audit {
                 evaluationPrompt = """
                 Perform an observational spatial intake diagnosis for Stage 1: The Audit for "\(room.name)".
-                CRITICAL CURRICULUM RULES FOR STAGE 1 (THE AUDIT):
+                CRITICAL CURRICULUM & VOICE RULES FOR STAGE 1 (THE AUDIT):
                 - The Audit is strictly an observational diagnosis of the room's CURRENT SITUATION and layout as scanned.
                 - DO NOT mention, score, or criticize artificial lighting, lamps, or fixtures! DO NOT tell the user to "add more lights" or "add lamps" (artificial lighting belongs strictly to Stage 3: The Illumination).
                 - There is NO score penalty in Stage 1. Return "score": 100 and "canAdvance": true.
-                - Describe what is happening right now in the room based on the layout data: room scale, current active furniture pieces, natural walking pathways (roomy vs snug), and where daylight enters.
+                - Location accuracy: Look at each piece's `Placement` tag. NEVER say a piece is "floating" or "in the center" when it is anchored against a wall or corner!
                 - Ground recommendations in the ACTUAL room by directly naming real pieces (e.g. Work Desk, Queen Bed). DO NOT quote textbook rules or measurement thresholds (e.g. DO NOT say "Ensure 76.2cm circulation").
                 - Note furniture facing: Pieces marked 'Facing: INWARD into the room (toward center)' are ALREADY properly facing the room. DO NOT tell the user to make them face the room.
-                - Mascot voice: warm, perceptive interior design buddy diagnosing what's currently here (under 35 words).
+                - Mascot voice: casual, grounded interior designer friend. Avoid awkward flowery phrasing (NEVER use "floating comfortably", "lovely daylight", or "enjoys open breathing room in the center"). Keep under 35 words.
 
                 Return ONLY a raw JSON object (no markdown quotes, no explanation) with this exact schema:
                 {
@@ -162,6 +162,8 @@ public final class LLMMascotAIService: MascotAIServiceProtocol {
                 evaluationPrompt = """
                 Perform a formal stage completion evaluation for \(stage.title) (Stage \(stage.stageNumber)).
                 CRITICAL CURRICULUM & ORIENTATION RULES:
+                - Voice: Casual, grounded interior designer companion. Avoid awkward flowery phrasing.
+                - Location accuracy: Look at each piece's `Placement` tag. NEVER say a piece is "floating" or "in the center" when it is anchored against a wall or corner!
                 - Ground every recommendation in the ACTUAL room by directly naming specific furniture pieces (e.g. "Work Desk", "Queen Bed", "Bookshelf").
                 - DO NOT write generic textbook rules or repeat measurement thresholds (e.g. NEVER say "Ensure 76.2cm circulation" or "Maintain 91.4cm clearance"). Instead give practical everyday advice: e.g. "Nudge the Queen Bed slightly left to widen the desk corridor" or "Your desk chair has generous pushback room".
                 - The spatial context explicitly calculates whether each furniture piece is facing inward toward the center of the room (e.g. 'Facing: INWARD into the room (toward center)').
@@ -196,6 +198,17 @@ public final class LLMMascotAIService: MascotAIServiceProtocol {
                 let praise = parsed["praise"] as? [String] ?? baseline.praise
 
                 let furnitures = room.workingLayout?.furnitures.filter { !$0.isArchived } ?? []
+
+                var cleanDialogue = dialogue
+                // Sanitize awkward "floating comfortably" or "in the center" hallucinations if bed is near wall
+                let hasBedNearWall = furnitures.contains { $0.category == .bed && (abs($0.positionX) > 0.6 || abs($0.positionZ) > 0.6) }
+                if hasBedNearWall {
+                    cleanDialogue = cleanDialogue
+                        .replacingOccurrences(of: "floating comfortably", with: "anchored neatly against the wall", options: .caseInsensitive)
+                        .replacingOccurrences(of: "floating", with: "placed", options: .caseInsensitive)
+                        .replacingOccurrences(of: "in the center", with: "along the wall", options: .caseInsensitive)
+                }
+
                 var filteredRecs: [String] = []
                 for rec in rawRecs {
                     let lower = rec.lowercased()
@@ -222,6 +235,18 @@ public final class LLMMascotAIService: MascotAIServiceProtocol {
                             continue
                         }
                     }
+
+                    // Filter out hallucinated "center" or "floating" tips for pieces placed along walls
+                    if (lower.contains("center") || lower.contains("floating") || lower.contains("middle")) && (lower.contains("bed") || lower.contains("desk")) {
+                        let isWallBound = furnitures.contains { f in
+                            guard f.category == .bed || f.category == .table else { return false }
+                            return abs(f.positionX) > 0.6 || abs(f.positionZ) > 0.6
+                        }
+                        if isWallBound {
+                            continue
+                        }
+                    }
+
                     filteredRecs.append(rec)
                 }
 
@@ -233,7 +258,7 @@ public final class LLMMascotAIService: MascotAIServiceProtocol {
                     canAdvance: canAdvance && baseline.canAdvance, // Safety: cannot advance if critical physical collision exists
                     score: score,
                     title: title,
-                    dialogue: dialogue,
+                    dialogue: cleanDialogue,
                     bottlenecks: baseline.bottlenecks,
                     recommendations: filteredRecs,
                     praise: praise

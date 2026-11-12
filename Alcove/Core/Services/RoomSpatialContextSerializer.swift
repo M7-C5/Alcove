@@ -37,19 +37,36 @@ public struct RoomSpatialContextSerializer: Sendable {
                 facingDescription = "Parallel to wall"
             }
 
+            // Outer footprint extents accounting for orientation
+            let absCos = abs(cos(f.rotationYaw))
+            let absSin = abs(sin(f.rotationYaw))
+            let extentX = (absCos * f.width + absSin * f.length) / 2.0
+            let extentZ = (absSin * f.width + absCos * f.length) / 2.0
+
+            let distToLeftWall = (f.positionX - extentX) - (-halfW)
+            let distToRightWall = halfW - (f.positionX + extentX)
+            let distToBackWall = (f.positionZ - extentZ) - (-halfL)
+            let distToFrontWall = halfL - (f.positionZ + extentZ)
+
             var placementContext: [String] = []
-            if f.positionX < -halfW + 0.6 {
+            if distToLeftWall < 0.45 {
                 placementContext.append("Anchored at Left Wall")
-            } else if f.positionX > halfW - 0.6 {
+            } else if distToRightWall < 0.45 {
                 placementContext.append("Anchored at Right Wall")
             }
-            if f.positionZ < -halfL + 0.6 {
+            if distToBackWall < 0.45 {
                 placementContext.append("Anchored at Back Wall")
-            } else if f.positionZ > halfL - 0.6 {
+            } else if distToFrontWall < 0.45 {
                 placementContext.append("Anchored at Front Wall")
             }
+
             if placementContext.isEmpty {
-                placementContext.append("Central room floor")
+                let distToCenter = sqrt(f.positionX * f.positionX + f.positionZ * f.positionZ)
+                if distToCenter < 0.70 {
+                    placementContext.append("Standing in open center of room")
+                } else {
+                    placementContext.append("Mid-floor offset from walls")
+                }
             }
 
             let wallStr = placementContext.joined(separator: ", ")
