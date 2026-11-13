@@ -155,10 +155,22 @@ public struct SpatialFactVerifier: Sendable {
         }
 
         // Circuit breaker: Claiming a wall-anchored piece is floating or in the center
+        // Use explicit placement phrases so valid advice like "keep the center of the room open" is allowed.
+        let falseCenterPhrases = [
+            "is floating",
+            "floating in",
+            "floating comfortably",
+            "is in the center",
+            "sits in the center",
+            "placed in the center",
+            "tucked in the center"
+        ]
         let hasFalseCenter = furnitures.contains { f in
             isFurnitureNearWall(f, halfW: halfW, halfL: halfL) &&
             answer.localizedCaseInsensitiveContains(f.name) &&
-            (answer.localizedCaseInsensitiveContains("floating") || answer.localizedCaseInsensitiveContains("in the center"))
+            falseCenterPhrases.contains { phrase in
+                answer.localizedCaseInsensitiveContains(phrase)
+            }
         }
         if hasFalseCenter {
             return fallbackAnswer

@@ -120,6 +120,16 @@ struct SpatialFactVerifierTests {
             fallbackAnswer: fallback
         )
         #expect(validAns == "Your Work Desk has great natural light by the window.")
+
+        // Advice mentioning keeping the center open should NOT trip false-center circuit breaker
+        let openCenterAdvice = "Slide your Queen Bed toward the open corner so the center of the room stays clear."
+        let preservedCenterAdvice = verifier.verifyChatAnswer(
+            answer: openCenterAdvice,
+            room: room,
+            stage: .rearrangement,
+            fallbackAnswer: fallback
+        )
+        #expect(preservedCenterAdvice == openCenterAdvice)
     }
 }
 
