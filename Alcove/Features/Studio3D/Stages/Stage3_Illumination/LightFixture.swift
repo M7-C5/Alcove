@@ -4,6 +4,9 @@ import Foundation
 public enum LightKind: String, Codable, CaseIterable, Sendable, Identifiable {
     case ceilingLight, pendantLight, deskLamp, standingLamp, tableLamp, wallLight
 
+    /// Portable lamps are offered through furniture; retained enum cases decode saved rooms.
+    public static let lightingKinds: [LightKind] = [.ceilingLight, .pendantLight, .wallLight]
+
     public var id: String { rawValue }
 
     public var title: String {

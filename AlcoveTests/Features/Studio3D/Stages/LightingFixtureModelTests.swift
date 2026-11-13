@@ -59,6 +59,16 @@ struct LightingFixtureModelTests {
         let clone = LightingFixtureModelBuilder.make(kind: kind)
         #expect(model !== clone)
         #expect(model.findEntity(named: name) !== clone.findEntity(named: name))
+        for fixture in [model, clone] {
+            var pending = [fixture]
+            while let entity = pending.popLast() {
+                if entity.components[ModelComponent.self] != nil {
+                    #expect(entity.components[DynamicLightShadowComponent.self]?.castsShadow == false)
+                    #expect(entity.components[GroundingShadowComponent.self]?.castsShadow == false)
+                }
+                pending.append(contentsOf: entity.children)
+            }
+        }
     }
 
     @Test func fixturesMountOnDeskFloorCeilingAndNearestWall() {

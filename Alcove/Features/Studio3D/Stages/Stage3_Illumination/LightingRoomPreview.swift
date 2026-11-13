@@ -2,6 +2,7 @@ import SwiftUI
 import RealityKit
 import UIKit
 import simd
+import Combine
 
 /// Immutable input: changing the clock never re-reads SwiftData or rebuilds furniture meshes.
 struct LightingRoomSnapshot: Sendable {
@@ -39,8 +40,11 @@ struct LightingRoomPreview: UIViewRepresentable {
     var backgroundColor: UIColor = .init(white: 0.08, alpha: 1)
     var onPlaceLight: ((SIMD2<Float>) -> Void)?
     var onSelectLight: ((UUID) -> Void)?
+    var onClearSelection: (() -> Void)?
+    var onMoveLight: ((UUID, SIMD2<Float>) -> Void)?
     var isPlacementMode = false
     var selectedFixtureIDs: Set<UUID> = []
+    var isSelectingMultiple = false
 
     func makeCoordinator() -> LightingRoomScene { LightingRoomScene(snapshot: snapshot) }
 
@@ -49,6 +53,7 @@ struct LightingRoomPreview: UIViewRepresentable {
         view.environment.background = .color(resolvedBackground)
         view.scene.addAnchor(context.coordinator.root)
         let pan = UIPanGestureRecognizer(target: context.coordinator, action: #selector(LightingRoomScene.orbit(_:)))
+        pan.maximumNumberOfTouches = 1
         let pinch = UIPinchGestureRecognizer(target: context.coordinator, action: #selector(LightingRoomScene.magnify(_:)))
         view.addGestureRecognizer(pan)
         view.addGestureRecognizer(pinch)
@@ -63,9 +68,17 @@ struct LightingRoomPreview: UIViewRepresentable {
         view.addGestureRecognizer(tap)
         context.coordinator.onPlaceLight = onPlaceLight
         context.coordinator.onSelectLight = onSelectLight
+        context.coordinator.onClearSelection = onClearSelection
+        context.coordinator.onMoveLight = onMoveLight
         context.coordinator.setPlacementMode(isPlacementMode)
         context.coordinator.setSelection(selectedFixtureIDs)
+        context.coordinator.isSelectingMultiple = isSelectingMultiple
         context.coordinator.apply(settings, preset: preset, in: view)
+        let coordinator = context.coordinator
+        coordinator.badgeSubscription = view.scene.subscribe(to: SceneEvents.Update.self) { [weak coordinator, weak view] _ in
+            guard let view else { return }
+            coordinator?.updateMoveBadges(in: view)
+        }
         return view
     }
 
@@ -73,13 +86,18 @@ struct LightingRoomPreview: UIViewRepresentable {
         view.environment.background = .color(resolvedBackground)
         context.coordinator.onPlaceLight = onPlaceLight
         context.coordinator.onSelectLight = onSelectLight
+        context.coordinator.onClearSelection = onClearSelection
+        context.coordinator.onMoveLight = onMoveLight
         context.coordinator.setPlacementMode(isPlacementMode)
         context.coordinator.updateFixtures(snapshot.fixtures)
         context.coordinator.setSelection(selectedFixtureIDs)
+        context.coordinator.isSelectingMultiple = isSelectingMultiple
         context.coordinator.apply(settings, preset: preset, in: view)
     }
 
     static func dismantleUIView(_ view: ARView, coordinator: LightingRoomScene) {
+        coordinator.badgeSubscription?.cancel()
+        coordinator.removeMoveBadges()
         view.scene.anchors.removeAll()
     }
 
@@ -102,11 +120,14 @@ final class LightingRoomScene: NSObject {
     private var fixtureDefinitions: [LightFixture] = []
     let placementOverlay = ModelEntity()
     private(set) var isPlacementMode = false
+    var isSelectingMultiple = false
     weak var panGesture: UIPanGestureRecognizer?
     weak var pinchGesture: UIPinchGestureRecognizer?
     weak var resetGesture: UITapGestureRecognizer?
     var onPlaceLight: ((SIMD2<Float>) -> Void)?
     var onSelectLight: ((UUID) -> Void)?
+    var onClearSelection: (() -> Void)?
+    var onMoveLight: ((UUID, SIMD2<Float>) -> Void)?
 
     init(snapshot: LightingRoomSnapshot) {
         self.snapshot = snapshot
@@ -116,9 +137,15 @@ final class LightingRoomScene: NSObject {
         updateFixtures(snapshot.fixtures)
         camera.camera.fieldOfViewInDegrees = 50
         root.addChild(camera)
+        sun.name = "Sunlight"
         sun.light.intensity = 0
         #if !targetEnvironment(simulator)
-        sun.shadow = DirectionalLightComponent.Shadow()
+        let span = Float(max(snapshot.geometry.width, snapshot.geometry.length, snapshot.geometry.height))
+        // A fixed projection stays anchored to the sun rather than following the camera frustum.
+        sun.shadow = DirectionalLightComponent.Shadow(
+            shadowProjection: .fixed(zNear: 0.01, zFar: span * 6, orthographicScale: span * 3),
+            depthBias: 1
+        )
         #endif
         root.addChild(sun)
     }
@@ -133,15 +160,17 @@ final class LightingRoomScene: NSObject {
         guard previousSettings != settings else { return }
         previousSettings = settings
         let daylight = IlluminationSimulationEngine().calculateDaylight(hourOfDay: settings.hourOfDay)
-        let fraction = Float(daylight.intensityLux / 10000)
+        let fraction = settings.sunlightOn ? Float(daylight.intensityLux / 10000) : 0
         view.environment.lighting.intensityExponent = settings.layoutOnly || isPlacementMode ? 1 : -5 + fraction * 2
-        sun.isEnabled = !settings.layoutOnly && !isPlacementMode && fraction > 0
+        sun.isEnabled = settings.sunlightOn && !settings.layoutOnly && !isPlacementMode && fraction > 0
         sun.light.intensity = Float(daylight.intensityLux)
         sun.light.color = color(kelvin: daylight.kelvin)
         let elevation = Float(daylight.elevationAngleRadians)
         let azimuth = Float(daylight.azimuthAngleRadians)
         let target: SIMD3<Float> = [0, 0, 0]
-        let source: SIMD3<Float> = [sin(azimuth) * 10, max(0.1, sin(elevation) * 10), -cos(azimuth) * 10]
+        let distance = Float(max(snapshot.geometry.width, snapshot.geometry.length, snapshot.geometry.height)) * 3
+        let direction = SIMD3<Float>(sin(azimuth) * cos(elevation), max(0.01, sin(elevation)), -cos(azimuth) * cos(elevation))
+        let source = simd_normalize(direction) * distance
         sun.look(at: target, from: source, relativeTo: root)
         let renderedIDs = settings.renderedFixtureIDs(in: fixtureDefinitions)
         for fixture in fixtures {
@@ -156,7 +185,54 @@ final class LightingRoomScene: NSObject {
 
     private var placementHeight: Float { Float(snapshot.geometry.height) + 0.04 }
 
+    var badgeSubscription: Cancellable?
+    private var selectedIDs: Set<UUID> = []
+    private var moveBadges: [UUID: UIImageView] = [:]
+    private var drag: (id: UUID, height: Float, offset: SIMD2<Float>)?
+
+    func removeMoveBadges() {
+        for badge in moveBadges.values { badge.removeFromSuperview() }
+        moveBadges.removeAll()
+    }
+
+    func updateMoveBadges(in view: ARView) {
+        for id in Array(moveBadges.keys) where !selectedIDs.contains(id) {
+            moveBadges.removeValue(forKey: id)?.removeFromSuperview()
+        }
+        for fixture in fixtures where selectedIDs.contains(fixture.definition.id) {
+            let id = fixture.definition.id
+            let badge: UIImageView
+            if let existing = moveBadges[id] {
+                badge = existing
+            } else {
+                badge = UIImageView(image: UIImage(systemName: "arrow.up.and.down.and.arrow.left.and.right"))
+                badge.preferredSymbolConfiguration = .init(textStyle: .caption1)
+                badge.tintColor = UIColor(named: "LightingInk") ?? .label
+                badge.contentMode = .scaleAspectFit
+                badge.isUserInteractionEnabled = false
+                view.addSubview(badge)
+                moveBadges[id] = badge
+            }
+            let bounds = fixture.model.root.visualBounds(relativeTo: nil)
+            let corners = [bounds.min.x, bounds.max.x].flatMap { x in
+                [bounds.min.y, bounds.max.y].flatMap { y in
+                    [bounds.min.z, bounds.max.z].compactMap { z in view.project([x, y, z]) }
+                }
+            }
+            if let right = corners.map(\.x).max(), let top = corners.map(\.y).min() {
+                // A small hint beside the silhouette keeps the fixture itself unobstructed.
+                badge.frame = CGRect(x: min(max(8, right + 8), max(8, view.bounds.width - 26)),
+                                     y: min(max(8, top), max(8, view.bounds.height - 26)),
+                                     width: 18, height: 18)
+                badge.isHidden = false
+            } else {
+                badge.isHidden = true
+            }
+        }
+    }
+
     func setSelection(_ ids: Set<UUID>) {
+        selectedIDs = ids
         for fixture in fixtures { fixture.model.setSelected(ids.contains(fixture.definition.id)) }
     }
 
@@ -164,7 +240,7 @@ final class LightingRoomScene: NSObject {
         guard isPlacementMode != enabled else { return }
         isPlacementMode = enabled
         navigation.setLocked(enabled)
-        panGesture?.isEnabled = !enabled
+        panGesture?.isEnabled = true
         pinchGesture?.isEnabled = !enabled
         resetGesture?.isEnabled = !enabled
         placementOverlay.isEnabled = enabled
@@ -275,12 +351,57 @@ final class LightingRoomScene: NSObject {
         }
     }
 
+    /// A pan starting on a selected fixture moves it; a pan elsewhere turns the camera.
     @objc func orbit(_ gesture: UIPanGestureRecognizer) {
-        guard !isPlacementMode, gesture.state == .changed else { return }
-        let delta = gesture.translation(in: gesture.view)
-        navigation.orbit(deltaX: delta.x, deltaY: delta.y)
-        gesture.setTranslation(.zero, in: gesture.view)
-        positionCamera(previousPreset ?? .dollhouseIsometric)
+        guard let view = gesture.view as? ARView else { return }
+        let point = gesture.location(in: view)
+        switch gesture.state {
+        case .began:
+            if let id = fixtureID(at: point, in: view), selectedIDs.contains(id),
+               let fixture = fixtures.first(where: { $0.definition.id == id }) {
+                let height = fixture.model.root.position(relativeTo: nil).y
+                if let start = planePoint(at: point, height: height, in: view) {
+                    drag = (id, height, SIMD2<Float>(Float(fixture.definition.positionX), Float(fixture.definition.positionZ)) - start)
+                }
+            }
+        case .changed:
+            if let drag {
+                if let position = planePoint(at: point, height: drag.height, in: view) {
+                    onMoveLight?(drag.id, position + drag.offset)
+                }
+            } else if !isPlacementMode {
+                let delta = gesture.translation(in: view)
+                navigation.orbit(deltaX: delta.x, deltaY: delta.y)
+                positionCamera(previousPreset ?? .dollhouseIsometric)
+            }
+            gesture.setTranslation(.zero, in: view)
+        case .ended, .cancelled, .failed:
+            drag = nil
+        default: break
+        }
+    }
+
+    private func planePoint(at point: CGPoint, height: Float, in view: ARView) -> SIMD2<Float>? {
+        guard let ray = view.ray(through: point), abs(ray.direction.y) > 0.0001 else { return nil }
+        let distance = (height - ray.origin.y) / ray.direction.y
+        guard distance > 0 else { return nil }
+        let world = ray.origin + ray.direction * distance
+        return [world.x, world.z]
+    }
+
+    private func fixtureID(at point: CGPoint, in view: ARView) -> UUID? {
+        if let badge = moveBadges.first(where: { !$0.value.isHidden && $0.value.frame.insetBy(dx: -13, dy: -13).contains(point) }) {
+            return badge.key
+        }
+        var hit = view.entity(at: point)
+        while let entity = hit {
+            if let fixture = entity.components[LightingFixtureIDComponent.self] { return fixture.id }
+            hit = entity.parent
+        }
+        return fixtures.compactMap { fixture -> (id: UUID, distance: CGFloat)? in
+            guard let projected = view.project(fixture.model.root.position(relativeTo: nil)) else { return nil }
+            return (fixture.definition.id, hypot(projected.x - point.x, projected.y - point.y))
+        }.filter { $0.distance <= 22 }.min { $0.distance < $1.distance }?.id
     }
 
     @objc func magnify(_ gesture: UIPinchGestureRecognizer) {
@@ -299,20 +420,12 @@ final class LightingRoomScene: NSObject {
     @objc func tapLayout(_ gesture: UITapGestureRecognizer) {
         guard let view = gesture.view as? ARView else { return }
         let point = gesture.location(in: view)
-        var hit = view.entity(at: point)
-        while let entity = hit {
-            if let fixture = entity.components[LightingFixtureIDComponent.self], let onSelectLight {
-                onSelectLight(fixture.id)
-                return
-            }
-            hit = entity.parent
+        if let id = fixtureID(at: point, in: view) {
+            onSelectLight?(id)
+            return
         }
-        let nearest = fixtures.compactMap { fixture -> (id: UUID, distance: CGFloat)? in
-            guard let projected = view.project(fixture.model.root.position(relativeTo: nil)) else { return nil }
-            return (fixture.definition.id, hypot(projected.x - point.x, projected.y - point.y))
-        }.min { $0.distance < $1.distance }
-        if let nearest, nearest.distance <= 22, let onSelectLight {
-            onSelectLight(nearest.id)
+        if !selectedIDs.isEmpty || isSelectingMultiple || !isPlacementMode {
+            onClearSelection?()
             return
         }
         guard isPlacementMode,
@@ -544,6 +657,7 @@ final class LightingFixtureModel {
             bar.scale = edge.size
             bar.position = edge.position
             bar.components.set(DynamicLightShadowComponent(castsShadow: false))
+            bar.components.set(GroundingShadowComponent(castsShadow: false))
             outline.addChild(bar)
         }
         outline.isEnabled = false
@@ -612,9 +726,16 @@ enum LightingFixtureModelBuilder {
         emitter.name = "LightEmitter"
         emitter.position = LightingFixtureOptics(kind: kind).emitterPosition
         root.addChild(emitter)
+        disableFixtureShadows(in: root)
         root.generateCollisionShapes(recursive: true)
         prototypes[kind] = root
         return root.clone(recursive: true)
+    }
+
+    private static func disableFixtureShadows(in entity: Entity) {
+        entity.components.set(DynamicLightShadowComponent(castsShadow: false))
+        entity.components.set(GroundingShadowComponent(castsShadow: false))
+        for child in entity.children { disableFixtureShadows(in: child) }
     }
 
     private static func deskLamp(in root: Entity) {

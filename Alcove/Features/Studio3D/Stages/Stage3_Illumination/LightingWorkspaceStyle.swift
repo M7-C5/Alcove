@@ -98,3 +98,30 @@ struct LightingGradientSlider: View {
         value = min(range.upperBound, max(range.lowerBound, next))
     }
 }
+
+/// Warm raised capsule shared by the lighting workspace's primary actions.
+struct LightingPrimaryButtonStyle: ButtonStyle {
+    var isCream = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(.headline, design: .rounded, weight: .heavy))
+            .foregroundStyle(LightingTheme.ink)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 12)
+            .frame(minHeight: 48)
+            .background {
+                ZStack {
+                    Capsule().fill(isCream ? Color(red: 0.91, green: 0.78, blue: 0.63) : Color(red: 1, green: 0.66, blue: 0))
+                    Capsule().fill(isCream ? Color(red: 1, green: 247.0 / 255, blue: 231.0 / 255) : Color(red: 1, green: 0.86, blue: 0.39))
+                        .padding(.bottom, 6)
+                    Capsule().strokeBorder(Color(red: 1, green: 0.94, blue: 0.73), lineWidth: 2)
+                        .padding(5)
+                        .padding(.bottom, 5)
+                }
+            }
+            .overlay(Capsule().strokeBorder(LightingTheme.ink, lineWidth: 2))
+            .contentShape(Capsule())
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+    }
+}

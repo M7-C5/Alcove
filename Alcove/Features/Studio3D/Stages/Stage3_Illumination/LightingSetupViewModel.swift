@@ -50,6 +50,7 @@ final class LightingSetupViewModel {
     }
 
     func toggleMultipleSelection() {
+        guard !drafts.isEmpty else { return }
         isSelectingMultiple.toggle()
         if !isSelectingMultiple { selectedID = selected?.id }
     }
@@ -60,6 +61,11 @@ final class LightingSetupViewModel {
     }
 
     func clearSelection() { selectedIDs.removeAll() }
+
+    func dismissSelection() {
+        isSelectingMultiple = false
+        clearSelection()
+    }
 
     func prepareForPlacement() {
         isSelectingMultiple = false
@@ -113,6 +119,15 @@ final class LightingSetupViewModel {
             update(&fixture)
             drafts[index] = geometry.clamped(fixture)
         }
+    }
+
+    /// Dragging preserves continuous room coordinates rather than snapping to the placement grid.
+    func move(_ id: UUID, x: Double, z: Double) {
+        guard x.isFinite, z.isFinite, let index = drafts.firstIndex(where: { $0.id == id }) else { return }
+        var fixture = drafts[index]
+        fixture.positionX = x
+        fixture.positionZ = z
+        drafts[index] = geometry.clamped(fixture)
     }
 
     func deleteSelected() {

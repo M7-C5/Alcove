@@ -13,8 +13,8 @@ struct LightingWorkspaceLayout: Sendable {
         usesColumns = width >= 900 && !accessibilityText
         inset = width >= 1100 ? 24 : 16
         spacing = width >= 1100 ? 24 : 16
-        sourceWidth = min(232, max(184, width * 0.19))
-        inspectorWidth = min(288, max(240, width * 0.235))
+        sourceWidth = min(288, max(240, width * 0.21))
+        inspectorWidth = sourceWidth
         viewportWidth = max(0, width - 2 * inset - 2 * spacing - sourceWidth - inspectorWidth)
     }
 }

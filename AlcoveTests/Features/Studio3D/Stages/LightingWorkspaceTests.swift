@@ -8,6 +8,72 @@ import UIKit
 
 @Suite("Lighting workspace") @MainActor
 struct LightingWorkspaceTests {
+    @Test func sunlightSwitchIsIndependentAndCameraPresetsKeepSunFixed() throws {
+        let room = makeBatchRoom()
+        let scene = LightingRoomScene(snapshot: LightingRoomSnapshot(room: room, fixtures: room.workingLayout?.lightFixtures ?? []))
+        let view = ARView(frame: .zero, cameraMode: .nonAR, automaticallyConfigureSession: false)
+        var settings = LightingSimulationSettings()
+        scene.apply(settings, preset: .front, in: view)
+        let sun = try #require(scene.root.findEntity(named: "Sunlight"))
+        let position = sun.position
+        let orientation = sun.orientation.vector
+        #expect(sun.isEnabled)
+        scene.apply(settings, preset: .right, in: view)
+        #expect(sun.position == position && sun.orientation.vector == orientation)
+        settings.sunlightOn = false
+        scene.apply(settings, preset: .right, in: view)
+        #expect(!sun.isEnabled)
+        let fixture = LightFixture(name: "Test", layer: .ambient)
+        #expect(settings.output(for: fixture) == fixture.lumens)
+        settings.artificialLightsOn = false
+        settings.sunlightOn = true
+        scene.apply(settings, preset: .right, in: view)
+        #expect(sun.isEnabled)
+        #expect(settings.output(for: fixture) == 0)
+        #expect(sun.position == position && sun.orientation.vector == orientation)
+    }
+
+    @Test func dismissingSelectionExitsGroupModeWithoutChangingLights() {
+        let editor = LightingSetupViewModel(room: makeBatchRoom())
+        let before = editor.drafts
+        editor.selectAll()
+        editor.dismissSelection()
+        #expect(editor.selectedIDs.isEmpty)
+        #expect(!editor.isSelectingMultiple)
+        #expect(editor.drafts == before)
+        editor.selectAll()
+        editor.deleteSelected()
+        editor.toggleMultipleSelection()
+        #expect(!editor.isSelectingMultiple)
+        #expect(LightKind.lightingKinds == [.ceilingLight, .pendantLight, .wallLight])
+    }
+
+    @Test func freeformMovePreservesOffGridPositionAndSavedLayoutUntilSave() throws {
+        let room = makeBatchRoom()
+        let editor = LightingSetupViewModel(room: room)
+        let original = editor.drafts
+        let id = original[0].id
+        editor.prepareForPlacement()
+        editor.toggleMultipleSelection()
+        editor.select(id)
+        #expect(editor.isSelectingMultiple && editor.selectedIDs == [id])
+        editor.move(id, x: 0.123, z: -0.237)
+        #expect(editor.drafts[0].positionX == 0.123 && editor.drafts[0].positionZ == -0.237)
+        #expect(editor.drafts[0].lumens == original[0].lumens)
+        #expect(Array(editor.drafts.dropFirst()) == Array(original.dropFirst()))
+        #expect(room.workingLayout?.lightFixtures == original)
+        editor.move(id, x: .infinity, z: 0)
+        #expect(editor.drafts[0].positionX == 0.123)
+        editor.move(id, x: 100, z: -100)
+        #expect(editor.drafts[0].positionX == (editor.geometry.width - 0.3) / 2)
+        #expect(editor.drafts[0].positionZ == -(editor.geometry.length - 0.3) / 2)
+        let context = ModelContext(try ModelContainer.createInMemoryContainer())
+        context.insert(room)
+        try editor.save(in: room, context: context)
+        #expect(room.workingLayout?.lightFixtures == editor.drafts)
+        #expect(room.baselineLayout?.lightFixtures.isEmpty == true)
+    }
+
     @Test func multipleSelectionTogglesWithoutEditingFixturesAndDoneReturnsToOneLight() throws {
         let room = makeBatchRoom()
         let editor = LightingSetupViewModel(room: room)
@@ -177,7 +243,7 @@ struct LightingWorkspaceTests {
         #expect(navigation.yaw < 0)
     }
 
-    @Test func whitePlacementLayerIsTemporaryAndDisablesNavigationGestures() {
+    @Test func whitePlacementLayerKeepsDragAvailableAndDisablesCameraNavigation() {
         let room = MockRoomGenerator.generateBedroomOfficeCombo()
         let scene = LightingRoomScene(snapshot: LightingRoomSnapshot(room: room))
         let pan = UIPanGestureRecognizer()
@@ -190,7 +256,7 @@ struct LightingWorkspaceTests {
         scene.setPlacementMode(true)
         #expect(scene.placementOverlay.isEnabled)
         #expect(scene.placementOverlay.position.y > Float(room.dimensionsHeight))
-        #expect(!pan.isEnabled && !pinch.isEnabled && !reset.isEnabled)
+        #expect(pan.isEnabled && !pinch.isEnabled && !reset.isEnabled)
         scene.setPlacementMode(false)
         #expect(!scene.placementOverlay.isEnabled)
         #expect(pan.isEnabled && pinch.isEnabled && reset.isEnabled)
@@ -242,6 +308,7 @@ struct LightingWorkspaceTests {
         #expect(layout.usesColumns)
         #expect(layout.viewportWidth >= 300)
         #expect(layout.inspectorWidth <= 288)
+        #expect(layout.sourceWidth == layout.inspectorWidth)
         #expect(layout.sourceWidth + layout.inspectorWidth + layout.viewportWidth + 2 * layout.inset + 2 * layout.spacing <= width + 0.001)
         #expect(!LightingWorkspaceLayout(width: width, accessibilityText: true).usesColumns)
     }

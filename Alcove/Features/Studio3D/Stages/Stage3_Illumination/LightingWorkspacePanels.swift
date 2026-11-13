@@ -8,6 +8,11 @@ struct LightingSourcePanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             sourceHeader
+            Button(action: onAdd) {
+                Label(isAdding ? "Done adding" : "Add light", systemImage: isAdding ? "checkmark" : "plus.circle")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(LightingPrimaryButtonStyle(isCream: true))
             if editor.isSelectingMultiple { selectionControls }
             ScrollView {
                 LazyVStack(spacing: 16) {
@@ -22,19 +27,12 @@ struct LightingSourcePanel: View {
                     }
                 }
             }
-            Button(action: onAdd) {
-                Label(isAdding ? "Done adding" : "Add light", systemImage: isAdding ? "checkmark" : "plus.circle")
-                    .font(.system(.subheadline, design: .rounded, weight: .bold))
-                    .frame(maxWidth: .infinity, minHeight: 48)
-                    .background(LightingTheme.row, in: RoundedRectangle(cornerRadius: 16))
-            }
-            .buttonStyle(.plain)
             if editor.hasUnsavedChanges {
                 Label("Unsaved changes", systemImage: "circle.fill")
                     .font(.caption)
             }
         }
-        .padding(16)
+        .padding(24)
         .lightingPanel()
     }
 
@@ -50,7 +48,8 @@ struct LightingSourcePanel: View {
                     .frame(minWidth: 44, minHeight: 44)
                     .contentShape(Rectangle())
             }
-            .disabled(isAdding || editor.drafts.isEmpty)
+            .disabled(editor.drafts.isEmpty)
+            .opacity(editor.drafts.isEmpty ? 0.4 : 1)
             .accessibilityLabel(editor.isSelectingMultiple ? "Finish selecting lights" : "Select multiple lights")
         }
     }
@@ -111,21 +110,15 @@ struct LightingSimulationPanel: View {
     let activeFixtureCount: Int
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 16) {
             Label("Lighting preview", systemImage: "sun.max")
                 .font(.system(.headline, design: .rounded, weight: .heavy))
                 .fixedSize(horizontal: false, vertical: true)
-            HStack(spacing: 16) {
-                Spacer(minLength: 0)
-                Text("Off")
-                Toggle("Room lights", isOn: $settings.artificialLightsOn)
-                    .labelsHidden()
-                    .tint(.green)
-                    .frame(minHeight: 44)
-                Text("On")
-                Spacer(minLength: 0)
+            HStack(alignment: .top, spacing: 16) {
+                lightToggle("Lights", isOn: $settings.artificialLightsOn)
+                lightToggle("Sunlight", isOn: $settings.sunlightOn)
             }
-            .font(.subheadline)
+            .disabled(settings.layoutOnly)
             VStack(spacing: 0) {
                 HStack {
                     Text("12 AM")
@@ -142,15 +135,25 @@ struct LightingSimulationPanel: View {
                     .accessibilityLabel("Time of day")
                     .accessibilityValue(settings.timeLabel)
             }
-            .disabled(settings.layoutOnly)
+            .disabled(settings.layoutOnly || !settings.sunlightOn)
             if activeFixtureCount > 7 {
                 Text("Showing your seven brightest lights.").font(.caption)
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
+        .padding(24)
         .lightingPanel()
     }
+    private func lightToggle(_ title: String, isOn: Binding<Bool>) -> some View {
+        VStack(spacing: 8) {
+            Text(title).font(.subheadline.bold())
+            Toggle(title, isOn: isOn)
+                .labelsHidden()
+                .tint(.green)
+                .frame(minHeight: 44)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
 }
 
 struct LightingEditPanel: View {
@@ -180,8 +183,7 @@ struct LightingEditPanel: View {
                     .padding(.bottom, 16)
             }
         }
-        .padding(.horizontal, 24)
-        .padding(.vertical, 16)
+        .padding(24)
         .lightingPanel()
     }
 
@@ -203,7 +205,12 @@ struct LightingEditPanel: View {
             if editor.selected != nil && editor.commonKind == nil {
                 Text("Mixed types").tag(nil as LightKind?)
             }
-            ForEach(LightKind.allCases) { kind in
+            if let current = editor.commonKind, !LightKind.lightingKinds.contains(current) {
+                Label(current.title, systemImage: current.icon)
+                    .tag(Optional(current))
+                    .disabled(true)
+            }
+            ForEach(LightKind.lightingKinds) { kind in
                 Label(kind.title, systemImage: kind.icon).tag(Optional(kind))
             }
         }
