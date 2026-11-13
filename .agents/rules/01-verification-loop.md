@@ -19,7 +19,8 @@ This runs two sub-second / fast tiers:
 ## 2. Thermal & Simulator Guard
 - Xcode simulator processes consume substantial CPU and thermal budget.
 - **Execution Scoping**:
-  - **Required**: Run `./scripts/verify.sh` strictly after authoring or modifying Swift source code (`Alcove/`, `AlcoveTests/`, project config) prior to declaring task completion.
+  - **Required**: Run `./scripts/verify.sh` after modifying behavioral Swift code (models, services, view models, layout/spatial math, RealityKit logic), `AlcoveTests/`, or project config prior to declaring task completion.
+  - **Skip Full Test Suite**: Do NOT re-run `./scripts/verify.sh` for trivial cosmetic SwiftUI edits (e.g., swapping SF Symbol names, copy/label text, padding, or color tokens) when logic is unchanged; at most run `xcodebuild build` if compilation is in doubt.
   - **Prohibited**: Do NOT run `./scripts/verify.sh` after markdown/docs updates, clean `git pull` operations, planning turns, or general queries.
 - Test runner scripts and verification workflows MUST cleanly shut down simulators immediately after verification completes:
   ```bash

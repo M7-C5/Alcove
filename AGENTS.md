@@ -69,8 +69,9 @@ Alcove/
   ./scripts/verify.sh
   ```
 - **Execution Scoping**:
-  - **Required**: Run `./scripts/verify.sh` strictly after authoring or modifying Swift source code (`Alcove/`, `AlcoveTests/`, project config) prior to declaring task completion.
-  - **Prohibited**: Do NOT run `./scripts/verify.sh` on markdown/docs updates, clean `git pull` operations, planning, or general queries.
+  - **Required**: Run `./scripts/verify.sh` after modifying behavioral Swift code (models, services, view models, layout/spatial math, RealityKit logic), `AlcoveTests/`, or project config prior to declaring task completion.
+  - **Skip Full Test Suite**: Do NOT re-run `./scripts/verify.sh` for trivial cosmetic SwiftUI edits (e.g., swapping SF Symbol names, copy/label text, padding, or color tokens) when logic is unchanged; at most run `xcodebuild build` if compilation is in doubt.
+  - **Prohibited**: Do NOT run `./scripts/verify.sh` after markdown/docs updates, clean `git pull` operations, planning turns, or general queries.
 - Always shut down simulators after test runs to preserve battery and thermal headroom:
   ```bash
   xcrun simctl shutdown all 2>/dev/null || true
