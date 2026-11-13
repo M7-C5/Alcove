@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add semantic color and shapestyle extensions.
+- Add global alcove color palette assets.
 - Implement mascot landing home screen and tactile pill button.
 - Add dashboard route and decouple dashboard stack embedding.
 - Import optimized home background art and cleanow font resources.
