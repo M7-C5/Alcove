@@ -1,7 +1,6 @@
 import Foundation
 import Testing
 import UIKit
-import CoreText
 @testable import Alcove
 
 @Suite("Cleanow Font Tests")
