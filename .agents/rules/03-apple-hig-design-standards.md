@@ -1,13 +1,13 @@
-# Apple Human Interface Guidelines (HIG) & SwiftUI Design Standards
+# Apple Human Interface Guidelines (HIG) & Alcove Design Standards
 
-This rule governs all SwiftUI UI, layout, typography, and styling decisions within Alcove to ensure premier visual polish, accessibility, and native Apple feel on iPad landscape displays.
+This rule governs SwiftUI UI, layout, typography, and styling decisions within Alcove to ensure native iPad landscape ergonomics, accessibility, and visual consistency.
 
 ---
 
 ## 1. iPad Landscape Form Factor & HUD Ergonomics
 
 - **Landscape-First Alignment**: Alcove is built native landscape-first for iPad displays. Keep interface orientation locked to landscape.
-- **Mascot HUD Placement**: Anchor the Mascot HUD at the bottom-left with an adjacent dialogue overlay panel. Ensure the 3D room viewport remains unobstructed and interactive.
+- **Unobstructed 3D Viewport**: Keep overlays, toolbars, and Mascot HUD panels docked cleanly at the edges/corners so the central 3D room viewport remains unobstructed and interactive.
 - **Safe Area Insets**: Never clip actionable controls or text into screen edges, rounded display corners, or navigation bars. Use `.safeAreaPadding()` or explicit margins.
 
 ---
@@ -15,41 +15,31 @@ This rule governs all SwiftUI UI, layout, typography, and styling decisions with
 ## 2. Spacing Grid, Surfaces & Container Tokens
 
 - **Standard 8pt Spacing Grid**: Adhere strictly to Apple's 8pt spatial grid:
-  - Small / compact spacing: 8 pt
-  - Standard spacing: 16 pt
-  - Section / card spacing: 24–32 pt
-- **Container Tokens & Materials**: Use native grouped surfaces with continuous curvature:
-  ```swift
-  .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-  ```
-  Card panels, HUD bars, and sheet surfaces should use `.continuous` corner styling to blend seamlessly into iPadOS squircle aesthetics.
+  - Small / compact spacing: `8 pt`
+  - Standard spacing: `16 pt`
+  - Section / card spacing: `24–32 pt`
+- **Container Curvature**: Use `.continuous` corner styling (`RoundedRectangle(cornerRadius: ..., style: .continuous)`) on cards, containers, and HUD surfaces.
 
 ---
 
 ## 3. Touch Targets & Interaction Geometry
 
 - **Minimum Hit Target**: Every tappable interactive control must maintain a minimum bounding frame of **44 × 44 pt** (`.frame(minWidth: 44, minHeight: 44)` or `.contentShape(Rectangle())`).
-- **Primary HUD Actions**: Primary Mascot HUD buttons and stage navigation triggers should prefer **48 × 48 pt** hit targets for comfortable thumb-driven iPad interaction.
+- **Primary HUD Actions**: Primary HUD buttons and stage navigation triggers should prefer **48 × 48 pt** hit targets for comfortable thumb-driven iPad interaction.
 
 ---
 
-## 4. Dynamic Type & Typography Hierarchy
+## 4. Typography & Dynamic Type
 
-- **Semantic Text Styles**: Always use semantic system fonts (`.largeTitle`, `.title`, `.headline`, `.body`, `.subheadline`, `.caption`) rather than hardcoded point sizes (`.font(.system(size: 14))`). Fixed sizes break accessibility when users adjust Dynamic Type scaling.
-- **Multilingual & Dynamic Type Wrappers**: Allow labels and Mascot dialogue text to adaptively wrap or scale rather than clipping:
-  ```swift
-  Text(mascotDialogue)
-      .font(.subheadline)
-      .lineLimit(3)
-      .minimumScaleFactor(0.85)
-  ```
+- **Font Family**: Use `SF Pro Rounded` (`.system(..., design: .rounded)`) with semantic text styles (`.largeTitle`, `.title2`, `.headline`, `.subheadline`, `.caption`) so text scales cleanly with Dynamic Type.
+- **Wrapping & Scaling**: Allow labels and Mascot dialogue text to wrap or scale rather than clipping (`minimumScaleFactor(0.85)`, `fixedSize(horizontal: false, vertical: true)`).
 
 ---
 
-## 5. Dark Mode & High Contrast Symmetry
+## 5. Light-Only Global Color System & Contrast
 
-- **Semantic Colors**: Use semantic system colors (`Color.primary`, `Color.secondary`, `Color(uiColor: .systemBackground)`, `Color(uiColor: .secondarySystemGroupedBackground)`) instead of hardcoded hex values or literal `.black` / `.white`.
-- **SF Symbols**: Use Apple's SF Symbols with semantic weights and hierarchical rendering:
+- **Light-Only Palette**: Alcove does not support Dark Mode. Use the global `Alcove*` semantic color tokens in `Assets.xcassets` / `Alcove/UI/Colors.swift` (e.g., `.alcoveInk` `#6D4531` for text/borders, `.alcoveBackground` `#FEF6ED` for backgrounds, `.alcoveSurface` `#FEEEDE` for containers/alerts, `.alcovePrimaryFill` `#FBD460` for primary actions) rather than hardcoded inline hex values or Dark Mode system backgrounds.
+- **SF Symbols**: Use Apple's SF Symbols with semantic weights and hierarchical rendering where appropriate:
   ```swift
   Image(systemName: "cube.fill")
       .symbolRenderingMode(.hierarchical)
