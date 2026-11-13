@@ -37,7 +37,7 @@ public struct MascotChatDrawer: View {
                     LazyVStack(alignment: .leading, spacing: 16) {
                         chatBubble(
                             isUser: false,
-                            text: "Hi! I'm your interior design companion. Ask me anything about clearance, lighting balance, or furniture placement for \(viewModel.currentStage.title)."
+                            text: "Hey there, so glad you're here! I'm your Alcove design buddy—tell me what feels good or tricky in \(viewModel.room.name) right now, and we'll figure out \(viewModel.currentStage.title) together at your own pace."
                         )
 
                         ForEach(viewModel.chatHistory) { entry in

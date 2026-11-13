@@ -201,5 +201,35 @@ struct LLMMascotAIServiceTests {
         #expect(response.contains("Queen Bed"))
         #expect(!response.contains("Welcome to your Studio Apartment"))
     }
+
+    @Test @MainActor func systemPromptIncludesAllSevenAIVibes() {
+        let lowerPrompt = DesignKnowledgeSystemPrompt.prompt.lowercased()
+        let requiredVibes = [
+            "welcoming",
+            "attentive",
+            "empathetic",
+            "reassuring",
+            "encouraging",
+            "proactive",
+            "personable"
+        ]
+        for vibe in requiredVibes {
+            #expect(lowerPrompt.contains(vibe), "System prompt should encode AI vibe: \(vibe)")
+        }
+    }
+
+    @Test @MainActor func offlineMascotRespondsEmpatheticallyWhenOverwhelmed() async {
+        let mascot = MockMascotAIService()
+        let room = SampleData.createStarterRoom()
+
+        let reply = await mascot.askMascot(
+            question: "I feel stuck and overwhelmed arranging this room",
+            currentStage: .rearrangement,
+            room: room
+        )
+
+        #expect(reply.contains("zero pressure") || reply.contains("overwhelming"))
+        #expect(reply.contains("step by step"))
+    }
 }
 
