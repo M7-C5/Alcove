@@ -55,8 +55,12 @@ public struct Studio3DView: View {
                         currentStage: viewModel.currentStage,
                         beforeAfterSplit: viewModel.beforeAfterSplit,
                         revealMode: viewModel.revealMode,
+                        furnitureWarningSeverities: viewModel.warningSeverityByFurnitureID,
                         onFurnitureMoved: { event in
                             viewModel.handleFurnitureMoved(event)
+                        },
+                        onFurnitureDragging: {
+                            viewModel.notifyLiveFurnitureDrag()
                         },
                         onFloorRaycasterResolved: { raycaster in
                             viewModel.floorRaycaster = raycaster
@@ -76,16 +80,20 @@ public struct Studio3DView: View {
                 }
 
                 // Resign-style Circular Sims Action HUD projected over selected furniture
-                if let furniture = viewModel.selectedFurniture,
+                if viewModel.currentStage.unlockedTools.contains(.rotateFurniture),
+                   viewModel.currentStage != .harmony,
+                   let furniture = viewModel.selectedFurniture,
                    let projected = selectedFurnitureScreenPosition,
                    !viewModel.isArchiveListPresented {
                     let clamped = FurnitureSimsActionHUD.clampedPosition(
                         projected: projected,
                         in: geometry.size
                     )
+                    let currentWarningSeverity = viewModel.warningSeverityByFurnitureID[furniture.id]
                     FurnitureSimsActionHUD(
                         furniture: furniture,
-                        isColliding: false,
+                        isColliding: currentWarningSeverity == .collision,
+                        warningSeverity: currentWarningSeverity,
                         onStepRotate: {
                             handleStepRotate(for: furniture)
                         },
@@ -127,12 +135,63 @@ public struct Studio3DView: View {
 
                     Spacer()
 
-                    // Mascot Reaction Feedback Pill
-                    if !viewModel.mascotMessage.isEmpty {
+                    // Top Warning Notification Banner (Red: Collision, Yellow: Can Be Better)
+                    if let warning = viewModel.activeTopWarning {
+                        let isCollision = warning.severity == .collision
+                        let accentTint: Color = isCollision ? .red : .yellow
+                        let badgeTint: Color = isCollision ? .red : Color(red: 0.78, green: 0.48, blue: 0.0)
+
+                        Button {
+                            if let targetID = warning.furnitureIDs.first {
+                                viewModel.selectFurniture(id: targetID)
+                            }
+                        } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: isCollision ? "exclamationmark.triangle.fill" : "exclamationmark.circle.fill")
+                                    .font(.body.weight(.semibold))
+                                    .foregroundStyle(badgeTint)
+
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(warning.title.uppercased())
+                                        .font(.caption2.weight(.bold))
+                                        .foregroundStyle(badgeTint)
+                                        .tracking(0.6)
+
+                                    Text(warning.message)
+                                        .font(.caption.weight(.medium))
+                                        .foregroundStyle(.primary)
+                                        .lineLimit(2)
+                                        .multilineTextAlignment(.leading)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                            }
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .frame(minHeight: 44)
+                            .frame(maxWidth: 460, alignment: .leading)
+                            .background {
+                                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                    .fill(.regularMaterial)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                            .fill(accentTint.opacity(isCollision ? 0.14 : 0.18))
+                                    )
+                            }
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                    .stroke(accentTint.opacity(isCollision ? 0.65 : 0.80), lineWidth: 1.5)
+                            )
+                            .shadow(color: accentTint.opacity(0.18), radius: 8, y: 2)
+                        }
+                        .buttonStyle(.plain)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                        .animation(.easeInOut(duration: 0.2), value: warning.id)
+                    } else if viewModel.currentStage != .harmony {
                         HStack(spacing: 8) {
-                            Text(viewModel.mascotEmotion.emoji)
+                            Image(systemName: "checkmark.circle.fill")
                                 .font(.subheadline)
-                            Text(viewModel.mascotMessage)
+                                .foregroundStyle(.green)
+                            Text("No collisions or tight walkways")
                                 .font(.caption.weight(.medium))
                                 .foregroundStyle(.primary)
                                 .lineLimit(1)
@@ -140,6 +199,10 @@ public struct Studio3DView: View {
                         .padding(.horizontal, 14)
                         .frame(minHeight: 44)
                         .background(.regularMaterial, in: Capsule())
+                        .overlay(
+                            Capsule()
+                                .stroke(Color.green.opacity(0.30), lineWidth: 1)
+                        )
                         .transition(.move(edge: .top).combined(with: .opacity))
                     }
 
@@ -201,47 +264,49 @@ public struct Studio3DView: View {
                         .accessibilityLabel("Launch 1:1 Life-Size AR Walkthrough")
 
                         // Circular Archive Button (Icon + number badge pinned on top right)
-                        Button {
-                            withAnimation(.spring(response: 0.35, dampingFraction: 0.78)) {
-                                viewModel.isArchiveListPresented.toggle()
-                            }
-                            playSnapFeedback()
-                        } label: {
-                            ZStack(alignment: .topTrailing) {
-                                Image(systemName: viewModel.isArchiveListPresented ? "archivebox.fill" : "archivebox")
-                                    .font(.body.weight(.semibold))
-                                    .foregroundStyle(viewModel.isArchiveListPresented ? .white : .primary)
-                                    .frame(width: 44, height: 44)
-                                    .background {
-                                        if viewModel.isArchiveListPresented {
-                                            Circle().fill(Color.accentColor)
-                                        } else {
-                                            Circle().fill(.regularMaterial)
+                        if viewModel.currentStage.unlockedTools.contains(.inventoryArchive) && viewModel.currentStage != .harmony {
+                            Button {
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.78)) {
+                                    viewModel.isArchiveListPresented.toggle()
+                                }
+                                playSnapFeedback()
+                            } label: {
+                                ZStack(alignment: .topTrailing) {
+                                    Image(systemName: viewModel.isArchiveListPresented ? "archivebox.fill" : "archivebox")
+                                        .font(.body.weight(.semibold))
+                                        .foregroundStyle(viewModel.isArchiveListPresented ? .white : .primary)
+                                        .frame(width: 44, height: 44)
+                                        .background {
+                                            if viewModel.isArchiveListPresented {
+                                                Circle().fill(Color.accentColor)
+                                            } else {
+                                                Circle().fill(.regularMaterial)
+                                            }
                                         }
-                                    }
-                                    .overlay(
-                                        Circle()
-                                            .stroke(viewModel.isArchiveListPresented ? Color.accentColor : Color.primary.opacity(0.08), lineWidth: 1)
-                                    )
-                                    .shadow(
-                                        color: viewModel.isArchiveListPresented ? Color.accentColor.opacity(0.40) : Color.black.opacity(0.04),
-                                        radius: 8,
-                                        y: 2
-                                    )
+                                        .overlay(
+                                            Circle()
+                                                .stroke(viewModel.isArchiveListPresented ? Color.accentColor : Color.primary.opacity(0.08), lineWidth: 1)
+                                        )
+                                        .shadow(
+                                            color: viewModel.isArchiveListPresented ? Color.accentColor.opacity(0.40) : Color.black.opacity(0.04),
+                                            radius: 8,
+                                            y: 2
+                                        )
 
-                                if !viewModel.archivedFurnitures.isEmpty {
-                                    Text("\(viewModel.archivedFurnitures.count)")
-                                        .font(.caption2.weight(.bold))
-                                        .foregroundStyle(.white)
-                                        .padding(.horizontal, 5)
-                                        .padding(.vertical, 2)
-                                        .background(Color.accentColor, in: Capsule())
-                                        .offset(x: 4, y: -4)
+                                    if !viewModel.archivedFurnitures.isEmpty {
+                                        Text("\(viewModel.archivedFurnitures.count)")
+                                            .font(.caption2.weight(.bold))
+                                            .foregroundStyle(.white)
+                                            .padding(.horizontal, 5)
+                                            .padding(.vertical, 2)
+                                            .background(Color.accentColor, in: Capsule())
+                                            .offset(x: 4, y: -4)
+                                    }
                                 }
                             }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(viewModel.isArchiveListPresented ? "Close archive inventory" : "Open archive inventory, \(viewModel.archivedFurnitures.count) items archived")
                         }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel(viewModel.isArchiveListPresented ? "Close archive inventory" : "Open archive inventory, \(viewModel.archivedFurnitures.count) items archived")
                     }
                 }
                 .padding(.horizontal, 16)
@@ -260,7 +325,7 @@ public struct Studio3DView: View {
                 }
 
                 // Freeform Pen Selection Style Bottom Center Furniture Archive Dock (60% screen width)
-                if viewModel.isArchiveListPresented {
+                if viewModel.isArchiveListPresented && viewModel.currentStage.unlockedTools.contains(.inventoryArchive) && viewModel.currentStage != .harmony {
                     VStack {
                         Spacer()
                         FurnitureInventoryDock(
@@ -343,7 +408,11 @@ public struct Studio3DView: View {
                 mascotService: viewModel.mascotService,
                 feedbackService: viewModel.feedbackService,
                 currentStage: viewModel.currentStage,
-                room: viewModel.room
+                room: viewModel.room,
+                initialHistory: viewModel.chatHistory,
+                onHistoryUpdated: { updated in
+                    viewModel.chatHistory = updated
+                }
             )
             .presentationDetents([.fraction(0.55), .fraction(0.85), .large])
             .presentationDragIndicator(.visible)

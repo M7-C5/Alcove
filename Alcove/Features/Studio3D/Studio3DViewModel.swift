@@ -37,6 +37,7 @@ public final class Studio3DViewModel {
 
     // Modal dialog presentation state
     public var showingChatDrawer: Bool = false
+    public var chatHistory: [ChatMessage] = []
     public var showingEvaluationSheet: Bool = false
     public var evaluationResult: StageEvaluationResult?
     public var isEvaluating: Bool = false
@@ -96,6 +97,47 @@ public final class Studio3DViewModel {
     public var floorRaycaster: ((CGPoint) -> SIMD3<Float>?)? = nil
     public var snapToViewport: ((ViewportPreset) -> Void)? = nil
 
+    // Live Spatial Warnings (Red collisions & Yellow improvements)
+    public var dragRevision: Int = 0
+
+    public func notifyLiveFurnitureDrag() {
+        dragRevision &+= 1
+        markLayoutDirty()
+    }
+
+    public var spatialWarnings: [SpatialWarning] {
+        _ = dragRevision
+        guard currentStage != .harmony else { return [] }
+        return FastPathRulebook().evaluateSpatialWarnings(
+            furnitures: activeFurnitures,
+            roomDimensions: (width: room.dimensionsWidth, length: room.dimensionsLength)
+        )
+    }
+
+    public var warningSeverityByFurnitureID: [UUID: SpatialWarningSeverity] {
+        var map: [UUID: SpatialWarningSeverity] = [:]
+        for warning in spatialWarnings {
+            for id in warning.furnitureIDs {
+                if let existing = map[id] {
+                    map[id] = max(existing, warning.severity)
+                } else {
+                    map[id] = warning.severity
+                }
+            }
+        }
+        return map
+    }
+
+    public var activeTopWarning: SpatialWarning? {
+        if let selectedID = selectedFurnitureID {
+            let matching = spatialWarnings.filter { $0.furnitureIDs.contains(selectedID) }
+            if let highestForSelected = matching.first {
+                return highestForSelected
+            }
+        }
+        return spatialWarnings.first
+    }
+
     public var archivedFurnitures: [Furniture] {
         room.workingLayout?.furnitures.filter { $0.isArchived } ?? []
     }
@@ -104,8 +146,14 @@ public final class Studio3DViewModel {
         room.workingLayout?.furnitures.filter { !$0.isArchived } ?? []
     }
 
+    public var canManipulateFurniture: Bool {
+        currentStage.unlockedTools.contains(.dragFurniture) && currentStage != .harmony
+    }
+
     public func restoreFurniture(_ item: Furniture) {
+        guard canManipulateFurniture else { return }
         item.isArchived = false
+        dragRevision &+= 1
         selectedFurnitureID = item.id
         mascotEmotion = .happy
         mascotMessage = "Restored \(item.name) to room!"
@@ -114,7 +162,9 @@ public final class Studio3DViewModel {
     }
 
     public func archiveFurniture(_ item: Furniture) {
+        guard canManipulateFurniture else { return }
         item.isArchived = true
+        dragRevision &+= 1
         if selectedFurnitureID == item.id {
             selectedFurnitureID = nil
         }
@@ -153,7 +203,7 @@ public final class Studio3DViewModel {
     }
 
     public func rotateSelectedFurniture(delta: Double) {
-        guard let item = selectedFurniture else { return }
+        guard canManipulateFurniture, let item = selectedFurniture else { return }
         let oldPos = (x: item.positionX, z: item.positionZ)
         item.rotationYaw = FurnitureTransformEngine.normalizeYaw(item.rotationYaw + delta)
 
@@ -182,7 +232,7 @@ public final class Studio3DViewModel {
     }
 
     public func resetSelectedFurniture() {
-        guard let selected = selectedFurniture else { return }
+        guard canManipulateFurniture, let selected = selectedFurniture else { return }
         let oldPos = (x: selected.positionX, z: selected.positionZ)
         if let baselineItem = room.baselineLayout?.furnitures.first(where: { $0.id == selected.id || $0.name == selected.name }) {
             selected.positionX = baselineItem.positionX
@@ -206,9 +256,10 @@ public final class Studio3DViewModel {
     }
 
     public func toggleSelectedFurnitureArchive() {
-        guard let item = selectedFurniture else { return }
+        guard canManipulateFurniture, let item = selectedFurniture else { return }
         markLayoutDirty()
         item.isArchived.toggle()
+        dragRevision &+= 1
         let archived = item.isArchived
         selectedFurnitureID = nil
         mascotEmotion = .curious
@@ -222,6 +273,7 @@ public final class Studio3DViewModel {
     }
 
     public func handleFurnitureMoved(_ event: FurnitureMoveEvent) {
+        dragRevision &+= 1
         markLayoutDirty()
         if let reaction = mascotService.microReact(
             event: event,
@@ -242,6 +294,7 @@ public final class Studio3DViewModel {
     public func resetWorkingLayout() {
         markLayoutDirty()
         room.resetWorkingLayoutToBaseline()
+        dragRevision &+= 1
         selectedFurnitureID = nil
         mascotEmotion = .curious
         mascotMessage = "Restored your room to the original baseline scan!"

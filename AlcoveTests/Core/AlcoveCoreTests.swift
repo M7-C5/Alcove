@@ -307,4 +307,80 @@ struct AlcoveCoreTests {
         // Ensure baseline layout was also populated
         #expect(room.baselineLayout?.furnitures.count == 6)
     }
+
+    @Test func evaluateSpatialWarningsDistinguishesCollisionAndCaution() {
+        let rulebook = FastPathRulebook()
+        let roomDims = (width: 4.5, length: 5.5)
+
+        let bed = Furniture(
+            name: "Queen Bed",
+            category: .bed,
+            positionX: 0.0,
+            positionY: 0.0,
+            positionZ: 0.0,
+            width: 1.6,
+            length: 2.1
+        )
+        let deskColliding = Furniture(
+            name: "Work Desk",
+            category: .table,
+            positionX: 0.3,
+            positionY: 0.0,
+            positionZ: 0.2,
+            width: 1.2,
+            length: 0.7
+        )
+
+        // 1. Overlapping furniture -> Red collision + floating bed caution
+        let overlapWarnings = rulebook.evaluateSpatialWarnings(
+            furnitures: [bed, deskColliding],
+            roomDimensions: roomDims
+        )
+        #expect(overlapWarnings.contains { $0.severity == .collision && $0.furnitureIDs == Set([bed.id, deskColliding.id]) })
+        #expect(overlapWarnings.first?.severity == .collision)
+
+        // 2. Adjacent tight walkway (~0.30m gap, non-overlapping) -> Yellow caution, no collision
+        let anchoredBed = Furniture(
+            name: "Queen Bed",
+            category: .bed,
+            positionX: -1.45,
+            positionY: 0.0,
+            positionZ: -1.7,
+            width: 1.6,
+            length: 2.1
+        )
+        let deskTight = Furniture(
+            name: "Work Desk",
+            category: .table,
+            positionX: 0.25,
+            positionY: 0.0,
+            positionZ: -1.7,
+            width: 1.2,
+            length: 0.7
+        )
+        let tightWarnings = rulebook.evaluateSpatialWarnings(
+            furnitures: [anchoredBed, deskTight],
+            roomDimensions: roomDims
+        )
+        #expect(!tightWarnings.contains { $0.severity == .collision })
+        #expect(tightWarnings.contains { $0.severity == .caution && $0.title == "Can Be Better" })
+
+        // 3. Furniture blocking Front-Left entrance door -> Red door collision
+        let halfW = roomDims.width / 2.0
+        let halfL = roomDims.length / 2.0
+        let blocker = Furniture(
+            name: "Bookshelf",
+            category: .storage,
+            positionX: -halfW * 0.35,
+            positionY: 0.0,
+            positionZ: halfL - 0.2,
+            width: 0.8,
+            length: 0.35
+        )
+        let doorWarnings = rulebook.evaluateSpatialWarnings(
+            furnitures: [blocker],
+            roomDimensions: roomDims
+        )
+        #expect(doorWarnings.contains { $0.severity == .collision && $0.title == "Door Blocked" && $0.furnitureIDs.contains(blocker.id) })
+    }
 }

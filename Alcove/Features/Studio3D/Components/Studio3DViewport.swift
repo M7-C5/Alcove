@@ -17,9 +17,11 @@ public struct Studio3DViewport: UIViewRepresentable {
     public var currentStage: StageType = .rearrangement
     public var beforeAfterSplit: Double = 1.0
     public var revealMode: HarmonyRevealMode = .splitSlider
+    public var furnitureWarningSeverities: [UUID: SpatialWarningSeverity] = [:]
     public typealias FloorRaycaster = (CGPoint) -> SIMD3<Float>?
     public typealias ViewportSnapper = (ViewportPreset) -> Void
     public var onFurnitureMoved: ((FurnitureMoveEvent) -> Void)? = nil
+    public var onFurnitureDragging: (() -> Void)? = nil
     public var onFloorRaycasterResolved: ((@escaping FloorRaycaster) -> Void)? = nil
     public var onSnapToViewportResolved: ((@escaping ViewportSnapper) -> Void)? = nil
     public var onTapBackground: (() -> Void)? = nil
@@ -34,7 +36,9 @@ public struct Studio3DViewport: UIViewRepresentable {
         currentStage: StageType = .rearrangement,
         beforeAfterSplit: Double = 1.0,
         revealMode: HarmonyRevealMode = .splitSlider,
+        furnitureWarningSeverities: [UUID: SpatialWarningSeverity] = [:],
         onFurnitureMoved: ((FurnitureMoveEvent) -> Void)? = nil,
+        onFurnitureDragging: (() -> Void)? = nil,
         onFloorRaycasterResolved: ((@escaping FloorRaycaster) -> Void)? = nil,
         onSnapToViewportResolved: ((@escaping ViewportSnapper) -> Void)? = nil,
         onTapBackground: (() -> Void)? = nil
@@ -48,7 +52,9 @@ public struct Studio3DViewport: UIViewRepresentable {
         self.currentStage = currentStage
         self.beforeAfterSplit = beforeAfterSplit
         self.revealMode = revealMode
+        self.furnitureWarningSeverities = furnitureWarningSeverities
         self.onFurnitureMoved = onFurnitureMoved
+        self.onFurnitureDragging = onFurnitureDragging
         self.onFloorRaycasterResolved = onFloorRaycasterResolved
         self.onSnapToViewportResolved = onSnapToViewportResolved
         self.onTapBackground = onTapBackground
@@ -58,6 +64,7 @@ public struct Studio3DViewport: UIViewRepresentable {
         Coordinator(
             room: room,
             selectedFurnitureID: selectedFurnitureID,
+            furnitureWarningSeverities: furnitureWarningSeverities,
             onSelectFurniture: { id in
                 selectedFurnitureID = id
             },
@@ -65,6 +72,7 @@ public struct Studio3DViewport: UIViewRepresentable {
                 selectedFurnitureScreenPosition = point
             },
             onFurnitureMoved: onFurnitureMoved,
+            onFurnitureDragging: onFurnitureDragging,
             onTapBackground: onTapBackground
         )
     }
@@ -99,6 +107,8 @@ public struct Studio3DViewport: UIViewRepresentable {
         context.coordinator.currentStage = currentStage
         context.coordinator.beforeAfterSplit = beforeAfterSplit
         context.coordinator.revealMode = revealMode
+        context.coordinator.furnitureWarningSeverities = furnitureWarningSeverities
+        context.coordinator.onFurnitureDragging = onFurnitureDragging
         context.coordinator.updateFurnitureEntities(from: room)
         context.coordinator.updateSelectionHalos()
         context.coordinator.updateSelectedProjection()
@@ -133,10 +143,28 @@ public struct Studio3DViewport: UIViewRepresentable {
         var currentStage: StageType = .rearrangement
         var beforeAfterSplit: Double = 1.0
         var revealMode: HarmonyRevealMode = .splitSlider
+        var furnitureWarningSeverities: [UUID: SpatialWarningSeverity] = [:]
         var onSelectFurniture: ((UUID?) -> Void)?
         var onProjectSelectedFurniture: ((CGPoint?) -> Void)?
         var onFurnitureMoved: ((FurnitureMoveEvent) -> Void)?
+        var onFurnitureDragging: (() -> Void)?
         var onTapBackground: (() -> Void)?
+
+        private let blueHaloMaterial = SimpleMaterial(
+            color: UIColor.systemBlue.withAlphaComponent(0.45),
+            roughness: 0.2,
+            isMetallic: false
+        )
+        private let redHaloMaterial = SimpleMaterial(
+            color: UIColor.systemRed.withAlphaComponent(0.68),
+            roughness: 0.25,
+            isMetallic: false
+        )
+        private let yellowHaloMaterial = SimpleMaterial(
+            color: UIColor.systemYellow.withAlphaComponent(0.72),
+            roughness: 0.25,
+            isMetallic: false
+        )
 
         let root = Entity()
         let camera = PerspectiveCamera()
@@ -164,16 +192,20 @@ public struct Studio3DViewport: UIViewRepresentable {
         init(
             room: Room,
             selectedFurnitureID: UUID?,
+            furnitureWarningSeverities: [UUID: SpatialWarningSeverity] = [:],
             onSelectFurniture: ((UUID?) -> Void)?,
             onProjectSelectedFurniture: ((CGPoint?) -> Void)?,
             onFurnitureMoved: ((FurnitureMoveEvent) -> Void)?,
+            onFurnitureDragging: (() -> Void)? = nil,
             onTapBackground: (() -> Void)? = nil
         ) {
             self.room = room
             self.selectedFurnitureID = selectedFurnitureID
+            self.furnitureWarningSeverities = furnitureWarningSeverities
             self.onSelectFurniture = onSelectFurniture
             self.onProjectSelectedFurniture = onProjectSelectedFurniture
             self.onFurnitureMoved = onFurnitureMoved
+            self.onFurnitureDragging = onFurnitureDragging
             self.onTapBackground = onTapBackground
             super.init()
 
@@ -421,7 +453,8 @@ public struct Studio3DViewport: UIViewRepresentable {
             guard let arView = arView, gesture.state == .ended else { return }
             let point = gesture.location(in: arView)
 
-            if let hitEntity = arView.entity(at: point) {
+            let canSelectFurniture = currentStage.unlockedTools.contains(.dragFurniture) && currentStage != .harmony
+            if canSelectFurniture, let hitEntity = arView.entity(at: point) {
                 var current: Entity? = hitEntity
                 while let p = current, !p.name.hasPrefix("Furniture_") {
                     current = p.parent
@@ -439,7 +472,7 @@ public struct Studio3DViewport: UIViewRepresentable {
                 }
             }
 
-            // Tapped empty space -> deselect
+            // Tapped empty space (or Stage 1 inspection mode) -> deselect
             selectedFurnitureID = nil
             onSelectFurniture?(nil)
             onTapBackground?()
@@ -450,11 +483,12 @@ public struct Studio3DViewport: UIViewRepresentable {
         @objc private func handlePan(_ gesture: UIPanGestureRecognizer) {
             guard let arView = arView else { return }
             let point = gesture.location(in: arView)
+            let canDragFurniture = currentStage.unlockedTools.contains(.dragFurniture) && currentStage != .harmony
 
             switch gesture.state {
             case .began:
                 animationTask?.cancel()
-                if let hitEntity = arView.entity(at: point) {
+                if canDragFurniture, let hitEntity = arView.entity(at: point) {
                     var current: Entity? = hitEntity
                     while let p = current, !p.name.hasPrefix("Furniture_") {
                         current = p.parent
@@ -475,12 +509,13 @@ public struct Studio3DViewport: UIViewRepresentable {
                     }
                 }
 
-                // Touched unselected furniture or background -> camera orbit mode
+                // Touched unselected furniture, audit mode, or background -> camera orbit mode
                 dragMode = .orbiting(startYaw: yaw, startPitch: pitch)
 
             case .changed:
                 switch dragMode {
                 case .translating(let id, let offset, _):
+                    guard canDragFurniture else { return }
                     guard let floorPos = projectToFloor(from: point, in: arView) else { return }
                     guard let container = arView.scene.findEntity(named: "Furniture_\(id.uuidString)") else { return }
                     let layout = room.workingLayout ?? room.baselineLayout
@@ -496,7 +531,12 @@ public struct Studio3DViewport: UIViewRepresentable {
                         roomLength: Float(room.dimensionsLength)
                     )
                     container.position = clamped
+                    item.positionX = Double(clamped.x)
+                    item.positionZ = Double(clamped.z)
+                    recomputeLiveWarnings(in: layout?.furnitures ?? [])
+                    updateSelectionHalos()
                     updateSelectedProjection()
+                    onFurnitureDragging?()
 
                 case .orbiting(let startYaw, let startPitch):
                     let translation = gesture.translation(in: arView)
@@ -514,6 +554,7 @@ public struct Studio3DViewport: UIViewRepresentable {
             case .ended:
                 switch dragMode {
                 case .translating(let id, _, let initialPos):
+                    guard canDragFurniture else { break }
                     guard let container = arView.scene.findEntity(named: "Furniture_\(id.uuidString)") else { break }
                     let layout = room.workingLayout ?? room.baselineLayout
                     guard let item = layout?.furnitures.first(where: { $0.id == id }) else { break }
@@ -707,15 +748,49 @@ public struct Studio3DViewport: UIViewRepresentable {
             }
         }
 
+        private func recomputeLiveWarnings(in furnitures: [Furniture]) {
+            guard currentStage != .harmony else {
+                furnitureWarningSeverities = [:]
+                return
+            }
+            let warnings = FastPathRulebook().evaluateSpatialWarnings(
+                furnitures: furnitures,
+                roomDimensions: (width: room.dimensionsWidth, length: room.dimensionsLength)
+            )
+            var map: [UUID: SpatialWarningSeverity] = [:]
+            for warning in warnings {
+                for id in warning.furnitureIDs {
+                    if let existing = map[id] {
+                        map[id] = max(existing, warning.severity)
+                    } else {
+                        map[id] = warning.severity
+                    }
+                }
+            }
+            furnitureWarningSeverities = map
+        }
+
         func updateSelectionHalos() {
             guard let group = root.children.first(where: { $0.name == "FurnitureGroup" }) else { return }
             for child in group.children {
                 if child.name.starts(with: "Furniture_") {
                     let idString = String(child.name.dropFirst("Furniture_".count))
+                    let uuid = UUID(uuidString: idString)
                     let isSelected = (idString == selectedFurnitureID?.uuidString)
                     let isGhost = (idString == ghostFurnitureID?.uuidString && ghostFloorPosition != nil)
-                    if let halo = child.children.first(where: { $0.name == "SelectionHalo" }) {
-                        halo.isEnabled = isSelected || isGhost
+                    if let halo = child.children.first(where: { $0.name == "SelectionHalo" }) as? ModelEntity {
+                        if currentStage == .harmony {
+                            halo.isEnabled = isSelected || isGhost
+                            halo.model?.materials = [blueHaloMaterial]
+                        } else if let uuid, let severity = furnitureWarningSeverities[uuid] {
+                            halo.isEnabled = true
+                            halo.model?.materials = [severity == .collision ? redHaloMaterial : yellowHaloMaterial]
+                        } else if isSelected || isGhost {
+                            halo.isEnabled = true
+                            halo.model?.materials = [blueHaloMaterial]
+                        } else {
+                            halo.isEnabled = false
+                        }
                     }
                 }
             }
@@ -752,19 +827,14 @@ public struct Studio3DViewport: UIViewRepresentable {
             container.components.set(CollisionComponent(shapes: [boxShape.offsetBy(rotation: offset.rotation, translation: offset.translation)]))
             container.components.set(InputTargetComponent())
 
-            // Selection footprint halo on floor
+            // Selection / warning footprint halo on floor
             let haloMesh = MeshResource.generateBox(
-                size: SIMD3<Float>(width + 0.08, 0.004, length + 0.08),
-                cornerRadius: 0.02
+                size: SIMD3<Float>(width + 0.14, 0.006, length + 0.14),
+                cornerRadius: 0.03
             )
-            let haloMat = SimpleMaterial(
-                color: UIColor.systemBlue.withAlphaComponent(0.45),
-                roughness: 0.2,
-                isMetallic: false
-            )
-            let halo = ModelEntity(mesh: haloMesh, materials: [haloMat])
+            let halo = ModelEntity(mesh: haloMesh, materials: [blueHaloMaterial])
             halo.name = "SelectionHalo"
-            halo.position = SIMD3<Float>(0, 0.002, 0)
+            halo.position = SIMD3<Float>(0, 0.003, 0)
             halo.isEnabled = (item.id == selectedFurnitureID)
             container.addChild(halo)
 
