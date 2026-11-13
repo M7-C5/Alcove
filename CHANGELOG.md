@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Align mascot prompt and dialogues with seven AI vibes.
+- Add furniture catalog, add, remove, and swap actions.
 - Add real-time collision highlights, top warning banner, and audit lock.
 - Preserve multi-turn chat history and add zone occupancy context.
 - Teach actionable interior design principles in stage evaluation tips.
@@ -63,6 +65,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Use SwiftUI openURL environment action.
 - Share view model warning severities with 3D viewport.
 - Adopt global alcove color tokens in home and tactile pill.
 - Unify color extensions to internal access level.
