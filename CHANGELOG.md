@@ -28,6 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add stage walkthrough overlay, markdown rendering, and model config sheet.
 - Integrate Google Gemini service with quota fallback and guardrails.
 - Implement anthropometric standards and fast-path circulation heuristics.
+- Align sunlight preview with captured room compass.
+- Refine selection dragging and sunlight controls.
 - Add semantic color and shapestyle extensions.
 - Add global alcove color palette assets.
 - Implement mascot landing home screen and tactile pill button.
@@ -69,12 +71,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Store API key in Keychain, use header auth, and decouple chat badge.
 - Compute wall proximity from boundary extents and sanitize flowery placement wording.
 - Generate room-aware dynamic recommendations naming active furniture.
 - Replace textbook recommendations header with design tips.
 - Serialize inward facing vectors and filter hallucinated orientation tips.
 - Recognize task lighting companion pairs and exempt from walkway bottlenecks.
 - Treat lamps and elevated lighting as natural surface companions without false bottlenecks.
+- Restore shared team signing configuration.
 - Constrain hero bounds, refine tactile pill shading, and add accessibility.
 - Deduplicate font registration and release CoreText errors.
 - Unify viewport geometry and restore AR access.
