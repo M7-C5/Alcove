@@ -101,9 +101,11 @@ public final class Studio3DViewModel {
     // Live Spatial Warnings (Red collisions & Yellow improvements)
     public var dragRevision: Int = 0
 
-    public func notifyLiveFurnitureDrag() {
+    @discardableResult
+    public func notifyLiveFurnitureDrag() -> [UUID: SpatialWarningSeverity] {
         dragRevision &+= 1
         markLayoutDirty()
+        return warningSeverityByFurnitureID
     }
 
     public var spatialWarnings: [SpatialWarning] {
