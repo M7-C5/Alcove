@@ -3,32 +3,25 @@ import SwiftData
 
 public struct DashboardView: View {
     @Environment(\.modelContext) private var modelContext
-    @Environment(NavigationRouter.self) private var environmentRouter: NavigationRouter?
     @Query(sort: \Room.createdAt, order: .reverse) private var rooms: [Room]
     @State private var viewModel = DashboardViewModel()
-    @State private var localRouter = NavigationRouter()
+    @State private var router = NavigationRouter()
 
     public init() {}
 
     public var body: some View {
-        if environmentRouter != nil {
+        NavigationStack(path: $router.path) {
             dashboardContent
-        } else {
-            NavigationStack(path: $localRouter.path) {
-                dashboardContent
-                    .navigationDestination(for: AlcoveRoute.self) { route in
-                        switch route {
-                        case .stageList(let room):
-                            StageListView(room: room)
-                        case .studio(let room, let stage):
-                            Studio3DView(room: room, stage: stage)
-                        case .dashboard:
-                            DashboardView()
-                        }
+                .navigationDestination(for: AlcoveRoute.self) { route in
+                    switch route {
+                    case .stageList(let room):
+                        StageListView(room: room)
+                    case .studio(let room, let stage):
+                        Studio3DView(room: room, stage: stage)
                     }
-            }
-            .environment(localRouter)
+                }
         }
+        .environment(router)
     }
 
     private var dashboardContent: some View {

@@ -72,19 +72,11 @@ struct NavigationRouterTests {
         #expect(studioRoute1 != studioRoute3)
         #expect(route1 != studioRoute1)
 
-        let dashRoute1 = AlcoveRoute.dashboard
-        let dashRoute2 = AlcoveRoute.dashboard
-        #expect(dashRoute1 == dashRoute2)
-        #expect(dashRoute1 != route1)
-        #expect(dashRoute1 != studioRoute1)
-
         var set = Set<AlcoveRoute>()
         set.insert(route1)
         set.insert(route2)
         set.insert(studioRoute1)
-        set.insert(dashRoute1)
-        set.insert(dashRoute2)
-        #expect(set.count == 3)
+        #expect(set.count == 2)
     }
 
     @Test func navigationPathDirectBindingSync() {
