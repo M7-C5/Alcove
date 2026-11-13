@@ -33,9 +33,7 @@ Alcove/
 ├── .github/
 │   └── pull_request_template.md            # Standardized PR template
 ├── docs/
-│   ├── AGENTIC_PLAYBOOK.md                 # Agentic collaboration axioms, curriculum & circuit breakers
 │   ├── ARCHITECTURE.md                     # Deep technical and domain architecture
-│   ├── RECIPES.md                          # Prompt recipes for scaffolding, triage & zero-miss delivery
 │   └── adr/                                # Architectural Decision Records (MADR format)
 ├── scripts/
 │   ├── audit-ui.sh                         # Headless multimodal iPad visual contrast & Dynamic Type inspector
