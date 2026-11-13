@@ -204,7 +204,7 @@ public final class LLMMascotAIService: MascotAIServiceProtocol {
                 - DO NOT mention, score, or criticize artificial lighting, lamps, or fixtures! DO NOT tell the user to "add more lights" or "add lamps" (artificial lighting belongs strictly to Stage 3: The Illumination).
                 - There is NO score penalty in Stage 1. Return "score": 100 and "canAdvance": true.
                 - Location accuracy: Look at each piece's `Placement` tag. NEVER say a piece is "floating" or "in the center" when it is anchored against a wall or corner!
-                - Mascot voice: warm, insightful interior design companion. Avoid awkward real-estate brochure fluff (NEVER use "floating comfortably", "lovely daylight", or "enjoys open breathing room in the center"). Keep dialogue under 35 words.
+                - Mascot voice (AI Vibes): welcoming, attentive, empathetic (zero judgment on tight spots), reassuring, encouraging, proactive, and personable. Avoid awkward real-estate brochure fluff (NEVER use "floating comfortably", "lovely daylight", or "enjoys open breathing room in the center"). Keep dialogue under 40 words.
 
                 EDUCATIONAL DESIGN KNOWLEDGE RULES FOR RECOMMENDATIONS ("Design Tips"):
                 Every recommendation MUST be an educational, actionable design tip teaching an interior design principle tailored to this room's real layout:
@@ -228,7 +228,7 @@ public final class LLMMascotAIService: MascotAIServiceProtocol {
                 evaluationPrompt = """
                 Perform a formal stage completion evaluation for Stage 2: The Rearrangement for "\(room.name)".
                 CRITICAL CURRICULUM & ORIENTATION RULES:
-                - Voice: Casual, grounded interior designer companion. Friendly and encouraging.
+                - Voice (AI Vibes): welcoming, attentive, empathetic (never harsh about tight spots), reassuring, encouraging (celebrate what works!), proactive, and personable.
                 - Location accuracy: Look at each piece's `Placement` tag. NEVER say a piece is "floating" or "in the center" when it is anchored against a wall or corner!
                 - Pieces marked 'Facing: INWARD into the room (toward center)' are ALREADY properly facing the room. NEVER tell the user to rotate them to face the room.
 
@@ -251,6 +251,7 @@ public final class LLMMascotAIService: MascotAIServiceProtocol {
             } else if stage == .illumination {
                 evaluationPrompt = """
                 Perform a formal stage completion evaluation for Stage 3: The Illumination for "\(room.name)".
+                - Voice (AI Vibes): welcoming, attentive, empathetic, reassuring, encouraging, proactive, and personable. Celebrate their cozy lighting choices and offer a helpful next idea!
                 EDUCATIONAL DESIGN KNOWLEDGE RULES FOR RECOMMENDATIONS ("Design Tips"):
                 Provide 2 concrete, educational lighting design tips based on Karlen & Benya / Frida Ramstedt principles:
                 1. Task Lighting: Emphasize focused task illumination at the desk or bedside to reduce eye strain and screen glare.
@@ -269,6 +270,7 @@ public final class LLMMascotAIService: MascotAIServiceProtocol {
             } else {
                 evaluationPrompt = """
                 Perform a formal stage completion evaluation for Stage 4: The Harmony Reveal for "\(room.name)".
+                - Voice (AI Vibes): warmly celebratory, encouraging, personable, reassuring, and proactive about helping them enjoy their transformed space!
                 EDUCATIONAL DESIGN KNOWLEDGE RULES FOR RECOMMENDATIONS ("Design Tips"):
                 Provide 2 celebratory, practical synthesis tips:
                 1. Flow & Clearance: Celebrate the percentage improvement in open circulation and elimination of bottlenecks.
@@ -368,7 +370,7 @@ public final class LLMMascotAIService: MascotAIServiceProtocol {
                     let clearance = max(0.0, dist - radiusSum)
                     let isCompanionPair = AnthropometricStandards.isFunctionalCompanionPair(a: a, b: b)
                     if clearance < AnthropometricStandards.minimumCirculation && !isCompanionPair {
-                        bottleneckNote = " Also, in \(room.name), \(a.name) and \(b.name) look a little too tight for walking comfortably. Try nudging one to open up the walkway!"
+                        bottleneckNote = " Also, I noticed in \(room.name) that \(a.name) and \(b.name) are sitting a little tight for walking comfortably—no worries at all, try sliding one slightly when you're ready to open up that path!"
                         break
                     }
                 }

@@ -23,44 +23,44 @@ public struct StageDialogueCurator: Sendable {
         case .audit:
             return [
                 WalkthroughStep(
-                    text: "Hey there! Are you excited to start rearranging your room?",
+                    text: "Hey there, welcome in! Are you excited to start rearranging your room together?",
                     emotion: .happy
                 ),
                 WalkthroughStep(
-                    text: "First, let's inspect your baseline condition and natural pathways.",
+                    text: "First, let's take a gentle look at your baseline condition and natural pathways—zero pressure, we're just getting to know your space.",
                     emotion: .neutral
                 )
             ]
         case .rearrangement:
             return [
                 WalkthroughStep(
-                    text: "Stage 2: The Rearrangement! Let's get hands-on.",
+                    text: "Stage 2: The Rearrangement! Let's get hands-on and experiment freely.",
                     emotion: .curious
                 ),
                 WalkthroughStep(
-                    text: "Drag pieces across the floor, or tap to rotate their orientation.",
+                    text: "Drag pieces across the floor or tap to rotate them until it feels just right—nothing is permanent, and small nudges go a long way!",
                     emotion: .happy
                 )
             ]
         case .illumination:
             return [
                 WalkthroughStep(
-                    text: "Stage 3: Let's bring light into the space!",
+                    text: "Stage 3: Let's bring warm, inviting light into your space!",
                     emotion: .happy
                 ),
                 WalkthroughStep(
-                    text: "A balanced room combines overhead ambient fill with focused task lamps.",
+                    text: "Blending gentle overhead ambient fill with cozy task lamps helps your room feel calm and layered at every hour.",
                     emotion: .neutral
                 )
             ]
         case .harmony:
             return [
                 WalkthroughStep(
-                    text: "Congratulations! You've made it to The Harmony Reveal!",
+                    text: "Amazing work—you've made it to The Harmony Reveal!",
                     emotion: .celebrating
                 ),
                 WalkthroughStep(
-                    text: "Take a look at how your new layout transforms the space compared to your baseline scan.",
+                    text: "Take a moment to enjoy how thoughtfully your new layout opens up the space compared to where we started.",
                     emotion: .happy
                 )
             ]
@@ -90,7 +90,7 @@ public struct StageDialogueCurator: Sendable {
 
                     if clearance < AnthropometricStandards.minimumCirculation {
                         return WalkthroughStep(
-                            text: "Heads up! The pathway between '\(a.name)' & '\(b.name)' feels a little too tight for walking comfortably. Let's spot which pieces are pinching the room!",
+                            text: "Gentle heads-up: the pathway between '\(a.name)' & '\(b.name)' feels a little too tight right now—totally normal in cozy rooms! Let's spot what's pinching the path so we can ease it next.",
                             emotion: .warning,
                             highlightedFurnitureName: a.name
                         )
@@ -129,7 +129,7 @@ public struct StageDialogueCurator: Sendable {
 
                     if clearance < AnthropometricStandards.minimumCirculation {
                         return WalkthroughStep(
-                            text: "Your main mission: Scoot '\(a.name)' to give '\(b.name)' breathing room so you can walk through without a squeeze!",
+                            text: "Your main mission: try scooting '\(a.name)' slightly to give '\(b.name)' extra breathing room—just a gentle nudge will make walking through feel effortless!",
                             emotion: .thinking,
                             highlightedFurnitureName: a.name
                         )
@@ -165,7 +165,7 @@ public struct StageDialogueCurator: Sendable {
             let hasTaskLight = activeFixtures.contains(where: { $0.layer == .task })
             if hasDesk && !hasTaskLight {
                 return WalkthroughStep(
-                    text: "You have a work area but no task light! Try placing a Desk Lamp on it to avoid screen glare.",
+                    text: "I noticed you have a cozy work spot set up, so adding a Desk Lamp for focused task light will make working way easier on your eyes—want to try placing one?",
                     emotion: .curious
                 )
             }
@@ -188,12 +188,12 @@ public struct StageDialogueCurator: Sendable {
             let metrics = harmonyEngine.synthesizeHarmony(room: room)
             if metrics.clearanceImprovementPercentage > 0 {
                 return WalkthroughStep(
-                    text: "You cleared the tight squeeze and boosted room flow by \(metrics.clearanceImprovementPercentage)%! Tap 'View in AR' to project this layout directly into your real room!",
+                    text: "You cleared those tight spots and boosted room flow by \(metrics.clearanceImprovementPercentage)%—seriously impressive! Tap 'View in AR' whenever you want to walk through your new space at real life size!",
                     emotion: .celebrating
                 )
             } else {
                 return WalkthroughStep(
-                    text: "Notice the open visual weight and layered lighting. Tap 'View in AR' to experience your new room in real space!",
+                    text: "I love how balanced your room weight and layered lighting feel now. Tap 'View in AR' to step inside your space in real life!",
                     emotion: .happy
                 )
             }

@@ -12,13 +12,13 @@ public final class MockMascotAIService: MascotAIServiceProtocol {
     public func stageGreeting(stage: StageType, roomName: String) -> String {
         switch stage {
         case .audit:
-            return "Welcome to \(roomName)! Let's begin by assessing your current space. Look around and spot any tight corners or obstructed paths."
+            return "Welcome to \(roomName)! So glad you're here—take a cozy look around at your own pace, and we'll gently spot any tight corners or snug walkways together."
         case .rearrangement:
-            return "Stage 2 unlocked! Now you can grab, slide, and rotate furniture. Aim for at least 76.2cm of open walkway clearance (Panero & Zelnik standard)."
+            return "Stage 2 unlocked—let's have fun with it! Feel free to slide and rotate pieces with zero pressure; keeping at least 76.2cm of open walkway makes moving around feel effortless."
         case .illumination:
-            return "Stage 3 is all about light! Scrub through daylight hours to observe sun angles, and balance ambient, task, and accent lighting layers."
+            return "Stage 3 is all about bringing warm mood and light into your space! Slide through the daylight hours and mix ambient, task, and accent lamps—I've got your back if you want ideas."
         case .harmony:
-            return "Congratulations! You've reached The Harmony Reveal. Drag the Before/After split slider to admire your spatial transformation!"
+            return "Amazing job making it to The Harmony Reveal! Drag the Before/After split slider to celebrate how thoughtfully your room has come together."
         }
     }
 
@@ -69,7 +69,7 @@ public final class MockMascotAIService: MascotAIServiceProtocol {
                 canAdvance: true,
                 score: 100,
                 title: "Baseline Audit Captured",
-                dialogue: "We've mapped out the baseline flow of your room! Notice where the main pathways feel open and where pieces cluster together. When you're ready, let's move to Stage 2 to start rearranging.",
+                dialogue: "Nice work getting started—we've mapped out your room's baseline flow together! I can already see what's working nicely and a few snug spots we can easily open up next. Ready for Stage 2 when you are!",
                 bottlenecks: bottlenecks,
                 recommendations: auditRecs,
                 praise: ["Baseline room scan captured cleanly", "Room boundaries and furniture mapped"]
@@ -141,10 +141,10 @@ public final class MockMascotAIService: MascotAIServiceProtocol {
                 score: max(score, 50),
                 title: bottlenecks.isEmpty ? "Flawless Layout!" : (canAdvance ? "Good Progress!" : "Clearance Issues"),
                 dialogue: bottlenecks.isEmpty
-                    ? "Incredible circulation! All walkways adhere to comfortable circulation standards (≥91.4cm)."
+                    ? "You nailed the flow—every walkway feels spacious and comfortable (≥91.4cm)! Want to carry this great energy right into Stage 3 lighting?"
                     : (canAdvance
-                        ? "Circulation meets baseline standards. You can tweak tighter spots or proceed to lighting!"
-                        : "There are critical bottlenecks below 76.2cm that block natural 1-person passage. Please widen the pathways."),
+                        ? "You're making awesome progress and your main paths work well! Feel free to nudge any snug corners, or jump right into lighting whenever you're happy with it."
+                        : "I know tight studio layouts can feel tricky, so no stress at all—a couple of walkways are just under 76.2cm right now. Let's scoot one piece slightly to give you comfy walking room!"),
                 bottlenecks: bottlenecks,
                 recommendations: rearrangeRecs,
                 praise: ["Focal points established", "Proportions balanced"]
@@ -290,23 +290,27 @@ public final class MockMascotAIService: MascotAIServiceProtocol {
         }
 
         let q = effectiveQuestion.lowercased()
-        if (q.contains("where") || q.contains("place") || q.contains("move") || q.contains("put")) &&
+        if q.contains("stuck") || q.contains("confused") || q.contains("overwhelmed") ||
+            q.contains("unsure") || q.contains("don't know") || q.contains("dont know") ||
+            q.contains("awkward") || q.contains("weird") {
+            return "Totally understandable—arranging a room can feel overwhelming at first, and there's zero pressure to get it perfect in one shot! Let's start with just one anchor piece like your bed or desk, and I'll help you map out the rest step by step."
+        } else if (q.contains("where") || q.contains("place") || q.contains("move") || q.contains("put")) &&
             (q.contains("bed") || q.contains("desk")) {
             return placementGuidance(for: q, room: room)
         } else if q.contains("clearance") || q.contains("walkway") || q.contains("space") {
-            return "For room walkways, minimum 1-person passage requires at least 76.2cm (secondary paths need at least 60cm), while comfortable circulation with carrying objects needs 91.4cm. A bed-making perimeter needs 66–99cm of open space."
+            return "Great question! Giving yourself at least 76.2cm for main circulation paths (or 91.4cm when carrying laundry or bags, and 60cm for side paths) keeps your room feeling calm and effortless—nothing worse than bumping a hip! Would you like me to spot which path in \(room.name) to open up first?"
         } else if q.contains("light") || q.contains("window") || q.contains("sun") {
-            return "A balanced room coordinates 3 essential layers: Ambient (general fill), Task (focused reading/desk lights), and Accent (visual interest). Aim for 5 to 7 light points per room to achieve balanced warmth and eliminate harsh shadows."
+            return "Think of lighting like layering a cozy outfit: gentle overhead ambient light, focused task lamps for reading or work, and warm accent glow so corners have no harsh shadows. Pairing that with natural daylight makes a huge difference—want a tip on where your next lamp would shine best?"
         } else if q.contains("focal") || q.contains("point") || q.contains("style") || q.contains("balance") {
-            return "A room feels harmonious when key pieces like the bed or sofa are firmly anchored against solid walls, visual weight is distributed evenly across the room, and clear sightlines are preserved toward windows."
+            return "You're already thinking like a designer! Anchoring key pieces like your bed against a solid wall, balancing visual weight across the room, and keeping clear sightlines to the window instantly makes things feel grounded—want to try anchoring one corner together?"
         } else if q.contains("bed") {
-            return "Bed-to-bed clearance should be at least 91.4cm, and the bed perimeter needs 66–99cm for easily making sheets. Placing the headboard facing the entry door also helps you feel psychologically secure."
+            return "Your bed is your sanctuary, so giving it cozy 66–99cm breathing room on the sides (and 91.4cm between beds) makes sheet changes and morning routines much calmer. Placing the headboard against a solid wall facing the doorway also feels super safe—want help testing a cozy bed wall?"
         } else if q.contains("desk") || q.contains("work") {
-            return "Leave at least 76.2cm behind a desk for chair egress (91.4cm if someone walks behind). Also, angle desk lamps to avoid computer monitor glare."
+            return "Smart to think about your work comfort! Leaving about 76.2cm behind your desk lets your chair glide back smoothly, and angling a task lamp sideways keeps monitor glare away—would you like to check how your desk aligns with the window daylight?"
         } else if q.contains("harmony") || q.contains("before") || q.contains("after") {
-            return "The Harmony stage compares your new design against your baseline scan. True harmony happens when circulation paths and layered light points work together effortlessly."
+            return "This is the best part—seeing all your thoughtful tweaks side by side against your starting scan! When easy circulation paths and layered lighting work together, your room finally feels like home—try dragging the split slider to celebrate your progress!"
         } else {
-            return "Great design question! On \(currentStage.title), we focus on comfortable spatial clearances, layered lighting, and visual balance. How does the arrangement feel to you right now?"
+            return "I'm really glad you asked! Right now on \(currentStage.title), our goal is keeping \(room.name) comfortable, easy to walk through, and true to how you actually live—how is the space feeling to you so far, and should we look at furniture flow or lighting next?"
         }
     }
 
@@ -353,24 +357,24 @@ public final class MockMascotAIService: MascotAIServiceProtocol {
             if let desk {
                 let deskZone = zoneNameFor(desk)
                 if let bestOpen = openZones.first(where: { $0 != bedZone && $0 != deskZone }) {
-                    return "Since \(deskZone) is occupied by your \(desk.name), place your \(bed.name) in the open \(bestOpen) zone (moving it from \(bedZone)). That puts the bed within easy reach of your desk while keeping the Back-Right work corner and central walkway clear!"
+                    return "Love that you're thinking about keeping your bed and desk connected! Since \(deskZone) already holds your \(desk.name), tucking your \(bed.name) into the open \(bestOpen) zone keeps them handy to each other while preserving clear walking flow—feel free to drag it there and see how it feels!"
                 }
                 let swappable = furnitures.first {
                     $0.id != bed.id && $0.id != desk.id && max($0.width, $0.length) > 0.55
                 }
                 if let swappable {
                     let swapZone = zoneNameFor(swappable)
-                    return "\(deskZone) is already occupied by your \(desk.name), so avoid sliding the bed straight into that corner. Instead, swap your \(bed.name) (\(bedZone)) with the \(swappable.name) (\(swapZone)), keeping clear circulation between sleep and work areas."
+                    return "Makes total sense wanting your bed closer to your desk! Right now \(deskZone) holds your \(desk.name), so instead of squeezing them together, try gently swapping your \(bed.name) (\(bedZone)) with the \(swappable.name) (\(swapZone))—I think you'll love how much calmer the walkway feels!"
                 }
             }
             if let openZone = openZones.first {
-                return "Try moving your \(bed.name) from \(bedZone) into the open \(openZone) corner, anchored along the perimeter wall so the center stays open."
+                return "Great instinct! Try sliding your \(bed.name) from \(bedZone) over to the open \(openZone) corner along the wall—it'll open up the center nicely, and you can always nudge it right back if you prefer!"
             }
         }
 
         if let openZone = openZones.first {
-            return "Look at the open \(openZone) corner — anchoring there avoids colliding with occupied zones and keeps a comfortable walkway through the center."
+            return "You've got a lovely open spot in the \(openZone) corner! Sliding a piece there gives the center room to breathe and keeps your daily path super comfortable—want to give that corner a try?"
         }
-        return "All four perimeter zones currently hold large furniture. Try swapping two pieces across opposite corners so walkways stay clear without crowding the desk."
+        return "Studio layouts can definitely feel packed when every corner already holds something, so don't worry! Try swapping two pieces across opposite walls first so your desk and main walkway both get some breathing room."
     }
 }
