@@ -273,7 +273,8 @@ public final class LLMMascotAIService: MascotAIServiceProtocol {
     public func askMascot(
         question: String,
         currentStage: StageType,
-        room: Room
+        room: Room,
+        history: [ChatMessage] = []
     ) async -> String {
         // Guardrail 1: Anti-Prompt Injection Pre-Filter
         let lower = question.lowercased()
@@ -323,11 +324,11 @@ public final class LLMMascotAIService: MascotAIServiceProtocol {
         // Cloud LLM invocation with live spatial context
         do {
             let spatialContext = contextSerializer.serialize(room: room, stage: currentStage)
-            let answer = try await callGeminiAPI(question: question, context: spatialContext)
+            let answer = try await callGeminiAPI(question: question, context: spatialContext, history: history)
             self.isQuotaExhausted = false
 
             // Validate against spatial hallucinations via deterministic SpatialFactVerifier
-            let fallbackAnswer = await fallbackService.askMascot(question: question, currentStage: currentStage, room: room)
+            let fallbackAnswer = await fallbackService.askMascot(question: question, currentStage: currentStage, room: room, history: history)
             let verifiedAnswer = factVerifier.verifyChatAnswer(
                 answer: answer,
                 room: room,
@@ -342,7 +343,7 @@ public final class LLMMascotAIService: MascotAIServiceProtocol {
                           error.localizedDescription.localizedCaseInsensitiveContains("RESOURCE_EXHAUSTED") ||
                           error.localizedDescription.localizedCaseInsensitiveContains("exhausted")
             self.isQuotaExhausted = isQuota
-            let offlineAnswer = await fallbackService.askMascot(question: question, currentStage: currentStage, room: room)
+            let offlineAnswer = await fallbackService.askMascot(question: question, currentStage: currentStage, room: room, history: history)
             if isQuota {
                 return "\(offlineAnswer)\n\n*(⚡️ Daily cloud quota is resting, so I'm using my built-in design brain right now!)*"
             } else {
@@ -352,7 +353,51 @@ public final class LLMMascotAIService: MascotAIServiceProtocol {
     }
 
     // MARK: - Google Gemini API Call (Multi-Key Pool & Multi-Model Free Tier)
-    private func callGeminiAPI(question: String, context: String) async throws -> String {
+    internal static func buildGeminiContents(
+        question: String,
+        context: String,
+        history: [ChatMessage]
+    ) -> [[String: Any]] {
+        var turns: [(role: String, text: String)] = []
+
+        for message in history.suffix(10) {
+            let trimmed = message.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { continue }
+            let role = message.isUser ? "user" : "model"
+            if let last = turns.last, last.role == role {
+                turns[turns.count - 1].text += "\n\n\(trimmed)"
+            } else {
+                turns.append((role: role, text: trimmed))
+            }
+        }
+
+        // Gemini expects conversation history to start with a user turn.
+        while let first = turns.first, first.role != "user" {
+            turns.removeFirst()
+        }
+
+        let continuationNote = turns.isEmpty
+            ? ""
+            : "\n\nConversation Continuation Rule: This is an ongoing chat. Answer the user's latest follow-up directly using the prior turns and current room state; do NOT re-introduce or re-summarize the whole room."
+
+        let latestUserText = "\(context)\(continuationNote)\n\nUser Question: \(question)"
+        if let last = turns.last, last.role == "user" {
+            turns[turns.count - 1].text += "\n\n\(latestUserText)"
+        } else {
+            turns.append((role: "user", text: latestUserText))
+        }
+
+        return turns.map { turn in
+            [
+                "role": turn.role,
+                "parts": [
+                    ["text": turn.text]
+                ]
+            ]
+        }
+    }
+
+    private func callGeminiAPI(question: String, context: String, history: [ChatMessage] = []) async throws -> String {
         let availableKeys = apiKeys.isEmpty ? (apiKey.isEmpty ? [] : [apiKey]) : apiKeys
         guard !availableKeys.isEmpty else {
             throw NSError(domain: "GeminiAPI", code: 401, userInfo: [NSLocalizedDescriptionKey: "No API key configured"])
@@ -382,20 +427,15 @@ public final class LLMMascotAIService: MascotAIServiceProtocol {
                     ]
                 }
 
+                let contents = Self.buildGeminiContents(question: question, context: context, history: history)
+
                 let body: [String: Any] = [
                     "system_instruction": [
                         "parts": [
                             ["text": DesignKnowledgeSystemPrompt.prompt]
                         ]
                     ],
-                    "contents": [
-                        [
-                            "role": "user",
-                            "parts": [
-                                ["text": "\(context)\n\nUser Question: \(question)"]
-                            ]
-                        ]
-                    ],
+                    "contents": contents,
                     "generationConfig": generationConfig
                 ]
 

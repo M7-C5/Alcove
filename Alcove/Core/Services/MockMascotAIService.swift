@@ -273,10 +273,27 @@ public final class MockMascotAIService: MascotAIServiceProtocol {
     public func askMascot(
         question: String,
         currentStage: StageType,
-        room: Room
+        room: Room,
+        history: [ChatMessage] = []
     ) async -> String {
-        let q = question.lowercased()
-        if q.contains("clearance") || q.contains("walkway") || q.contains("space") {
+        let trimmed = question.trimmingCharacters(in: .whitespacesAndNewlines)
+        let lower = trimmed.lowercased()
+        let followUpTriggers = ["but where", "where", "how", "which wall", "which corner", "why"]
+        let isShortFollowUp = trimmed.split(whereSeparator: \.isWhitespace).count <= 4 &&
+            followUpTriggers.contains { lower.contains($0) }
+
+        let effectiveQuestion: String
+        if isShortFollowUp, let lastUserPrompt = history.last(where: { $0.isUser })?.text {
+            effectiveQuestion = "\(lastUserPrompt) \(trimmed)"
+        } else {
+            effectiveQuestion = trimmed
+        }
+
+        let q = effectiveQuestion.lowercased()
+        if (q.contains("where") || q.contains("place") || q.contains("move") || q.contains("put")) &&
+            (q.contains("bed") || q.contains("desk")) {
+            return placementGuidance(for: q, room: room)
+        } else if q.contains("clearance") || q.contains("walkway") || q.contains("space") {
             return "For room walkways, minimum 1-person passage requires at least 76.2cm (secondary paths need at least 60cm), while comfortable circulation with carrying objects needs 91.4cm. A bed-making perimeter needs 66–99cm of open space."
         } else if q.contains("light") || q.contains("window") || q.contains("sun") {
             return "A balanced room coordinates 3 essential layers: Ambient (general fill), Task (focused reading/desk lights), and Accent (visual interest). Aim for 5 to 7 light points per room to achieve balanced warmth and eliminate harsh shadows."
@@ -291,5 +308,69 @@ public final class MockMascotAIService: MascotAIServiceProtocol {
         } else {
             return "Great design question! On \(currentStage.title), we focus on comfortable spatial clearances, layered lighting, and visual balance. How does the arrangement feel to you right now?"
         }
+    }
+
+    private func placementGuidance(for question: String, room: Room) -> String {
+        let furnitures = room.workingLayout?.furnitures.filter { !$0.isArchived } ?? []
+        let halfW = room.dimensionsWidth / 2.0
+        let halfL = room.dimensionsLength / 2.0
+        let zones: [(name: String, minX: Double, maxX: Double, minZ: Double, maxZ: Double)] = [
+            ("Back-Left", -halfW, 0, -halfL, 0),
+            ("Back-Right", 0, halfW, -halfL, 0),
+            ("Front-Left", -halfW, 0, 0, halfL),
+            ("Front-Right", 0, halfW, 0, halfL)
+        ]
+
+        let overlapMargin = 0.05
+        var largeOccupantsByZone: [String: [Furniture]] = [:]
+        for zone in zones {
+            let largeItems = furnitures.filter { f in
+                let absCos = abs(cos(f.rotationYaw))
+                let absSin = abs(sin(f.rotationYaw))
+                let extentX = (absCos * f.width + absSin * f.length) / 2.0
+                let extentZ = (absSin * f.width + absCos * f.length) / 2.0
+                let overlaps = (f.positionX + extentX) > (zone.minX + overlapMargin) &&
+                    (f.positionX - extentX) < (zone.maxX - overlapMargin) &&
+                    (f.positionZ + extentZ) > (zone.minZ + overlapMargin) &&
+                    (f.positionZ - extentZ) < (zone.maxZ - overlapMargin)
+                return overlaps && max(f.width, f.length) > 0.55
+            }
+            largeOccupantsByZone[zone.name] = largeItems
+        }
+
+        let openZones = zones.map(\.name).filter { (largeOccupantsByZone[$0] ?? []).isEmpty }
+        let bed = furnitures.first { $0.category == .bed || $0.name.lowercased().contains("bed") }
+        let desk = furnitures.first { $0.name.lowercased().contains("desk") } ?? furnitures.first { $0.category == .table }
+
+        let zoneNameFor: (Furniture) -> String = { f in
+            let depth = f.positionZ < 0 ? "Back" : "Front"
+            let side = f.positionX < 0 ? "Left" : "Right"
+            return "\(depth)-\(side)"
+        }
+
+        if question.contains("bed"), let bed {
+            let bedZone = zoneNameFor(bed)
+            if let desk {
+                let deskZone = zoneNameFor(desk)
+                if let bestOpen = openZones.first(where: { $0 != bedZone && $0 != deskZone }) {
+                    return "Since \(deskZone) is occupied by your \(desk.name), place your \(bed.name) in the open \(bestOpen) zone (moving it from \(bedZone)). That puts the bed within easy reach of your desk while keeping the Back-Right work corner and central walkway clear!"
+                }
+                let swappable = furnitures.first {
+                    $0.id != bed.id && $0.id != desk.id && max($0.width, $0.length) > 0.55
+                }
+                if let swappable {
+                    let swapZone = zoneNameFor(swappable)
+                    return "\(deskZone) is already occupied by your \(desk.name), so avoid sliding the bed straight into that corner. Instead, swap your \(bed.name) (\(bedZone)) with the \(swappable.name) (\(swapZone)), keeping clear circulation between sleep and work areas."
+                }
+            }
+            if let openZone = openZones.first {
+                return "Try moving your \(bed.name) from \(bedZone) into the open \(openZone) corner, anchored along the perimeter wall so the center stays open."
+            }
+        }
+
+        if let openZone = openZones.first {
+            return "Look at the open \(openZone) corner — anchoring there avoids colliding with occupied zones and keeps a comfortable walkway through the center."
+        }
+        return "All four perimeter zones currently hold large furniture. Try swapping two pieces across opposite corners so walkways stay clear without crowding the desk."
     }
 }

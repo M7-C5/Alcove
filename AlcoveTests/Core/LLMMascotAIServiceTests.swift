@@ -126,5 +126,46 @@ struct LLMMascotAIServiceTests {
         #expect(context.contains("Anchored at Back Wall"))
         #expect(!context.contains("Queen Bed") || !context.contains("Standing in open center of room"))
     }
+
+    @Test @MainActor func contextSerializerIncludesLandmarksZonesAndOccupancy() {
+        let room = SampleData.createStarterRoom()
+        let serializer = RoomSpatialContextSerializer()
+        let context = serializer.serialize(room: room, stage: .rearrangement)
+
+        #expect(context.contains("Window Location: Back Wall"))
+        #expect(context.contains("Entrance Door Location: Front Wall Front-Left"))
+        #expect(context.contains("Zone: Back-Left"))
+        #expect(context.contains("Zone: Back-Right"))
+        #expect(context.contains("ROOM ZONE OCCUPANCY & PLACEMENT GUIDE"))
+        #expect(context.contains("Back-Right: OCCUPIED by"))
+        #expect(context.contains("Front-Right: OPEN"))
+    }
+
+    @Test @MainActor func buildGeminiContentsPreservesMultiTurnHistoryAndFollowUp() {
+        let room = SampleData.createStarterRoom()
+        let context = RoomSpatialContextSerializer().serialize(room: room, stage: .rearrangement)
+        let history: [ChatMessage] = [
+            ChatMessage(isUser: false, text: "Leading greeting stripped for Gemini turn order"),
+            ChatMessage(isUser: true, text: "Where do u think I should place my bed when I wanna go near my desk"),
+            ChatMessage(isUser: false, text: "Try placing it near the back wall.")
+        ]
+
+        let contents = LLMMascotAIService.buildGeminiContents(
+            question: "But where",
+            context: context,
+            history: history
+        )
+
+        #expect(contents.count == 3)
+        #expect(contents[0]["role"] as? String == "user")
+        #expect(contents[1]["role"] as? String == "model")
+        #expect(contents[2]["role"] as? String == "user")
+
+        let latestParts = contents[2]["parts"] as? [[String: String]]
+        let latestText = latestParts?.first?["text"] ?? ""
+        #expect(latestText.contains("Conversation Continuation Rule"))
+        #expect(latestText.contains("User Question: But where"))
+        #expect(latestText.contains("ROOM ZONE OCCUPANCY & PLACEMENT GUIDE"))
+    }
 }
 

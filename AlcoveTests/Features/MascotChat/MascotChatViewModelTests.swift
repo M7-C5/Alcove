@@ -118,4 +118,73 @@ struct MascotChatViewModelTests {
         #expect(feedback.playedNotifications.contains(.success))
         #expect(!feedback.spokenTexts.isEmpty)
     }
+
+    @Test func followUpPassesHistoryAndPersistsAcrossDrawerReopen() async {
+        @MainActor
+        final class RecordingMascotService: MascotAIServiceProtocol {
+            private let delegate = MockMascotAIService()
+            var recordedHistories: [[ChatMessage]] = []
+
+            func stageGreeting(stage: StageType, roomName: String) -> String {
+                delegate.stageGreeting(stage: stage, roomName: roomName)
+            }
+
+            func microReact(
+                event: FurnitureMoveEvent,
+                roomDimensions: (width: Double, length: Double),
+                allFurnitures: [Furniture]
+            ) -> MicroReaction? { nil }
+
+            func daylightMicroReact(hour: Double, room: Room) -> MicroReaction? { nil }
+
+            func evaluateStage(stage: StageType, room: Room) async -> StageEvaluationResult {
+                await delegate.evaluateStage(stage: stage, room: room)
+            }
+
+            func askMascot(question: String, currentStage: StageType, room: Room, history: [ChatMessage]) async -> String {
+                recordedHistories.append(history)
+                return await delegate.askMascot(question: question, currentStage: currentStage, room: room, history: history)
+            }
+        }
+
+        let room = SampleData.createStarterRoom()
+        let spyService = RecordingMascotService()
+        var persistedHistory: [ChatMessage] = []
+
+        let vm = MascotChatViewModel(
+            mascotService: spyService,
+            currentStage: .rearrangement,
+            room: room,
+            initialHistory: persistedHistory,
+            onHistoryUpdated: { persistedHistory = $0 }
+        )
+
+        vm.inputPrompt = "Where do u think I should place my bed when I wanna go near my desk"
+        await vm.sendMessage()?.value
+
+        #expect(spyService.recordedHistories.count == 1)
+        #expect(spyService.recordedHistories[0].isEmpty)
+        #expect(persistedHistory.count == 2)
+
+        // Simulate closing and reopening the chat drawer with persisted studio state
+        let reopenedVM = MascotChatViewModel(
+            mascotService: spyService,
+            currentStage: .rearrangement,
+            room: room,
+            initialHistory: persistedHistory,
+            onHistoryUpdated: { persistedHistory = $0 }
+        )
+
+        #expect(reopenedVM.chatHistory == persistedHistory)
+
+        reopenedVM.inputPrompt = "But where"
+        await reopenedVM.sendMessage()?.value
+
+        #expect(spyService.recordedHistories.count == 2)
+        #expect(spyService.recordedHistories[1].count == 2)
+        #expect(persistedHistory.count == 4)
+
+        let reply = reopenedVM.chatHistory.last?.text ?? ""
+        #expect(reply.contains("Back-Right") || reply.contains("Front-Right"))
+    }
 }

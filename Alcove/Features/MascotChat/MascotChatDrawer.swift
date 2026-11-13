@@ -10,14 +10,18 @@ public struct MascotChatDrawer: View {
         mascotService: any MascotAIServiceProtocol,
         feedbackService: (any MascotFeedbackServiceProtocol)? = nil,
         currentStage: StageType,
-        room: Room
+        room: Room,
+        initialHistory: [ChatMessage] = [],
+        onHistoryUpdated: (([ChatMessage]) -> Void)? = nil
     ) {
         self._viewModel = State(
             initialValue: MascotChatViewModel(
                 mascotService: mascotService,
                 feedbackService: feedbackService,
                 currentStage: currentStage,
-                room: room
+                room: room,
+                initialHistory: initialHistory,
+                onHistoryUpdated: onHistoryUpdated
             )
         )
     }

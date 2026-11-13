@@ -12,14 +12,23 @@ public struct RoomSpatialContextSerializer: Sendable {
 
         var lines: [String] = []
         lines.append("### CURRENT ROOM STATE")
+        let halfW = room.dimensionsWidth / 2.0
+        let halfL = room.dimensionsLength / 2.0
         lines.append("- Room Name: \(room.name)")
         lines.append("- Stage: \(stage.stageNumber) (\(stage.title) — \(stage.subtitle))")
         lines.append("- Dimensions: \(String(format: "%.1f", room.dimensionsWidth))m wide × \(String(format: "%.1f", room.dimensionsLength))m long (Area: ~\(String(format: "%.1f", room.dimensionsWidth * room.dimensionsLength)) m²)")
-        lines.append("- Daylight Orientation: South-facing window exposure (standard daylight simulation)")
+        lines.append("- Window Location: Back Wall (z = -\(String(format: "%.2f", halfL))m, centered along the top wall)")
+        lines.append("- Entrance Door Location: Front Wall Front-Left (z = +\(String(format: "%.2f", halfL))m, x ≈ -\(String(format: "%.2f", halfW * 0.35))m, bottom-left)")
+        lines.append("- Daylight Orientation: South-facing window exposure at the Back Wall (standard daylight simulation)")
 
         lines.append("\n### ACTIVE FURNITURE (\(furnitures.count) items):")
-        let halfW = room.dimensionsWidth / 2.0
-        let halfL = room.dimensionsLength / 2.0
+
+        struct PlacedExtent {
+            let furniture: Furniture
+            let extentX: Double
+            let extentZ: Double
+        }
+        var placedExtents: [PlacedExtent] = []
 
         for f in furnitures {
             let facingX = sin(f.rotationYaw)
@@ -70,7 +79,40 @@ public struct RoomSpatialContextSerializer: Sendable {
             }
 
             let wallStr = placementContext.joined(separator: ", ")
-            lines.append("• \(f.name) [\(f.category.rawValue)]: Position(x: \(String(format: "%.2f", f.positionX))m, z: \(String(format: "%.2f", f.positionZ))m), Size(\(String(format: "%.2f", f.width))m × \(String(format: "%.2f", f.length))m), Facing: \(facingDescription), Placement: \(wallStr)")
+            let zoneLabel = Self.quadrantLabel(x: f.positionX, z: f.positionZ)
+            placedExtents.append(PlacedExtent(furniture: f, extentX: extentX, extentZ: extentZ))
+            lines.append("• \(f.name) [\(f.category.rawValue)]: Zone: \(zoneLabel), Position(x: \(String(format: "%.2f", f.positionX))m, z: \(String(format: "%.2f", f.positionZ))m), Size(\(String(format: "%.2f", f.width))m × \(String(format: "%.2f", f.length))m), Facing: \(facingDescription), Placement: \(wallStr)")
+        }
+
+        // Summarize 2D quadrant occupancy so advice never tells the user to move large furniture into an occupied corner
+        lines.append("\n### ROOM ZONE OCCUPANCY & PLACEMENT GUIDE:")
+        let zones: [(name: String, minX: Double, maxX: Double, minZ: Double, maxZ: Double)] = [
+            ("Back-Left", -halfW, 0, -halfL, 0),
+            ("Back-Right", 0, halfW, -halfL, 0),
+            ("Front-Left", -halfW, 0, 0, halfL),
+            ("Front-Right", 0, halfW, 0, halfL)
+        ]
+        let overlapMargin = 0.05
+        for zone in zones {
+            let occupants = placedExtents.filter { item in
+                let f = item.furniture
+                return (f.positionX + item.extentX) > (zone.minX + overlapMargin) &&
+                    (f.positionX - item.extentX) < (zone.maxX - overlapMargin) &&
+                    (f.positionZ + item.extentZ) > (zone.minZ + overlapMargin) &&
+                    (f.positionZ - item.extentZ) < (zone.maxZ - overlapMargin)
+            }.map(\.furniture)
+
+            if occupants.isEmpty {
+                lines.append("• \(zone.name): OPEN (available for placing large furniture)")
+            } else {
+                let names = occupants.map(\.name).joined(separator: ", ")
+                let hasLargeItem = occupants.contains { max($0.width, $0.length) > 0.55 }
+                if hasLargeItem {
+                    lines.append("• \(zone.name): OCCUPIED by \(names) (do NOT place another large piece here without proposing a swap or relocation)")
+                } else {
+                    lines.append("• \(zone.name): AVAILABLE FOR LARGE FURNITURE (only small item(s): \(names))")
+                }
+            }
         }
 
         // Compute anthropometric clearances using Panero & Zelnik standards
@@ -124,5 +166,30 @@ public struct RoomSpatialContextSerializer: Sendable {
         }
 
         return lines.joined(separator: "\n")
+    }
+
+    private static func quadrantLabel(x: Double, z: Double) -> String {
+        let depth: String
+        if z < -0.35 {
+            depth = "Back"
+        } else if z > 0.35 {
+            depth = "Front"
+        } else {
+            depth = "Mid"
+        }
+
+        let side: String
+        if x < -0.35 {
+            side = "Left"
+        } else if x > 0.35 {
+            side = "Right"
+        } else {
+            side = "Center"
+        }
+
+        if depth == "Mid" && side == "Center" {
+            return "Center"
+        }
+        return "\(depth)-\(side)"
     }
 }

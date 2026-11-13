@@ -128,8 +128,33 @@ public protocol MascotAIServiceProtocol: Sendable {
     func askMascot(
         question: String,
         currentStage: StageType,
-        room: Room
+        room: Room,
+        history: [ChatMessage]
     ) async -> String
+}
+
+public struct ChatMessage: Identifiable, Equatable, Sendable {
+    public let id: UUID
+    public let isUser: Bool
+    public let text: String
+    public let modelBadge: String?
+
+    public init(id: UUID = UUID(), isUser: Bool, text: String, modelBadge: String? = nil) {
+        self.id = id
+        self.isUser = isUser
+        self.text = text
+        self.modelBadge = modelBadge
+    }
+}
+
+public extension MascotAIServiceProtocol {
+    func askMascot(
+        question: String,
+        currentStage: StageType,
+        room: Room
+    ) async -> String {
+        await askMascot(question: question, currentStage: currentStage, room: room, history: [])
+    }
 }
 
 public struct FurnitureMoveEvent: Sendable {
@@ -151,5 +176,36 @@ public struct FurnitureMoveEvent: Sendable {
         self.oldPosition = oldPosition
         self.newPosition = newPosition
         self.rotationYaw = rotationYaw
+    }
+}
+
+public enum SpatialWarningSeverity: String, Codable, Sendable, Comparable {
+    case caution   // Yellow: tight clearance or layout improvement ("can be better")
+    case collision // Red: physical overlap / collision or blocked doorway
+
+    public static func < (lhs: SpatialWarningSeverity, rhs: SpatialWarningSeverity) -> Bool {
+        lhs == .caution && rhs == .collision
+    }
+}
+
+public struct SpatialWarning: Identifiable, Equatable, Sendable {
+    public let id: String
+    public let severity: SpatialWarningSeverity
+    public let furnitureIDs: Set<UUID>
+    public let title: String
+    public let message: String
+
+    public init(
+        id: String,
+        severity: SpatialWarningSeverity,
+        furnitureIDs: Set<UUID>,
+        title: String,
+        message: String
+    ) {
+        self.id = id
+        self.severity = severity
+        self.furnitureIDs = furnitureIDs
+        self.title = title
+        self.message = message
     }
 }
