@@ -17,11 +17,13 @@ struct LightingRoomSnapshot: Sendable {
     let geometry: LightingRoomGeometry
     let fixtures: [LightFixture]
     let furnishings: [Furnishing]
+    let compassOrientation: RoomCompassOrientation?
 
     @MainActor init(room: Room, fixtures draftFixtures: [LightFixture]? = nil) {
         let bounds = LightingRoomGeometry(width: room.dimensionsWidth, length: room.dimensionsLength,
                                           height: room.dimensionsHeight)
         geometry = bounds
+        compassOrientation = room.compassOrientation
         let layout = room.workingLayout ?? room.baselineLayout
         fixtures = (draftFixtures ?? layout?.lightFixtures ?? []).map { bounds.clamped($0) }
         furnishings = (layout?.furnitures ?? []).filter { !$0.isArchived }.map {
@@ -165,11 +167,9 @@ final class LightingRoomScene: NSObject {
         sun.isEnabled = settings.sunlightOn && !settings.layoutOnly && !isPlacementMode && fraction > 0
         sun.light.intensity = Float(daylight.intensityLux)
         sun.light.color = color(kelvin: daylight.kelvin)
-        let elevation = Float(daylight.elevationAngleRadians)
-        let azimuth = Float(daylight.azimuthAngleRadians)
         let target: SIMD3<Float> = [0, 0, 0]
         let distance = Float(max(snapshot.geometry.width, snapshot.geometry.length, snapshot.geometry.height)) * 3
-        let direction = SIMD3<Float>(sin(azimuth) * cos(elevation), max(0.01, sin(elevation)), -cos(azimuth) * cos(elevation))
+        let direction = IlluminationSimulationEngine().sunlightDirection(for: daylight, orientation: snapshot.compassOrientation)
         let source = simd_normalize(direction) * distance
         sun.look(at: target, from: source, relativeTo: root)
         let renderedIDs = settings.renderedFixtureIDs(in: fixtureDefinitions)

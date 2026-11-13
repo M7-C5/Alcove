@@ -41,6 +41,7 @@
         "ENABLE_PREVIEWS": "YES",
         "GENERATE_INFOPLIST_FILE": "YES",
         "INFOPLIST_KEY_NSCameraUsageDescription": "Alcove requires camera access for the 1:1 life-size AR spatial walkthrough and room inspection.",
+        "INFOPLIST_KEY_NSMotionUsageDescription": "Alcove uses the compass while starting a room scan to align the sunlight preview with your room.",
         "INFOPLIST_KEY_UIAppFonts": "cleanow.ttf",
         "INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]": "YES",
         "INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]": "YES",

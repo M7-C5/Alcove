@@ -203,7 +203,7 @@ struct LightingWorkspaceView: View {
                 editor.place(unitX: 0.5, unitZ: 0.5)
             }
             viewportControls
-            Text("Sunlight is a preview")
+            Text(room.compassOrientation == nil ? "Sunlight preview · Sample direction" : "Sunlight preview · Aligned to magnetic north")
                 .font(.caption)
                 .foregroundStyle(LightingTheme.ink.opacity(0.85))
         }
