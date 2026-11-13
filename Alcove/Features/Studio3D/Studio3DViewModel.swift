@@ -43,6 +43,7 @@ public final class Studio3DViewModel {
     public var isEvaluating: Bool = false
     /// Tracks if the room layout has been modified since the last stage evaluation (prevents redundant API calls)
     public private(set) var hasPendingLayoutChanges: Bool = true
+    private var evaluationTask: Task<Void, Never>?
 
     // Walkthrough Onboarding Sequence state (Figma Image 1 & 2)
     public var isWalkthroughActive: Bool = false
@@ -115,17 +116,7 @@ public final class Studio3DViewModel {
     }
 
     public var warningSeverityByFurnitureID: [UUID: SpatialWarningSeverity] {
-        var map: [UUID: SpatialWarningSeverity] = [:]
-        for warning in spatialWarnings {
-            for id in warning.furnitureIDs {
-                if let existing = map[id] {
-                    map[id] = max(existing, warning.severity)
-                } else {
-                    map[id] = warning.severity
-                }
-            }
-        }
-        return map
+        FastPathRulebook.warningSeverityMap(from: spatialWarnings)
     }
 
     public var activeTopWarning: SpatialWarning? {
@@ -314,8 +305,13 @@ public final class Studio3DViewModel {
             return cached
         }
 
+        let requestedStage = currentStage
         isEvaluating = true
-        let result = await mascotService.evaluateStage(stage: currentStage, room: room)
+        let result = await mascotService.evaluateStage(stage: requestedStage, room: room)
+        guard !Task.isCancelled, currentStage == requestedStage else {
+            self.isEvaluating = false
+            return nil
+        }
         self.evaluationResult = result
         self.hasPendingLayoutChanges = false
         self.isEvaluating = false
@@ -331,12 +327,18 @@ public final class Studio3DViewModel {
     }
 
     public func triggerStageEvaluation(forceReprompt: Bool = false) {
-        Task {
+        guard !isEvaluating else { return }
+        evaluationTask?.cancel()
+        evaluationTask = Task {
             await evaluateCurrentStage(forceReprompt: forceReprompt)
+            self.evaluationTask = nil
         }
     }
 
     public func advanceToNextStage(result: StageEvaluationResult) {
+        evaluationTask?.cancel()
+        evaluationTask = nil
+        isEvaluating = false
         room.completeStage(currentStage, score: result.score, feedback: result.dialogue)
         if let next = currentStage.nextStage {
             currentStage = next
@@ -349,6 +351,9 @@ public final class Studio3DViewModel {
 
     public func switchToStage(_ stage: StageType) {
         guard room.isUnlocked(stage) else { return }
+        evaluationTask?.cancel()
+        evaluationTask = nil
+        isEvaluating = false
         currentStage = stage
         updateMascotGreeting()
         evaluationResult = nil
