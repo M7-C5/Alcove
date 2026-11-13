@@ -95,6 +95,8 @@ public final class Studio3DViewModel {
 
     // Archive & Inventory Presentation
     public var isArchiveListPresented: Bool = false
+    public var isFurnitureCatalogPresented: Bool = false
+    public var swapTargetFurnitureID: UUID? = nil
     public var floorRaycaster: ((CGPoint) -> SIMD3<Float>?)? = nil
     public var snapToViewport: ((ViewportPreset) -> Void)? = nil
 
@@ -158,6 +160,7 @@ public final class Studio3DViewModel {
         guard canManipulateFurniture else { return }
         item.isArchived = true
         dragRevision &+= 1
+        markLayoutDirty()
         if selectedFurnitureID == item.id {
             selectedFurnitureID = nil
         }
@@ -165,6 +168,122 @@ public final class Studio3DViewModel {
         mascotMessage = "Archived \(item.name) into inventory!"
         feedbackService.playImpact(.heavy)
         feedbackService.speak(mascotMessage)
+    }
+
+    public func openAddFurnitureCatalog() {
+        guard canManipulateFurniture else { return }
+        swapTargetFurnitureID = nil
+        isArchiveListPresented = false
+        isFurnitureCatalogPresented = true
+    }
+
+    public func openSwapFurnitureCatalog(for item: Furniture) {
+        guard canManipulateFurniture else { return }
+        swapTargetFurnitureID = item.id
+        isArchiveListPresented = false
+        isFurnitureCatalogPresented = true
+    }
+
+    @discardableResult
+    public func addFurniture(from catalogItem: FurnitureCatalogItem) -> Furniture? {
+        guard canManipulateFurniture, let workingLayout = room.workingLayout else { return nil }
+
+        let clamped = FurnitureTransformEngine.clampPosition(
+            position: SIMD3<Float>(0, 0, 0),
+            furnitureWidth: Float(catalogItem.width),
+            furnitureLength: Float(catalogItem.length),
+            rotationYaw: 0,
+            roomWidth: Float(room.dimensionsWidth),
+            roomLength: Float(room.dimensionsLength)
+        )
+
+        let newItem = catalogItem.makeFurniture(
+            positionX: Double(clamped.x),
+            positionZ: Double(clamped.z),
+            rotationYaw: 0.0,
+            isUserAdded: true
+        )
+        newItem.layout = workingLayout
+        workingLayout.furnitures.append(newItem)
+
+        dragRevision &+= 1
+        markLayoutDirty()
+        selectedFurnitureID = newItem.id
+        isFurnitureCatalogPresented = false
+        swapTargetFurnitureID = nil
+
+        mascotEmotion = .happy
+        mascotMessage = "Added \(newItem.name) to your room!"
+        feedbackService.playImpact(.medium)
+        feedbackService.speak(mascotMessage)
+
+        return newItem
+    }
+
+    public func removeFurniture(_ item: Furniture) {
+        guard canManipulateFurniture, item.isUserAdded, let workingLayout = room.workingLayout else { return }
+        workingLayout.furnitures.removeAll { $0.id == item.id }
+        item.layout = nil
+
+        if selectedFurnitureID == item.id {
+            selectedFurnitureID = nil
+        }
+        if swapTargetFurnitureID == item.id {
+            swapTargetFurnitureID = nil
+        }
+
+        dragRevision &+= 1
+        markLayoutDirty()
+
+        mascotEmotion = .curious
+        mascotMessage = "Removed \(item.name) from your room."
+        feedbackService.playImpact(.heavy)
+        feedbackService.speak(mascotMessage)
+    }
+
+    public func swapFurniture(_ item: Furniture, with catalogItem: FurnitureCatalogItem) {
+        guard canManipulateFurniture else { return }
+        let oldPos = (x: item.positionX, z: item.positionZ)
+        let previousName = item.name
+
+        item.name = catalogItem.name
+        item.category = catalogItem.category
+        item.width = catalogItem.width
+        item.length = catalogItem.length
+        item.height = catalogItem.height
+        item.assetIdentifier = catalogItem.assetIdentifier
+
+        let clamped = FurnitureTransformEngine.clampPosition(
+            position: SIMD3<Float>(Float(item.positionX), Float(item.positionY), Float(item.positionZ)),
+            furnitureWidth: Float(item.width),
+            furnitureLength: Float(item.length),
+            rotationYaw: Float(item.rotationYaw),
+            roomWidth: Float(room.dimensionsWidth),
+            roomLength: Float(room.dimensionsLength)
+        )
+        item.positionX = Double(clamped.x)
+        item.positionZ = Double(clamped.z)
+
+        isFurnitureCatalogPresented = false
+        swapTargetFurnitureID = nil
+        selectedFurnitureID = item.id
+        feedbackService.playImpact(.medium)
+
+        handleFurnitureMoved(
+            FurnitureMoveEvent(
+                furnitureName: item.name,
+                category: item.category,
+                oldPosition: oldPos,
+                newPosition: (x: item.positionX, z: item.positionZ),
+                rotationYaw: item.rotationYaw
+            )
+        )
+
+        if mascotMessage.isEmpty || mascotEmotion == .neutral {
+            mascotEmotion = .happy
+            mascotMessage = "Swapped \(previousName) for \(item.name)!"
+            feedbackService.speak(mascotMessage)
+        }
     }
 
     public func toggleVoiceNarration() {

@@ -179,6 +179,7 @@ public struct Studio3DViewport: UIViewRepresentable {
 
         var updateSubscription: (any Cancellable)?
         var animationTask: Task<Void, Never>? = nil
+        private var entitySignatures: [UUID: String] = [:]
 
         // Camera Orbit & Distance
         var yaw: Float = 0.0
@@ -724,12 +725,32 @@ public struct Studio3DViewport: UIViewRepresentable {
                 }
             } else {
                 ghostGroup?.isEnabled = false
+
+                // Prune entities for user-added furniture that were removed from workingLayout
+                let activeIDs = Set(layout.furnitures.map(\.id))
+                for child in group.children where child.name.starts(with: "Furniture_") {
+                    let idString = String(child.name.dropFirst("Furniture_".count))
+                    if let uuid = UUID(uuidString: idString), !activeIDs.contains(uuid) {
+                        child.removeFromParent()
+                        entitySignatures.removeValue(forKey: uuid)
+                    }
+                }
+
                 for item in layout.furnitures {
+                    let signature = "\(item.name)|\(item.categoryRaw)|\(item.width)|\(item.length)|\(item.height)|\(item.assetIdentifier ?? "")"
                     var entity = group.children.first(where: { $0.name == "Furniture_\(item.id.uuidString)" })
+
+                    // Rebuild entity if item was swapped in-place with a different catalog preset
+                    if let existing = entity, entitySignatures[item.id] != signature {
+                        existing.removeFromParent()
+                        entity = nil
+                    }
+
                     if entity == nil {
                         let newEntity = buildFurnitureEntity(for: item)
                         newEntity.isEnabled = !item.isArchived
                         group.addChild(newEntity)
+                        entitySignatures[item.id] = signature
                         entity = newEntity
                     }
                     guard let entity else { continue }

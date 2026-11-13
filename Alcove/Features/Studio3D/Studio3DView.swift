@@ -109,7 +109,14 @@ public struct Studio3DView: View {
                         },
                         onArchive: {
                             handleArchive(for: furniture)
-                        }
+                        },
+                        onSwap: {
+                            playSnapFeedback()
+                            viewModel.openSwapFurnitureCatalog(for: furniture)
+                        },
+                        onRemove: furniture.isUserAdded ? {
+                            handleRemove(for: furniture)
+                        } : nil
                     )
                     .position(clamped)
                     .transition(.scale(scale: 0.85).combined(with: .opacity))
@@ -266,6 +273,27 @@ public struct Studio3DView: View {
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel("Launch 1:1 Life-Size AR Walkthrough")
+
+                        // Circular Add Furniture Button (Stage 2)
+                        if viewModel.canManipulateFurniture {
+                            Button {
+                                playSnapFeedback()
+                                viewModel.openAddFurnitureCatalog()
+                            } label: {
+                                Image(systemName: "plus")
+                                    .font(.body.weight(.semibold))
+                                    .foregroundStyle(Color.alcoveInk)
+                                    .frame(width: 44, height: 44)
+                                    .background(Color.alcoveSurface, in: Circle())
+                                    .overlay(
+                                        Circle()
+                                            .stroke(Color.alcoveInk.opacity(0.16), lineWidth: 1)
+                                    )
+                                    .shadow(color: Color.black.opacity(0.04), radius: 8, y: 2)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Add furniture")
+                        }
 
                         // Circular Archive Button (Icon + number badge pinned on top right)
                         if viewModel.currentStage.unlockedTools.contains(.inventoryArchive) && viewModel.currentStage != .harmony {
@@ -463,6 +491,30 @@ public struct Studio3DView: View {
             .presentationDetents([.fraction(0.85), .large])
             .presentationDragIndicator(.visible)
         }
+        .sheet(isPresented: $bindableVM.isFurnitureCatalogPresented) {
+            let swapTarget = viewModel.swapTargetFurnitureID.flatMap { id in
+                room.workingLayout?.furnitures.first(where: { $0.id == id })
+            }
+            FurnitureCatalogSheet(
+                swapTarget: swapTarget,
+                onSelectItem: { item in
+                    playSnapFeedback()
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                        if let target = swapTarget {
+                            viewModel.swapFurniture(target, with: item)
+                        } else {
+                            viewModel.addFurniture(from: item)
+                        }
+                    }
+                },
+                onDismiss: {
+                    viewModel.isFurnitureCatalogPresented = false
+                    viewModel.swapTargetFurnitureID = nil
+                }
+            )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+        }
         .fullScreenCover(isPresented: $isARWalkthroughPresented) {
             ARWalkthroughView(room: room)
         }
@@ -520,6 +572,13 @@ public struct Studio3DView: View {
         playSnapFeedback()
         withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
             viewModel.archiveFurniture(furniture)
+        }
+    }
+
+    private func handleRemove(for furniture: Furniture) {
+        playSnapFeedback()
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+            viewModel.removeFurniture(furniture)
         }
     }
 
