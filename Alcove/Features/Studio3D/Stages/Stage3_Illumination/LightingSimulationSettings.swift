@@ -3,6 +3,7 @@ import Foundation
 /// Preview choices belong to the studio session, independently of saved fixture switches.
 struct LightingSimulationSettings: Equatable, Sendable {
     var artificialLightsOn = true
+    var sunlightOn = true
     var minuteOfDay = 12 * 60
     var layoutOnly = false
 

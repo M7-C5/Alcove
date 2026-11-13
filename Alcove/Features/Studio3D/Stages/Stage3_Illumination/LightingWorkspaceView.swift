@@ -76,13 +76,8 @@ struct LightingWorkspaceView: View {
                 .frame(maxWidth: .infinity)
             Button(action: save) {
                 Label("Save", systemImage: "checkmark")
-                    .font(.subheadline.bold())
-                    .padding(.horizontal, 16)
-                    .frame(minHeight: 44)
-                    .foregroundStyle(LightingTheme.background)
-                    .background(LightingTheme.ink, in: Capsule())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(LightingPrimaryButtonStyle())
             .disabled(!editor.hasUnsavedChanges)
             .opacity(editor.hasUnsavedChanges ? 1 : 0.55)
             Button { showingARWalkthrough = true } label: {
@@ -158,7 +153,7 @@ struct LightingWorkspaceView: View {
     }
 
     private func columns(_ layout: LightingWorkspaceLayout) -> some View {
-        HStack(alignment: .center, spacing: layout.spacing) {
+        HStack(alignment: .top, spacing: layout.spacing) {
             LightingSourcePanel(editor: editor, isAdding: placement.isActive, onAdd: togglePlacement)
                 .frame(width: layout.sourceWidth)
                 .frame(maxHeight: .infinity)
@@ -166,8 +161,9 @@ struct LightingWorkspaceView: View {
                 .frame(width: layout.viewportWidth)
                 .frame(maxHeight: .infinity)
             ScrollView {
-                inspectors.padding(.vertical, 4)
+                inspectors
             }
+            .scrollClipDisabled()
             .frame(width: layout.inspectorWidth)
         }
     }
@@ -219,10 +215,16 @@ struct LightingWorkspaceView: View {
             settings: settings,
             preset: preset,
             backgroundColor: UIColor(LightingTheme.canvas),
-            onPlaceLight: { point in editor.place(unitX: Double(point.x), unitZ: Double(point.y)) },
+            onPlaceLight: { point in
+                    guard !editor.isSelectingMultiple else { return }
+                    editor.place(unitX: Double(point.x), unitZ: Double(point.y))
+                },
             onSelectLight: { editor.select($0) },
+            onClearSelection: { editor.dismissSelection() },
+                onMoveLight: { id, point in editor.move(id, x: Double(point.x), z: Double(point.y)) },
             isPlacementMode: placement.isActive,
-            selectedFixtureIDs: editor.selectedIDs
+            selectedFixtureIDs: editor.selectedIDs,
+            isSelectingMultiple: editor.isSelectingMultiple
         )
     }
 
@@ -251,14 +253,14 @@ struct LightingWorkspaceView: View {
     }
 
     private var viewportPrompt: String {
-        if placement.isActive { return "Tap where you want a light." }
         if editor.isSelectingMultiple { return "Tap lights in the room or list to select them." }
+        if placement.isActive { return "Tap to add a light. Drag a selected light to move it." }
         if editor.drafts.isEmpty { return "Tap Add light to get started." }
-        return "Choose a light to change its color or brightness."
+        return "Tap a light to edit it. Drag the move icon to reposition it."
     }
 
     private var inspectors: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 24) {
             LightingSimulationPanel(settings: $settings,
                                     activeFixtureCount: editor.drafts.filter { settings.output(for: $0) > 0 }.count)
             LightingEditPanel(editor: editor, onDelete: { showingDelete = true })
