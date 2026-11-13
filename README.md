@@ -9,17 +9,9 @@
 **Alcove** transforms interior design learning into an interactive 3D spatial simulation. Instead of passive tutorials, users scan or import their real rooms and progress through a structured 4-stage design curriculum:
 
 1. **The Audit**: Spatial bottleneck inspection, clearance analysis, and mascot onboarding.
-2. **The Rearrangement**: Interactive furniture repositioning with circular rotation snapping and inventory storage.
-3. **The Illumination**: Daylight path scrubbing and balanced ambient/task/accent lighting.
-4. **The Harmony Reveal**: Before/After split comparison, comprehensive design scorecard, and AR walkthrough.
-
-**The Illumination** uses a three-column workspace: **Your lights** on the left, the RealityKit room in the center, and **Lighting preview** plus **Light settings** on the right. **Add light** locks the main viewport to a top view with a translucent white placement layer. Choose a familiar lamp type, then tap the room to place it on a hidden 5 cm grid. **Done** restores the previous camera preset. Lamp type sets the mounting details automatically; users adjust only light color and brightness. **Save** persists the working layout; the clock and master light switch belong to the studio session. Daylight is illustrative until captured windows and geographic orientation are available.
-
-Use **Test Lighting** on the dashboard to open Illumination immediately with a temporary mock bedroom layout. Add lamps and test the simulation without completing earlier stages. Closing the playground discards its temporary room; reopening starts fresh.
-
-Each light appears as its own 3D lamp model. Desk and table lamps sit on tapped furniture surfaces, standing lamps sit on the floor, and ceiling and wall fixtures mount automatically. Light comes from the lamp head or shade, with a focused beam or diffuse glow appropriate to the type; color and brightness controls update both the model and its illumination.
-
-Tap **Select** in **Your lights** to edit several lamps together. Tap lamps in the list or room, or use **Select all**; checkmarks, a count, and outlines show the selection. Different settings display **Mixed**. Changing lamp type, light color, or brightness applies only that setting to the selected lamps. **Done** returns to editing one lamp; **Save** persists the edits.
+2. **The Rearrangement**: Interactive furniture repositioning, circular rotation snapping, inventory archive, and catalog add/swap/remove.
+3. **The Illumination**: Three-column lighting workspace with room compass daylight simulation and multi-fixture placement.
+4. **The Harmony Reveal**: Before/After split comparison, comprehensive design scorecard, and 1:1 AR walkthrough.
 
 ---
 
@@ -38,14 +30,18 @@ Alcove follows a modular vertical-slice architecture:
 ```
 Alcove/
 ├── Core/
-│   ├── Models/       # Room, Layout, Furniture, StageProgress
-│   └── Services/     # Mascot AI service, Fast-path rulebook, Evaluation engine
+│   ├── Models/       # SwiftData models (Room, Layout, Furniture, StageProgress)
+│   ├── Services/     # Mascot AI, Fast-path rulebook, Evaluation & spatial engines
+│   └── Storage/      # Seed data, sample rooms, and FurnitureCatalog presets
 ├── Features/
-│   ├── Dashboard/    # Room gallery and room scan launcher
+│   ├── Home/         # Landing view and entry navigation
+│   ├── Dashboard/    # Room gallery, RoomPlan scan, and compass capture
 │   ├── Stages/       # 4-stage progression cards
-│   ├── Studio3D/     # RealityKit viewport, gesture controls, Mascot HUD
+│   ├── Studio3D/     # RealityKit viewport, Sims HUD, Stage 3 & 4 workspaces
+│   ├── ARWalkthrough/# 1:1 scale AR room walkthrough
 │   └── MascotChat/   # Advisory dialogue and conversational LLM
-└── UI/               # Reusable HUD elements, cards, and dials
+├── Navigation/       # Value-based VSA navigation router
+└── UI/               # Shared Light-only Alcove* color tokens and HUD components
 ```
 
 ---
