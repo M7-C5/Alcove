@@ -4,7 +4,7 @@ set -eo pipefail
 # ==============================================================================
 # scripts/audit-ui.sh
 # Headless Multimodal Visual Inspector for iPad Landscape UI
-# Audits Light/Dark appearance and Dynamic Type contrast & scaling
+# Audits Light-only appearance and Dynamic Type contrast & scaling
 # ==============================================================================
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -24,7 +24,7 @@ usage() {
 Usage: ./scripts/audit-ui.sh [OPTIONS]
 
 Headless visual inspector capturing iPad landscape screenshots across
-Light/Dark appearances and standard/accessibility Dynamic Type tiers.
+Light appearance and standard/accessibility Dynamic Type tiers.
 
 Options:
   --build           Force recompiling and reinstalling the Alcove app scheme prior to auditing
@@ -203,8 +203,6 @@ except Exception:
 
 capture_variant "light" "extra-large" "ipad-landscape-light-standard.png" "Light Appearance (Standard Dynamic Type)"
 capture_variant "light" "accessibility-extra-large" "ipad-landscape-light-accessibility.png" "Light Appearance (Accessibility Dynamic Type)"
-capture_variant "dark" "extra-large" "ipad-landscape-dark-standard.png" "Dark Appearance (Standard Dynamic Type)"
-capture_variant "dark" "accessibility-extra-large" "ipad-landscape-dark-accessibility.png" "Dark Appearance (Accessibility Dynamic Type)"
 
 # 4. Audit Summary Report
 echo "[4/4] Visual Audit Complete!"
