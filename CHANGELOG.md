@@ -63,6 +63,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Share view model warning severities with 3D viewport.
 - Adopt global alcove color tokens in home and tactile pill.
 - Unify color extensions to internal access level.
 - Remove unused dashboard route and restore single stack ownership.
