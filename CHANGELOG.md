@@ -42,6 +42,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Adopt global alcove color tokens in home and tactile pill.
+- Unify color extensions to internal access level.
 - Remove unused dashboard route and restore single stack ownership.
 - Extract procedural room shell builder for multi-viewport reuse.
 - Structure autonomous vertical slices with dedicated view models and components.
