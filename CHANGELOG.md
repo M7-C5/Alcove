@@ -40,11 +40,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Remove unused dashboard route and restore single stack ownership.
 - Extract procedural room shell builder for multi-viewport reuse.
 - Structure autonomous vertical slices with dedicated view models and components.
 
 ### Fixed
 
+- Constrain hero bounds, refine tactile pill shading, and add accessibility.
+- Deduplicate font registration and release CoreText errors.
 - Unify viewport geometry and restore AR access.
 - Anchor sunlight to window opening and preserve shadows during wall cutaways.
 - Replace solid window border with hollow casing and transparent glass.
