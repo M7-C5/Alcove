@@ -6,6 +6,7 @@ import SwiftUI
 public struct ARWalkthroughView: View {
     let room: Room
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.openURL) private var openURL
     @State private var viewModel: ARWalkthroughViewModel
 
     public init(room: Room) {
@@ -138,7 +139,7 @@ public struct ARWalkthroughView: View {
 
                     Button {
                         if let url = URL(string: UIApplication.openSettingsURLString) {
-                            UIApplication.shared.open(url)
+                            openURL(url)
                         }
                     } label: {
                         Text("Open Settings")
