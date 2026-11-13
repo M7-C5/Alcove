@@ -753,21 +753,10 @@ public struct Studio3DViewport: UIViewRepresentable {
                 furnitureWarningSeverities = [:]
                 return
             }
-            let warnings = FastPathRulebook().evaluateSpatialWarnings(
+            furnitureWarningSeverities = FastPathRulebook().warningSeverityByFurnitureID(
                 furnitures: furnitures,
                 roomDimensions: (width: room.dimensionsWidth, length: room.dimensionsLength)
             )
-            var map: [UUID: SpatialWarningSeverity] = [:]
-            for warning in warnings {
-                for id in warning.furnitureIDs {
-                    if let existing = map[id] {
-                        map[id] = max(existing, warning.severity)
-                    } else {
-                        map[id] = warning.severity
-                    }
-                }
-            }
-            furnitureWarningSeverities = map
         }
 
         func updateSelectionHalos() {

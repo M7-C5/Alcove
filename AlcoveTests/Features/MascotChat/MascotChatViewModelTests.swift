@@ -187,4 +187,24 @@ struct MascotChatViewModelTests {
         let reply = reopenedVM.chatHistory.last?.text ?? ""
         #expect(reply.contains("Back-Right") || reply.contains("Front-Right"))
     }
+
+    @Test @MainActor func usesInjectedServiceModelBadgeRatherThanSharedSingleton() async {
+        let originalDevKey = LLMMascotAIService.hardcodedDeveloperKey
+        LLMMascotAIService.hardcodedDeveloperKey = "shared_key_should_not_leak_badge"
+        defer {
+            LLMMascotAIService.hardcodedDeveloperKey = originalDevKey
+        }
+
+        let room = SampleData.createStarterRoom()
+        let vm = MascotChatViewModel(
+            mascotService: MockMascotAIService(),
+            currentStage: .audit,
+            room: room
+        )
+
+        vm.inputPrompt = "How is the room layout?"
+        await vm.sendMessage()?.value
+
+        #expect(vm.chatHistory.last?.modelBadge == "📖 Local Engine")
+    }
 }

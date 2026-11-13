@@ -1,4 +1,5 @@
 import Foundation
+import Security
 
 /// Active LLM provider selection
 public enum LLMProvider: String, CaseIterable, Codable, Sendable {
@@ -33,7 +34,23 @@ public final class LLMMascotAIService: MascotAIServiceProtocol {
     /// When true, skips reading local file secrets (useful for deterministic offline tests)
     public static var bypassFileSecretLoading: Bool = false
 
-    /// Multi-key pool: Parses all available keys from gitignored secret files, environment, or UserDefaults
+    private static let keychainService = "com.alcove.ai"
+    private static let keychainAccount = "alcove_llm_api_key"
+    private var inMemoryStoredKey: String?
+    private var hasInMemoryOverride: Bool = false
+
+    /// Active status badge shown in mascot chat UI
+    public var activeModelBadge: String {
+        if apiKey.isEmpty {
+            return "📖 Local Engine"
+        } else if isQuotaExhausted {
+            return "📖 Local Engine (Cloud Quota Resting)"
+        } else {
+            return "✨ \(provider.rawValue)"
+        }
+    }
+
+    /// Multi-key pool: Parses all available keys from environment or Keychain
     /// Supports comma or newline separation for automatic multi-account failover!
     public var apiKeys: [String] {
         var rawSources: [String] = []
@@ -41,36 +58,11 @@ public final class LLMMascotAIService: MascotAIServiceProtocol {
         if !Self.hardcodedDeveloperKey.isEmpty {
             rawSources.append(Self.hardcodedDeveloperKey)
         }
-        if !Self.bypassFileSecretLoading {
-            if let secretURL = Bundle.main.url(forResource: "developer", withExtension: "secret"),
-               let content = try? String(contentsOf: secretURL, encoding: .utf8) {
-                rawSources.append(content)
-            }
-            // Direct project path fallback when running in Xcode / local simulator
-            let fileURL = URL(fileURLWithPath: #filePath)
-            let subfolderSecret = fileURL
-                .deletingLastPathComponent() // Services
-                .deletingLastPathComponent() // Core
-                .deletingLastPathComponent() // Alcove
-                .appendingPathComponent("developer.secret").path
-            let repoRootSecret = fileURL
-                .deletingLastPathComponent() // Services
-                .deletingLastPathComponent() // Core
-                .deletingLastPathComponent() // Alcove
-                .deletingLastPathComponent() // repo root
-                .appendingPathComponent("developer.secret").path
-
-            for path in [subfolderSecret, repoRootSecret] {
-                if let content = try? String(contentsOfFile: path, encoding: .utf8) {
-                    rawSources.append(content)
-                }
-            }
-        }
-
-        if let envKey = ProcessInfo.processInfo.environment["GEMINI_API_KEY"], !envKey.isEmpty {
+        if !Self.bypassFileSecretLoading,
+           let envKey = ProcessInfo.processInfo.environment["GEMINI_API_KEY"], !envKey.isEmpty {
             rawSources.append(envKey)
         }
-        if let userKey = UserDefaults.standard.string(forKey: "alcove_llm_api_key"), !userKey.isEmpty {
+        if let userKey = loadStoredAPIKey(), !userKey.isEmpty {
             rawSources.append(userKey)
         }
 
@@ -93,7 +85,74 @@ public final class LLMMascotAIService: MascotAIServiceProtocol {
             apiKeys.first ?? ""
         }
         set {
-            UserDefaults.standard.set(newValue.trimmingCharacters(in: .whitespacesAndNewlines), forKey: "alcove_llm_api_key")
+            saveStoredAPIKey(newValue)
+        }
+    }
+
+    private func loadStoredAPIKey() -> String? {
+        if let legacyKey = UserDefaults.standard.string(forKey: Self.keychainAccount) {
+            UserDefaults.standard.removeObject(forKey: Self.keychainAccount)
+            let trimmedLegacy = legacyKey.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmedLegacy.isEmpty {
+                saveStoredAPIKey(trimmedLegacy)
+                return trimmedLegacy
+            }
+        }
+
+        if hasInMemoryOverride {
+            return inMemoryStoredKey
+        }
+
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: Self.keychainService,
+            kSecAttrAccount as String: Self.keychainAccount,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        guard status == errSecSuccess,
+              let data = result as? Data,
+              let key = String(data: data, encoding: .utf8),
+              !key.isEmpty else {
+            return nil
+        }
+        return key
+    }
+
+    private func saveStoredAPIKey(_ key: String) {
+        let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
+        UserDefaults.standard.removeObject(forKey: Self.keychainAccount)
+
+        let baseQuery: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: Self.keychainService,
+            kSecAttrAccount as String: Self.keychainAccount
+        ]
+        let deleteStatus = SecItemDelete(baseQuery as CFDictionary)
+
+        guard !trimmed.isEmpty, let data = trimmed.data(using: .utf8) else {
+            if deleteStatus == errSecSuccess || deleteStatus == errSecItemNotFound {
+                hasInMemoryOverride = false
+                inMemoryStoredKey = nil
+            } else {
+                hasInMemoryOverride = true
+                inMemoryStoredKey = nil
+            }
+            return
+        }
+
+        var addQuery = baseQuery
+        addQuery[kSecValueData as String] = data
+        addQuery[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        let addStatus = SecItemAdd(addQuery as CFDictionary, nil)
+        if addStatus == errSecSuccess {
+            hasInMemoryOverride = false
+            inMemoryStoredKey = nil
+        } else {
+            hasInMemoryOverride = true
+            inMemoryStoredKey = trimmed
         }
     }
 
@@ -295,7 +354,7 @@ public final class LLMMascotAIService: MascotAIServiceProtocol {
         guard !apiKey.isEmpty else {
             print("📖 [Alcove AI] No API key set. Using Local Built-in Engine. Question: '\(question)'")
             // Intelligent local response grounded in Panero & Zelnik + Ramstedt
-            let baseAnswer = await fallbackService.askMascot(question: question, currentStage: currentStage, room: room)
+            let baseAnswer = await fallbackService.askMascot(question: question, currentStage: currentStage, room: room, history: history)
             
             // Check if room has active bottlenecks
             let furnitures = room.workingLayout?.furnitures.filter { !$0.isArchived } ?? []
@@ -408,13 +467,15 @@ public final class LLMMascotAIService: MascotAIServiceProtocol {
 
         for key in availableKeys {
             for model in candidateModels {
-                guard let url = URL(string: "https://generativelanguage.googleapis.com/v1beta/models/\(model):generateContent?key=\(key)") else {
+                guard let url = URL(string: "https://generativelanguage.googleapis.com/v1beta/models/\(model):generateContent") else {
                     continue
                 }
 
                 var request = URLRequest(url: url)
                 request.httpMethod = "POST"
-                request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+                request.timeoutInterval = 15.0
+                request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                request.setValue(key, forHTTPHeaderField: "x-goog-api-key")
 
                 var generationConfig: [String: Any] = [
                     "maxOutputTokens": 1024,

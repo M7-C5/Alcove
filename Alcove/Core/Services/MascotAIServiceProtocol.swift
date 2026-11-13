@@ -131,6 +131,9 @@ public protocol MascotAIServiceProtocol: Sendable {
         room: Room,
         history: [ChatMessage]
     ) async -> String
+
+    /// Display badge describing the active reasoning engine (cloud provider or local engine)
+    var activeModelBadge: String { get }
 }
 
 public struct ChatMessage: Identifiable, Equatable, Sendable {
@@ -148,6 +151,10 @@ public struct ChatMessage: Identifiable, Equatable, Sendable {
 }
 
 public extension MascotAIServiceProtocol {
+    var activeModelBadge: String {
+        "📖 Local Engine"
+    }
+
     func askMascot(
         question: String,
         currentStage: StageType,

@@ -50,19 +50,16 @@ struct LLMMascotAIServiceTests {
     @Test @MainActor func multiKeyParsingAndRotation() {
         let originalDevKey = LLMMascotAIService.hardcodedDeveloperKey
         let originalBypass = LLMMascotAIService.bypassFileSecretLoading
-        let originalUserKey = UserDefaults.standard.string(forKey: "alcove_llm_api_key")
+        let service = LLMMascotAIService()
+        LLMMascotAIService.hardcodedDeveloperKey = ""
+        LLMMascotAIService.bypassFileSecretLoading = true
+        let originalStoredKey = service.apiKey
         defer {
             LLMMascotAIService.hardcodedDeveloperKey = originalDevKey
             LLMMascotAIService.bypassFileSecretLoading = originalBypass
-            if let originalUserKey {
-                UserDefaults.standard.set(originalUserKey, forKey: "alcove_llm_api_key")
-            } else {
-                UserDefaults.standard.removeObject(forKey: "alcove_llm_api_key")
-            }
+            service.apiKey = originalStoredKey
         }
-        UserDefaults.standard.removeObject(forKey: "alcove_llm_api_key")
-        LLMMascotAIService.bypassFileSecretLoading = true
-        let service = LLMMascotAIService()
+        service.apiKey = ""
 
         // Test comma separated keys
         LLMMascotAIService.hardcodedDeveloperKey = "key_alpha_1, key_beta_2 , key_gamma_3"
@@ -72,6 +69,12 @@ struct LLMMascotAIServiceTests {
         // Test newline separated keys
         LLMMascotAIService.hardcodedDeveloperKey = "key_one\nkey_two\n\nkey_three"
         #expect(service.apiKeys == ["key_one", "key_two", "key_three"])
+
+        // Test user-entered key is not persisted in plaintext UserDefaults
+        LLMMascotAIService.hardcodedDeveloperKey = ""
+        service.apiKey = "key_keychain_only"
+        #expect(UserDefaults.standard.string(forKey: "alcove_llm_api_key") == nil)
+        #expect(service.apiKeys == ["key_keychain_only"])
     }
 
     @Test @MainActor func providerSelectionAndDefaults() {
@@ -166,6 +169,37 @@ struct LLMMascotAIServiceTests {
         #expect(latestText.contains("Conversation Continuation Rule"))
         #expect(latestText.contains("User Question: But where"))
         #expect(latestText.contains("ROOM ZONE OCCUPANCY & PLACEMENT GUIDE"))
+    }
+
+    @Test @MainActor func offlineFallbackPreservesConversationHistory() async {
+        let originalDevKey = LLMMascotAIService.hardcodedDeveloperKey
+        let originalBypass = LLMMascotAIService.bypassFileSecretLoading
+        let service = LLMMascotAIService()
+        LLMMascotAIService.hardcodedDeveloperKey = ""
+        LLMMascotAIService.bypassFileSecretLoading = true
+        let originalStoredKey = service.apiKey
+        service.apiKey = ""
+        defer {
+            LLMMascotAIService.hardcodedDeveloperKey = originalDevKey
+            LLMMascotAIService.bypassFileSecretLoading = originalBypass
+            service.apiKey = originalStoredKey
+        }
+
+        let room = SampleData.createStarterRoom()
+        let history = [
+            ChatMessage(isUser: true, text: "Where should I place my Queen Bed near my Work Desk?"),
+            ChatMessage(isUser: false, text: "Try placing the Queen Bed closer to the back wall.")
+        ]
+
+        let response = await service.askMascot(
+            question: "But where",
+            currentStage: .rearrangement,
+            room: room,
+            history: history
+        )
+
+        #expect(response.contains("Queen Bed"))
+        #expect(!response.contains("Welcome to your Studio Apartment"))
     }
 }
 

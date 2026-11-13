@@ -19,7 +19,23 @@ public struct RoomSpatialContextSerializer: Sendable {
         lines.append("- Dimensions: \(String(format: "%.1f", room.dimensionsWidth))m wide × \(String(format: "%.1f", room.dimensionsLength))m long (Area: ~\(String(format: "%.1f", room.dimensionsWidth * room.dimensionsLength)) m²)")
         lines.append("- Window Location: Back Wall (z = -\(String(format: "%.2f", halfL))m, centered along the top wall)")
         lines.append("- Entrance Door Location: Front Wall Front-Left (z = +\(String(format: "%.2f", halfL))m, x ≈ -\(String(format: "%.2f", halfW * 0.35))m, bottom-left)")
-        lines.append("- Daylight Orientation: South-facing window exposure at the Back Wall (standard daylight simulation)")
+        if let compass = room.compassOrientation {
+            let bearing = ((Int(compass.magneticForwardBearingDegrees.rounded()) % 360) + 360) % 360
+            let cardinal: String
+            switch bearing {
+            case 23..<68: cardinal = "North-East"
+            case 68..<113: cardinal = "East"
+            case 113..<158: cardinal = "South-East"
+            case 158..<203: cardinal = "South"
+            case 203..<248: cardinal = "South-West"
+            case 248..<293: cardinal = "West"
+            case 293..<338: cardinal = "North-West"
+            default: cardinal = "North"
+            }
+            lines.append("- Daylight Orientation: Captured room compass — Back Wall faces \(cardinal) (\(bearing)° magnetic)")
+        } else {
+            lines.append("- Daylight Orientation: South-facing window exposure at the Back Wall (standard daylight simulation)")
+        }
 
         lines.append("\n### ACTIVE FURNITURE (\(furnitures.count) items):")
 

@@ -49,14 +49,7 @@ public final class MascotChatViewModel {
                 room: room,
                 history: priorHistory
             )
-            let badge: String
-            if LLMMascotAIService.shared.apiKey.isEmpty {
-                badge = "📖 Local Engine"
-            } else if LLMMascotAIService.shared.isQuotaExhausted {
-                badge = "📖 Local Engine (Cloud Quota Resting)"
-            } else {
-                badge = "✨ \(LLMMascotAIService.shared.provider.rawValue)"
-            }
+            let badge = mascotService.activeModelBadge
 
             self.chatHistory.append(ChatMessage(isUser: false, text: response, modelBadge: badge))
             self.onHistoryUpdated?(self.chatHistory)

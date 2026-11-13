@@ -315,6 +315,30 @@ public struct FastPathRulebook: Sendable {
         return warnings.sorted { $0.severity > $1.severity }
     }
 
+    /// Maps each furniture ID to its highest-severity active warning.
+    public static func warningSeverityMap(from warnings: [SpatialWarning]) -> [UUID: SpatialWarningSeverity] {
+        var map: [UUID: SpatialWarningSeverity] = [:]
+        for warning in warnings {
+            for id in warning.furnitureIDs {
+                if let existing = map[id] {
+                    map[id] = max(existing, warning.severity)
+                } else {
+                    map[id] = warning.severity
+                }
+            }
+        }
+        return map
+    }
+
+    /// Evaluates spatial warnings and returns the highest severity keyed by furniture ID.
+    public func warningSeverityByFurnitureID(
+        furnitures: [Furniture],
+        roomDimensions: (width: Double, length: Double)
+    ) -> [UUID: SpatialWarningSeverity] {
+        let warnings = evaluateSpatialWarnings(furnitures: furnitures, roomDimensions: roomDimensions)
+        return Self.warningSeverityMap(from: warnings)
+    }
+
     private func halfExtents(for f: Furniture) -> (x: Double, z: Double) {
         let absCos = abs(cos(f.rotationYaw))
         let absSin = abs(sin(f.rotationYaw))
