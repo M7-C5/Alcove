@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Align mascot prompt and dialogues with seven AI vibes.
 - Add real-time collision highlights, top warning banner, and audit lock.
 - Preserve multi-turn chat history and add zone occupancy context.
 - Teach actionable interior design principles in stage evaluation tips.
