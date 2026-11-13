@@ -12,6 +12,8 @@ public struct FurnitureSimsActionHUD: View {
     public let onCircularRotate: (Float) -> Void
     public let onDragRotateEnded: () -> Void
     public let onArchive: () -> Void
+    public let onSwap: () -> Void
+    public let onRemove: (() -> Void)?
 
     @State private var dragStartLocation: CGPoint? = nil
     @State private var previousLocation: CGPoint? = nil
@@ -23,6 +25,8 @@ public struct FurnitureSimsActionHUD: View {
     private let buttonRadius: CGFloat = 23
     private let defaultRotateAngle: CGFloat = -.pi * 0.94 // ~ -170° (bottom-left)
     private let defaultArchiveAngle: CGFloat = -.pi * 0.69 // ~ -125° (top-left)
+    private let defaultSwapAngle: CGFloat = -.pi * 0.31 // ~ -55° (top-right)
+    private let defaultRemoveAngle: CGFloat = -.pi * 0.06 // ~ -10° (bottom-right)
 
     public init(
         furniture: Furniture,
@@ -31,7 +35,9 @@ public struct FurnitureSimsActionHUD: View {
         onStepRotate: @escaping () -> Void,
         onCircularRotate: @escaping (Float) -> Void,
         onDragRotateEnded: @escaping () -> Void,
-        onArchive: @escaping () -> Void
+        onArchive: @escaping () -> Void,
+        onSwap: @escaping () -> Void = {},
+        onRemove: (() -> Void)? = nil
     ) {
         self.furniture = furniture
         self.isColliding = isColliding
@@ -40,6 +46,8 @@ public struct FurnitureSimsActionHUD: View {
         self.onCircularRotate = onCircularRotate
         self.onDragRotateEnded = onDragRotateEnded
         self.onArchive = onArchive
+        self.onSwap = onSwap
+        self.onRemove = onRemove
     }
 
     private var dialDiameter: CGFloat {
@@ -92,6 +100,38 @@ public struct FurnitureSimsActionHUD: View {
             )
             .accessibilityLabel("Archive furniture to inventory")
 
+            // 3. Swap Button (Fixed on rim at top-right)
+            Button {
+                onSwap()
+            } label: {
+                actionButtonContent(systemName: "arrow.left.arrow.right")
+            }
+            .buttonStyle(.plain)
+            .frame(width: 48, height: 48)
+            .contentShape(Circle())
+            .offset(
+                x: dialRadius * cos(defaultSwapAngle),
+                y: dialRadius * sin(defaultSwapAngle)
+            )
+            .accessibilityLabel("Swap furniture with catalog item")
+
+            // 4. Remove Button (Fixed on rim at bottom-right; only for user-added items)
+            if furniture.isUserAdded, let onRemove {
+                Button {
+                    onRemove()
+                } label: {
+                    actionButtonContent(systemName: "trash.fill", tint: .red)
+                }
+                .buttonStyle(.plain)
+                .frame(width: 48, height: 48)
+                .contentShape(Circle())
+                .offset(
+                    x: dialRadius * cos(defaultRemoveAngle),
+                    y: dialRadius * sin(defaultRemoveAngle)
+                )
+                .accessibilityLabel("Remove added furniture")
+            }
+
             // 3. Rotate Button (Draggable along circular orbit rim)
             let activeRotateAngle = currentDragAngle ?? defaultRotateAngle
             actionButtonContent(systemName: "arrow.clockwise")
@@ -116,10 +156,10 @@ public struct FurnitureSimsActionHUD: View {
         .coordinateSpace(name: "SimsHUDCoordinateSpace")
     }
 
-    private func actionButtonContent(systemName: String) -> some View {
+    private func actionButtonContent(systemName: String, tint: Color = Color(uiColor: .label)) -> some View {
         ZStack {
             Circle()
-                .fill(Color(uiColor: .label))
+                .fill(tint)
                 .frame(width: buttonRadius * 2, height: buttonRadius * 2)
                 .overlay(Circle().stroke(Color.white.opacity(0.35), lineWidth: 1))
                 .shadow(color: Color.black.opacity(0.22), radius: 5, x: 0, y: 2)

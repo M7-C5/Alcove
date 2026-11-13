@@ -36,6 +36,7 @@ public final class Furniture {
     public var length: Double
     public var height: Double
     public var isArchived: Bool
+    public var isUserAdded: Bool = false
     public var assetIdentifier: String?
 
     public var layout: Layout?
@@ -57,6 +58,7 @@ public final class Furniture {
         length: Double = 1.0,
         height: Double = 0.8,
         isArchived: Bool = false,
+        isUserAdded: Bool = false,
         assetIdentifier: String? = nil
     ) {
         self.id = id
@@ -70,6 +72,7 @@ public final class Furniture {
         self.length = length
         self.height = height
         self.isArchived = isArchived
+        self.isUserAdded = isUserAdded
         self.assetIdentifier = assetIdentifier
     }
 
@@ -87,6 +90,7 @@ public final class Furniture {
             length: self.length,
             height: self.height,
             isArchived: self.isArchived,
+            isUserAdded: self.isUserAdded,
             assetIdentifier: self.assetIdentifier
         )
     }
