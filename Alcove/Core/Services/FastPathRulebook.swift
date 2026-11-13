@@ -178,4 +178,168 @@ public struct FastPathRulebook: Sendable {
 
         return nil
     }
+
+    // MARK: - Live Spatial Warnings (Red Collisions & Yellow Improvements)
+
+    /// Evaluates the full active layout for real-time collisions (red) and ergonomic improvements (yellow).
+    public func evaluateSpatialWarnings(
+        furnitures: [Furniture],
+        roomDimensions: (width: Double, length: Double)
+    ) -> [SpatialWarning] {
+        let active = furnitures.filter { !$0.isArchived }
+        guard !active.isEmpty else { return [] }
+
+        let halfW = roomDimensions.width / 2.0
+        let halfL = roomDimensions.length / 2.0
+        var warnings: [SpatialWarning] = []
+
+        // 1. Pairwise collision & tight-walkway checks
+        for i in 0..<active.count {
+            let a = active[i]
+            if isSuspendedOrWallMounted(a) { continue }
+            let extA = halfExtents(for: a)
+
+            for j in (i + 1)..<active.count {
+                let b = active[j]
+                if isSuspendedOrWallMounted(b) { continue }
+                if isTabletopLampOnSurface(a: a, b: b) || isTabletopLampOnSurface(a: b, b: a) {
+                    continue
+                }
+
+                let extB = halfExtents(for: b)
+                let gapX = abs(a.positionX - b.positionX) - (extA.x + extB.x)
+                let gapZ = abs(a.positionZ - b.positionZ) - (extA.z + extB.z)
+                let edgeGap = hypot(max(0.0, gapX), max(0.0, gapZ))
+
+                if AnthropometricStandards.isFunctionalCompanionPair(a: a, b: b) {
+                    let isDeskChair = (a.category == .table && b.category == .seating) ||
+                        (b.category == .table && a.category == .seating)
+                    let tolerance = isDeskChair ? 0.22 : 0.06
+                    if gapX < -tolerance && gapZ < -tolerance {
+                        warnings.append(
+                            SpatialWarning(
+                                id: "overlap_\(a.id.uuidString)_\(b.id.uuidString)",
+                                severity: .collision,
+                                furnitureIDs: [a.id, b.id],
+                                title: "Collision",
+                                message: "\(a.name) is overlapping \(b.name) — nudge one slightly aside so both fit cleanly."
+                            )
+                        )
+                    }
+                    continue
+                }
+
+                if gapX < -0.02 && gapZ < -0.02 {
+                    warnings.append(
+                        SpatialWarning(
+                            id: "collision_\(a.id.uuidString)_\(b.id.uuidString)",
+                            severity: .collision,
+                            furnitureIDs: [a.id, b.id],
+                            title: "Collision",
+                            message: "\(a.name) and \(b.name) are colliding! Slide them apart so they don't overlap."
+                        )
+                    )
+                } else if edgeGap < AnthropometricStandards.minimumCirculation {
+                    warnings.append(
+                        SpatialWarning(
+                            id: "tight_\(a.id.uuidString)_\(b.id.uuidString)",
+                            severity: .caution,
+                            furnitureIDs: [a.id, b.id],
+                            title: "Can Be Better",
+                            message: "Tight walkway between \(a.name) and \(b.name) — leave a bit more breathing room for easy flow."
+                        )
+                    )
+                }
+            }
+        }
+
+        // 2. Single-piece architectural & ergonomic checks
+        let doorX = -halfW * 0.35
+        for f in active {
+            if isSuspendedOrWallMounted(f) { continue }
+            let ext = halfExtents(for: f)
+
+            // Red: Entrance door blocked on Front-Left wall
+            if (f.positionZ + ext.z) > (halfL - 0.55) &&
+                (f.positionX + ext.x) > (doorX - 0.42) &&
+                (f.positionX - ext.x) < (doorX + 0.42) {
+                warnings.append(
+                    SpatialWarning(
+                        id: "door_\(f.id.uuidString)",
+                        severity: .collision,
+                        furnitureIDs: [f.id],
+                        title: "Door Blocked",
+                        message: "\(f.name) is blocking the front-left entrance door — slide it clear of the doorway."
+                    )
+                )
+            }
+
+            // Yellow: Bed floating away from all perimeter walls
+            if f.category == .bed {
+                let distLeft = (f.positionX - ext.x) - (-halfW)
+                let distRight = halfW - (f.positionX + ext.x)
+                let distBack = (f.positionZ - ext.z) - (-halfL)
+                let distFront = halfL - (f.positionZ + ext.z)
+                if min(distLeft, distRight, distBack, distFront) > 0.45 {
+                    warnings.append(
+                        SpatialWarning(
+                            id: "floating_\(f.id.uuidString)",
+                            severity: .caution,
+                            furnitureIDs: [f.id],
+                            title: "Can Be Better",
+                            message: "\(f.name) is floating away from the walls — anchor it against a wall to open up the center floor."
+                        )
+                    )
+                }
+            }
+
+            // Yellow: Tall storage blocking the centered back wall window
+            if f.category == .storage && f.height >= 1.35 {
+                if (f.positionZ - ext.z) < (-halfL + 0.40) &&
+                    (f.positionX + ext.x) > -0.80 &&
+                    (f.positionX - ext.x) < 0.80 {
+                    warnings.append(
+                        SpatialWarning(
+                            id: "window_\(f.id.uuidString)",
+                            severity: .caution,
+                            furnitureIDs: [f.id],
+                            title: "Can Be Better",
+                            message: "\(f.name) is blocking the back window — move it to a side wall to let natural daylight in."
+                        )
+                    )
+                }
+            }
+        }
+
+        // Sort collisions first so Red always takes priority over Yellow
+        return warnings.sorted { $0.severity > $1.severity }
+    }
+
+    private func halfExtents(for f: Furniture) -> (x: Double, z: Double) {
+        let absCos = abs(cos(f.rotationYaw))
+        let absSin = abs(sin(f.rotationYaw))
+        return (
+            x: (absCos * f.width + absSin * f.length) / 2.0,
+            z: (absSin * f.width + absCos * f.length) / 2.0
+        )
+    }
+
+    private func isSuspendedOrWallMounted(_ f: Furniture) -> Bool {
+        f.name.localizedCaseInsensitiveContains("ceiling") ||
+        f.name.localizedCaseInsensitiveContains("pendant") ||
+        f.name.localizedCaseInsensitiveContains("sconce")
+    }
+
+    private func isTabletopLampOnSurface(a: Furniture, b: Furniture) -> Bool {
+        let isSurface = b.category == .table || b.category == .storage ||
+            b.name.localizedCaseInsensitiveContains("desk") ||
+            b.name.localizedCaseInsensitiveContains("table") ||
+            b.name.localizedCaseInsensitiveContains("nightstand")
+        guard isSurface else { return false }
+
+        let isDeskOrTableLamp = a.name.localizedCaseInsensitiveContains("desk lamp") ||
+            a.name.localizedCaseInsensitiveContains("table lamp") ||
+            (a.category == .lighting && !a.name.localizedCaseInsensitiveContains("floor"))
+        return isDeskOrTableLamp
+    }
 }

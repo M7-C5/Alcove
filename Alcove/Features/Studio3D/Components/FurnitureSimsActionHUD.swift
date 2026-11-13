@@ -7,6 +7,7 @@ import SwiftUI
 public struct FurnitureSimsActionHUD: View {
     public let furniture: Furniture
     public let isColliding: Bool
+    public let warningSeverity: SpatialWarningSeverity?
     public let onStepRotate: () -> Void
     public let onCircularRotate: (Float) -> Void
     public let onDragRotateEnded: () -> Void
@@ -26,6 +27,7 @@ public struct FurnitureSimsActionHUD: View {
     public init(
         furniture: Furniture,
         isColliding: Bool = false,
+        warningSeverity: SpatialWarningSeverity? = nil,
         onStepRotate: @escaping () -> Void,
         onCircularRotate: @escaping (Float) -> Void,
         onDragRotateEnded: @escaping () -> Void,
@@ -33,6 +35,7 @@ public struct FurnitureSimsActionHUD: View {
     ) {
         self.furniture = furniture
         self.isColliding = isColliding
+        self.warningSeverity = warningSeverity
         self.onStepRotate = onStepRotate
         self.onCircularRotate = onCircularRotate
         self.onDragRotateEnded = onDragRotateEnded
@@ -51,11 +54,24 @@ public struct FurnitureSimsActionHUD: View {
         ZStack {
             // 1. Translucent Circular Halo / Dial
             // Hit-testing disabled so 3D furniture underneath remains directly selectable and draggable
+            let effectiveSeverity = warningSeverity ?? (isColliding ? .collision : nil)
+            let haloFill: Color = switch effectiveSeverity {
+            case .collision: Color.red.opacity(0.18)
+            case .caution: Color.yellow.opacity(0.18)
+            case nil: Color.white.opacity(0.48)
+            }
+            let haloStroke: Color = switch effectiveSeverity {
+            case .collision: Color.red.opacity(0.85)
+            case .caution: Color.yellow.opacity(0.95)
+            case nil: Color.white.opacity(0.55)
+            }
+            let haloLineWidth: CGFloat = effectiveSeverity == nil ? 1.5 : 2.5
+
             Circle()
-                .fill(Color.white.opacity(0.48))
+                .fill(haloFill)
                 .overlay(
                     Circle()
-                        .stroke(isColliding ? Color.red.opacity(0.65) : Color.white.opacity(0.55), lineWidth: 1.5)
+                        .stroke(haloStroke, lineWidth: haloLineWidth)
                 )
                 .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 2)
                 .frame(width: dialDiameter, height: dialDiameter)

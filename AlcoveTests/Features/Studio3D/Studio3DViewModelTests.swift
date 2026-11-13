@@ -326,4 +326,62 @@ struct Studio3DViewModelTests {
         vm.showingARPlaceholder = true
         #expect(vm.showingARPlaceholder)
     }
+
+    @Test func spatialWarningsAndHighlightSeverityUpdateOnMove() {
+        let room = SampleData.createStarterRoom()
+        let vm = Studio3DViewModel(room: room, stage: .rearrangement)
+
+        guard let bed = vm.activeFurnitures.first(where: { $0.name == "Queen Bed" }),
+              let desk = vm.activeFurnitures.first(where: { $0.name == "Work Desk" }) else {
+            Issue.record("Expected Queen Bed and Work Desk in starter room")
+            return
+        }
+
+        // Move bed directly onto the Work Desk -> Red collision warning for both
+        bed.positionX = desk.positionX
+        bed.positionZ = desk.positionZ
+        vm.selectFurniture(id: bed.id)
+        vm.notifyLiveFurnitureDrag()
+
+        #expect(vm.warningSeverityByFurnitureID[bed.id] == .collision)
+        #expect(vm.warningSeverityByFurnitureID[desk.id] == .collision)
+        #expect(vm.activeTopWarning?.severity == .collision)
+
+        // Move bed to open Front-Right perimeter corner -> no collision
+        bed.positionX = 1.45
+        bed.positionZ = 1.70
+        vm.notifyLiveFurnitureDrag()
+
+        #expect(vm.warningSeverityByFurnitureID[bed.id] != .collision)
+    }
+
+    @Test func auditStagePreventsFurnitureRearrangement() async {
+        let room = SampleData.createStarterRoom()
+        let vm = Studio3DViewModel(room: room, stage: .audit)
+
+        #expect(vm.canManipulateFurniture == false)
+
+        guard let bed = vm.activeFurnitures.first(where: { $0.name == "Queen Bed" }) else {
+            Issue.record("Expected Queen Bed in starter room")
+            return
+        }
+
+        let initialYaw = bed.rotationYaw
+        let initialArchived = bed.isArchived
+
+        vm.selectFurniture(id: bed.id)
+        vm.rotateSelectedFurniture(delta: .pi / 4)
+        vm.archiveFurniture(bed)
+        vm.toggleSelectedFurnitureArchive()
+
+        #expect(bed.rotationYaw == initialYaw)
+        #expect(bed.isArchived == initialArchived)
+
+        // Advancing to Stage 2 unlocks rearrangement
+        let evalResult = await vm.mascotService.evaluateStage(stage: .audit, room: room)
+        vm.advanceToNextStage(result: evalResult)
+
+        #expect(vm.currentStage == .rearrangement)
+        #expect(vm.canManipulateFurniture == true)
+    }
 }
