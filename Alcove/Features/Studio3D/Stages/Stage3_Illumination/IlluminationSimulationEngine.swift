@@ -31,6 +31,19 @@ public struct IlluminationSimulationEngine: Sendable {
 
     public init() {}
 
+    /// The educational east–south–west arc is rotated into the captured room axes.
+    /// Compass alignment does not turn the arc into a location/date-based solar prediction.
+    public func sunlightDirection(for daylight: DaylightState, orientation: RoomCompassOrientation?) -> SIMD3<Float> {
+        if let orientation, orientation.isValid {
+            return orientation.direction(forBearingDegrees: 180 + daylight.azimuthAngleRadians * 180 / .pi,
+                                         elevationRadians: max(0.01, daylight.elevationAngleRadians))
+        }
+        // Preserve the existing sample-room preview when no compass was captured.
+        let elevation = Float(daylight.elevationAngleRadians)
+        let azimuth = Float(daylight.azimuthAngleRadians)
+        return [sin(azimuth) * cos(elevation), max(0.01, sin(elevation)), -cos(azimuth) * cos(elevation)]
+    }
+
     /// Illustrative solar arc, with darkness outside 08:00–20:00; not a geographic prediction.
     public func calculateDaylight(hourOfDay: Double) -> DaylightState {
         let clampedHour = hourOfDay.isFinite ? max(0, min(23 + 59.0 / 60, hourOfDay)) : 12

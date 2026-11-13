@@ -37,20 +37,11 @@ struct LightingCameraNavigation: Sendable {
     func position(preset: ViewportPreset, geometry: LightingRoomGeometry) -> SIMD3<Float> {
         let span = Float(max(geometry.width, geometry.length, geometry.height))
         if isLocked { return [0, span * 1.9, 0] }
-        let base: SIMD3<Float>
-        switch preset {
-        case .top: base = [0, span * 1.9, 0.01]
-        case .dollhouse: base = [span * 1.2, span, span * 1.4]
-        case .front: base = [0, span * 0.5, span * 2]
-        case .back: base = [0, span * 0.5, -span * 2]
-        case .left: base = [-span * 2, span * 0.5, 0]
-        case .right: base = [span * 2, span * 0.5, 0]
-        }
         let target = target(in: geometry)
-        let offset = base - target
-        let azimuth = atan2(offset.x, offset.z) + yaw
-        let elevation = min(.pi / 2 - 0.02, max(0.1, atan2(offset.y, hypot(offset.x, offset.z)) + pitch))
-        let distance = simd_length(offset) / zoom
+        // Use the same preset angles as the primary Studio3D viewport.
+        let azimuth = preset.targetYaw + yaw
+        let elevation = min(.pi / 2 - 0.02, max(0.1, preset.targetPitch + pitch))
+        let distance = span * 2.2 / zoom
         return target + SIMD3<Float>(sin(azimuth) * cos(elevation), sin(elevation), cos(azimuth) * cos(elevation)) * distance
     }
 }

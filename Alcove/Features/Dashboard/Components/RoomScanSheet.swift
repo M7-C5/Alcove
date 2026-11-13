@@ -2,11 +2,13 @@ import SwiftUI
 
 public struct RoomScanSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     let onRoomScanned: (Room) -> Void
 
     @State private var roomName = "My Living Room"
     @State private var width: Double = 4.0
     @State private var length: Double = 5.0
+    @State private var compass = RoomCompassCapture()
 
     public init(onRoomScanned: @escaping (Room) -> Void) {
         self.onRoomScanned = onRoomScanned
@@ -28,6 +30,7 @@ public struct RoomScanSheet: View {
                     Label("RoomPlan Scanning Ready", systemImage: "camera.metering.matrix")
                         .foregroundStyle(.indigo)
                 }
+                compassSection
             }
             .navigationTitle("New Room Scan")
             .navigationBarTitleDisplayMode(.inline)
@@ -52,6 +55,7 @@ public struct RoomScanSheet: View {
                             ]
                         )
                         let working = baseline.createCopy(name: "Working Layout")
+                        newRoom.compassOrientation = compass.orientation
                         newRoom.baselineLayout = baseline
                         newRoom.workingLayout = working
                         baseline.room = newRoom
@@ -62,6 +66,35 @@ public struct RoomScanSheet: View {
                     }
                 }
             }
+        }
+        .onAppear { compass.start() }
+        .onDisappear { compass.stop() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { compass.start() } else { compass.stop() }
+        }
+    }
+
+    private var compassSection: some View {
+        Section {
+            Label(compassMessage, systemImage: "location.north.circle")
+                .font(.subheadline)
+                .fixedSize(horizontal: false, vertical: true)
+        } header: {
+            Text("Room direction")
+        } footer: {
+            Text("Hold iPad upright facing the front of your room until north is found. This direction becomes the room’s front for the sunlight preview.")
+        }
+    }
+
+    private var compassMessage: String {
+        switch compass.status {
+        case .searching: return "Finding magnetic north… Hold iPad steady."
+        case .needsCalibration: return "Move iPad gently to calibrate the compass."
+        case .needsUpright: return "Hold iPad upright facing the front of your room."
+        case .captured:
+            return "North captured · Room front \(Int((compass.orientation?.magneticForwardBearingDegrees ?? 0).rounded()) % 360)°"
+        case .unavailable: return "Compass unavailable. Sunlight will use a sample direction."
+        case .failed: return "Couldn’t read the compass. Sunlight will use a sample direction."
         }
     }
 }

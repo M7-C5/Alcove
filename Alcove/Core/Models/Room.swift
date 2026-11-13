@@ -9,6 +9,17 @@ public final class Room {
     public var dimensionsWidth: Double
     public var dimensionsLength: Double
     public var dimensionsHeight: Double
+    /// Optional payload lets existing rooms migrate without inventing a north reference.
+    public var compassOrientationData: Data? = nil
+
+    public var compassOrientation: RoomCompassOrientation? {
+        get {
+            guard let data = compassOrientationData,
+                  let value = try? JSONDecoder().decode(RoomCompassOrientation.self, from: data), value.isValid else { return nil }
+            return value
+        }
+        set { compassOrientationData = newValue.flatMap { try? JSONEncoder().encode($0) } }
+    }
 
     @Relationship(deleteRule: .cascade)
     public var baselineLayout: Layout?
