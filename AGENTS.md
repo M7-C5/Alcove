@@ -25,14 +25,11 @@ Alcove/
 │   │   ├── 00-general-engineering.md       # Sendable, nil safety, value decoupling
 │   │   ├── 01-verification-loop.md         # Autonomous test verification & thermal guard
 │   │   ├── 02-swift-apple-architecture.md   # SwiftData models, Vertical Slices, HIG
-│   │   ├── 03-apple-hig-design-standards.md # iPad landscape HUD, 44pt touch targets
-│   │   └── 04-learned-patterns.md          # LP-001 through LP-015 patterns & traps
+│   │   ├── 03-apple-hig-design-standards.md # iPad landscape HUD, Light-only Alcove* tokens, 44pt targets
+│   │   └── 04-learned-patterns.md          # LP-007 through LP-017 empirical patterns & traps
 │   └── skills/
-│       ├── code-review/SKILL.md            # Adversarial Swift 6, @MainActor, and HIG checklist
-│       ├── perf-audit/SKILL.md             # Compile flags, RealityKit retain cycles, fast-path latency
-│       ├── scaffold-module/SKILL.md        # Contract-first vertical slice scaffolding
-│       ├── security-audit/SKILL.md         # SwiftData local security, ATS, and entitlements
-│       └── ui-audit/SKILL.md               # iPad landscape ergonomics, 44pt targets, contrast
+│       ├── code-review/SKILL.md            # Adversarial PR/diff checklist (signing, RealityKit, Swift 6)
+│       └── perf-audit/SKILL.md             # Compile flags, RealityKit retain cycles, fast-path latency
 ├── .github/
 │   └── pull_request_template.md            # Standardized PR template
 ├── docs/
@@ -100,10 +97,7 @@ Alcove/
 
 ## 5. Domain Rules & Specialized Skills
 
-When working in specific functional areas, consult and follow the corresponding rulebooks and superpower skills:
-- **Scaffold Module** (`.agents/skills/scaffold-module/SKILL.md`): Contract-first vertical slice development.
-- **Code Review** (`.agents/skills/code-review/SKILL.md`): Adversarial checklist for `@MainActor`, Swift 6 `Sendable`, and iPad landscape HUD touch targets.
+When working in specific functional areas, consult `.agents/rules/` and the remaining specialized skills:
+- **Code Review** (`.agents/skills/code-review/SKILL.md`): Adversarial PR/diff checklist for shared signing, RealityKit `OpacityComponent` cutaways, Light-only `Alcove*` tokens, and Swift 6 concurrency.
 - **Performance Audit** (`.agents/skills/perf-audit/SKILL.md`): Compile overhead, RealityKit entity retain cycles, and fast-path reaction latency.
-- **Security Audit** (`.agents/skills/security-audit/SKILL.md`): Local SwiftData file protection, on-device boundaries, and ATS.
-- **UI & HIG Audit** (`.agents/skills/ui-audit/SKILL.md`): iPad landscape ergonomics, 44pt touch targets, Dynamic Type, and contrast symmetry.
 
