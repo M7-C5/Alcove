@@ -40,6 +40,7 @@ public struct Studio3DView: View {
 
     @ViewBuilder private var furnitureStudio: some View {
         @Bindable var bindableVM = viewModel
+        let warningSeverities = viewModel.warningSeverityByFurnitureID
 
         GeometryReader { geometry in
             ZStack(alignment: .topLeading) {
@@ -55,12 +56,15 @@ public struct Studio3DView: View {
                         currentStage: viewModel.currentStage,
                         beforeAfterSplit: viewModel.beforeAfterSplit,
                         revealMode: viewModel.revealMode,
-                        furnitureWarningSeverities: viewModel.warningSeverityByFurnitureID,
+                        furnitureWarningSeverities: warningSeverities,
                         onFurnitureMoved: { event in
                             viewModel.handleFurnitureMoved(event)
                         },
                         onFurnitureDragging: {
                             viewModel.notifyLiveFurnitureDrag()
+                        },
+                        onComputeWarningSeverities: {
+                            viewModel.warningSeverityByFurnitureID
                         },
                         onFloorRaycasterResolved: { raycaster in
                             viewModel.floorRaycaster = raycaster
@@ -89,7 +93,7 @@ public struct Studio3DView: View {
                         projected: projected,
                         in: geometry.size
                     )
-                    let currentWarningSeverity = viewModel.warningSeverityByFurnitureID[furniture.id]
+                    let currentWarningSeverity = warningSeverities[furniture.id]
                     FurnitureSimsActionHUD(
                         furniture: furniture,
                         isColliding: currentWarningSeverity == .collision,

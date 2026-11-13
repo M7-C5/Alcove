@@ -22,6 +22,7 @@ public struct Studio3DViewport: UIViewRepresentable {
     public typealias ViewportSnapper = (ViewportPreset) -> Void
     public var onFurnitureMoved: ((FurnitureMoveEvent) -> Void)? = nil
     public var onFurnitureDragging: (() -> Void)? = nil
+    public var onComputeWarningSeverities: (() -> [UUID: SpatialWarningSeverity])? = nil
     public var onFloorRaycasterResolved: ((@escaping FloorRaycaster) -> Void)? = nil
     public var onSnapToViewportResolved: ((@escaping ViewportSnapper) -> Void)? = nil
     public var onTapBackground: (() -> Void)? = nil
@@ -39,6 +40,7 @@ public struct Studio3DViewport: UIViewRepresentable {
         furnitureWarningSeverities: [UUID: SpatialWarningSeverity] = [:],
         onFurnitureMoved: ((FurnitureMoveEvent) -> Void)? = nil,
         onFurnitureDragging: (() -> Void)? = nil,
+        onComputeWarningSeverities: (() -> [UUID: SpatialWarningSeverity])? = nil,
         onFloorRaycasterResolved: ((@escaping FloorRaycaster) -> Void)? = nil,
         onSnapToViewportResolved: ((@escaping ViewportSnapper) -> Void)? = nil,
         onTapBackground: (() -> Void)? = nil
@@ -55,6 +57,7 @@ public struct Studio3DViewport: UIViewRepresentable {
         self.furnitureWarningSeverities = furnitureWarningSeverities
         self.onFurnitureMoved = onFurnitureMoved
         self.onFurnitureDragging = onFurnitureDragging
+        self.onComputeWarningSeverities = onComputeWarningSeverities
         self.onFloorRaycasterResolved = onFloorRaycasterResolved
         self.onSnapToViewportResolved = onSnapToViewportResolved
         self.onTapBackground = onTapBackground
@@ -73,6 +76,7 @@ public struct Studio3DViewport: UIViewRepresentable {
             },
             onFurnitureMoved: onFurnitureMoved,
             onFurnitureDragging: onFurnitureDragging,
+            onComputeWarningSeverities: onComputeWarningSeverities,
             onTapBackground: onTapBackground
         )
     }
@@ -109,6 +113,7 @@ public struct Studio3DViewport: UIViewRepresentable {
         context.coordinator.revealMode = revealMode
         context.coordinator.furnitureWarningSeverities = furnitureWarningSeverities
         context.coordinator.onFurnitureDragging = onFurnitureDragging
+        context.coordinator.onComputeWarningSeverities = onComputeWarningSeverities
         context.coordinator.updateFurnitureEntities(from: room)
         context.coordinator.updateSelectionHalos()
         context.coordinator.updateSelectedProjection()
@@ -148,6 +153,7 @@ public struct Studio3DViewport: UIViewRepresentable {
         var onProjectSelectedFurniture: ((CGPoint?) -> Void)?
         var onFurnitureMoved: ((FurnitureMoveEvent) -> Void)?
         var onFurnitureDragging: (() -> Void)?
+        var onComputeWarningSeverities: (() -> [UUID: SpatialWarningSeverity])?
         var onTapBackground: (() -> Void)?
 
         private let blueHaloMaterial = SimpleMaterial(
@@ -197,6 +203,7 @@ public struct Studio3DViewport: UIViewRepresentable {
             onProjectSelectedFurniture: ((CGPoint?) -> Void)?,
             onFurnitureMoved: ((FurnitureMoveEvent) -> Void)?,
             onFurnitureDragging: (() -> Void)? = nil,
+            onComputeWarningSeverities: (() -> [UUID: SpatialWarningSeverity])? = nil,
             onTapBackground: (() -> Void)? = nil
         ) {
             self.room = room
@@ -206,6 +213,7 @@ public struct Studio3DViewport: UIViewRepresentable {
             self.onProjectSelectedFurniture = onProjectSelectedFurniture
             self.onFurnitureMoved = onFurnitureMoved
             self.onFurnitureDragging = onFurnitureDragging
+            self.onComputeWarningSeverities = onComputeWarningSeverities
             self.onTapBackground = onTapBackground
             super.init()
 
@@ -533,10 +541,12 @@ public struct Studio3DViewport: UIViewRepresentable {
                     container.position = clamped
                     item.positionX = Double(clamped.x)
                     item.positionZ = Double(clamped.z)
-                    recomputeLiveWarnings(in: layout?.furnitures ?? [])
+                    onFurnitureDragging?()
+                    if let computed = onComputeWarningSeverities?() {
+                        furnitureWarningSeverities = computed
+                    }
                     updateSelectionHalos()
                     updateSelectedProjection()
-                    onFurnitureDragging?()
 
                 case .orbiting(let startYaw, let startPitch):
                     let translation = gesture.translation(in: arView)
@@ -746,17 +756,6 @@ public struct Studio3DViewport: UIViewRepresentable {
                     }
                 }
             }
-        }
-
-        private func recomputeLiveWarnings(in furnitures: [Furniture]) {
-            guard currentStage != .harmony else {
-                furnitureWarningSeverities = [:]
-                return
-            }
-            furnitureWarningSeverities = FastPathRulebook().warningSeverityByFurnitureID(
-                furnitures: furnitures,
-                roomDimensions: (width: room.dimensionsWidth, length: room.dimensionsLength)
-            )
         }
 
         func updateSelectionHalos() {
