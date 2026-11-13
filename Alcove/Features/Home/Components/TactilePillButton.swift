@@ -25,27 +25,27 @@ public struct TactilePillButton: View {
         } label: {
             Text(title)
                 .font(.custom("Cleanow", size: 32, relativeTo: .title))
-                .foregroundStyle(Color(red: 92 / 255, green: 54 / 255, blue: 47 / 255))
+                .foregroundStyle(.alcoveText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
                 .padding(.horizontal, 44)
                 .padding(.vertical, 20)
                 .frame(minWidth: 188, minHeight: 80)
                 .background {
-                    // Outer chocolate-brown border capsule wraps the inner clipped fill so
-                    // the stroke never covers the top highlight or bottom orange rim crescents.
+                    // Outer border capsule wraps the inner clipped fill so
+                    // the stroke never covers the top highlight or bottom rim crescents.
                     ZStack {
                         Capsule()
-                            .fill(Color(red: 100 / 255, green: 68 / 255, blue: 51 / 255))
+                            .fill(.alcoveBorder)
 
                         ZStack {
                             VStack(spacing: 0) {
-                                Color(red: 254 / 255, green: 241 / 255, blue: 193 / 255)
-                                Color(red: 240 / 255, green: 171 / 255, blue: 64 / 255)
+                                Color.alcovePrimaryHighlight
+                                Color.alcovePrimaryShadow
                             }
 
                             Capsule()
-                                .fill(Color(red: 245 / 255, green: 214 / 255, blue: 115 / 255))
+                                .fill(.alcovePrimaryFill)
                                 .padding(.top, 5.0)
                                 .padding(.bottom, 6.0)
                         }

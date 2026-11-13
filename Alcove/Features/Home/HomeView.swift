@@ -44,14 +44,14 @@ public struct HomeView: View {
                             // "Scan Your Room" Header in Cleanow
                             Text("Scan Your Room")
                                 .font(.custom("Cleanow", size: 32, relativeTo: .largeTitle))
-                                .foregroundStyle(Color(red: 74 / 255, green: 38 / 255, blue: 18 / 255))
+                                .foregroundStyle(.alcoveText)
                                 .multilineTextAlignment(.center)
                                 .minimumScaleFactor(0.8)
 
-                            // Explanatory Subtitle in SF Pro Rounded (Warm Golden Chestnut)
+                            // Explanatory Subtitle in SF Pro Rounded
                             Text("Turn your space into a 3D\nroom with a single scan.")
                                 .font(.system(.title3, design: .rounded, weight: .semibold))
-                                .foregroundStyle(Color(red: 131 / 255, green: 86 / 255, blue: 43 / 255))
+                                .foregroundStyle(.alcoveText)
                                 .multilineTextAlignment(.center)
                                 .lineSpacing(4)
                                 .minimumScaleFactor(0.85)
