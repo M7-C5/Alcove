@@ -23,21 +23,11 @@ public struct StageEvaluationSheet: View {
         self.onReevaluate = onReevaluate
     }
 
-    private var scoreColor: Color {
-        if result.score >= 80 {
-            return .green
-        } else if result.score >= 60 {
-            return .orange
-        } else {
-            return .red
-        }
-    }
-
     public var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
-                    // Score & Mascot Verdict
+                    // Evaluation Status & Mascot Verdict
                     HStack(spacing: 16) {
                         Text(result.canAdvance ? "🎉" : "🤔")
                             .font(.system(size: 48))
@@ -49,9 +39,9 @@ public struct StageEvaluationSheet: View {
                                     .font(.subheadline.bold())
                                     .foregroundStyle(.indigo)
                             } else {
-                                Text("Evaluation Score: \(result.score)/100")
+                                Text(result.canAdvance ? "Ready for Next Stage" : "Suggested Refinements")
                                     .font(.subheadline.bold())
-                                    .foregroundStyle(scoreColor)
+                                    .foregroundStyle(result.canAdvance ? .green : .orange)
                             }
                         }
                     }

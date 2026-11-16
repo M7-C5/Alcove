@@ -210,7 +210,7 @@ public final class LLMMascotAIService: MascotAIServiceProtocol {
                 CRITICAL CURRICULUM & VOICE RULES FOR STAGE 1 (THE AUDIT):
                 - The Audit is strictly an observational diagnosis of the room's CURRENT SITUATION and layout as scanned.
                 - DO NOT mention, score, or criticize artificial lighting, lamps, or fixtures! DO NOT tell the user to "add more lights" or "add lamps" (artificial lighting belongs strictly to Stage 3: The Illumination).
-                - There is NO score penalty in Stage 1. Return "score": 100 and "canAdvance": true.
+                - Provide qualitative evaluation only — DO NOT include any numerical scores, percentages, or letter grades anywhere in your output. Return "canAdvance": true.
                 - Location accuracy: Look at each piece's `Placement` tag. NEVER say a piece is "floating" or "in the center" when it is anchored against a wall or corner!
                 - Mascot voice (AI Vibes): welcoming, attentive, empathetic (zero judgment on tight spots), reassuring, encouraging, proactive, and personable. Avoid awkward real-estate brochure fluff (NEVER use "floating comfortably", "lovely daylight", or "enjoys open breathing room in the center"). Keep dialogue under 40 words.
 
@@ -225,7 +225,6 @@ public final class LLMMascotAIService: MascotAIServiceProtocol {
                 Return ONLY a raw JSON object (no markdown quotes, no explanation) with this exact schema:
                 {
                   "canAdvance": true,
-                  "score": 100,
                   "title": "Short punchy diagnosis title (2-4 words, e.g. 'Room Baseline Diagnosed')",
                   "dialogue": "1-2 short, punchy sentences diagnosing the room's current flow and natural light, setting up Stage 2 rearranging (under 35 words).",
                   "recommendations": ["Actionable design tip on desk daylight/glare or chair clearance (1 sentence)", "Actionable design tip on bed anchoring, zoning, or pathway flow (1 sentence)"],
@@ -237,6 +236,7 @@ public final class LLMMascotAIService: MascotAIServiceProtocol {
                 Perform a formal stage completion evaluation for Stage 2: The Rearrangement for "\(room.name)".
                 CRITICAL CURRICULUM & ORIENTATION RULES:
                 - Voice (AI Vibes): welcoming, attentive, empathetic (never harsh about tight spots), reassuring, encouraging (celebrate what works!), proactive, and personable.
+                - Provide qualitative evaluation only — DO NOT mention any numerical scores, point values, or letter grades.
                 - Location accuracy: Look at each piece's `Placement` tag. NEVER say a piece is "floating" or "in the center" when it is anchored against a wall or corner!
                 - Pieces marked 'Facing: INWARD into the room (toward center)' are ALREADY properly facing the room. NEVER tell the user to rotate them to face the room.
 
@@ -249,7 +249,6 @@ public final class LLMMascotAIService: MascotAIServiceProtocol {
                 Return ONLY a raw JSON object with this exact schema:
                 {
                   "canAdvance": true/false,
-                  "score": 0-100 integer,
                   "title": "Short punchy evaluation title (2-4 words, e.g. 'Layout & Flow Evaluated')",
                   "dialogue": "1-2 short, punchy sentences evaluating the layout's walking flow and functional zones (under 35 words).",
                   "recommendations": ["Specific tip on clearance or chair pushback naming real furniture (1 sentence)", "Specific tip on zoning or perimeter anchoring (1 sentence)"],
@@ -260,6 +259,7 @@ public final class LLMMascotAIService: MascotAIServiceProtocol {
                 evaluationPrompt = """
                 Perform a formal stage completion evaluation for Stage 3: The Illumination for "\(room.name)".
                 - Voice (AI Vibes): welcoming, attentive, empathetic, reassuring, encouraging, proactive, and personable. Celebrate their cozy lighting choices and offer a helpful next idea!
+                - Provide qualitative evaluation only — DO NOT mention any numerical scores, point values, or letter grades.
                 EDUCATIONAL DESIGN KNOWLEDGE RULES FOR RECOMMENDATIONS ("Design Tips"):
                 Provide 2 concrete, educational lighting design tips based on Karlen & Benya / Frida Ramstedt principles:
                 1. Task Lighting: Emphasize focused task illumination at the desk or bedside to reduce eye strain and screen glare.
@@ -268,7 +268,6 @@ public final class LLMMascotAIService: MascotAIServiceProtocol {
                 Return ONLY a raw JSON object with this exact schema:
                 {
                   "canAdvance": true/false,
-                  "score": 0-100 integer,
                   "title": "Short punchy evaluation title (2-4 words, e.g. 'Lighting Layers Balanced')",
                   "dialogue": "1-2 short, punchy sentences evaluating the room's lighting balance and daylight distribution (under 35 words).",
                   "recommendations": ["Educational tip on task lighting or reducing screen glare (1 sentence)", "Educational tip on ambient/accent lighting layers (1 sentence)"],
@@ -279,15 +278,15 @@ public final class LLMMascotAIService: MascotAIServiceProtocol {
                 evaluationPrompt = """
                 Perform a formal stage completion evaluation for Stage 4: The Harmony Reveal for "\(room.name)".
                 - Voice (AI Vibes): warmly celebratory, encouraging, personable, reassuring, and proactive about helping them enjoy their transformed space!
+                - Provide qualitative evaluation only — DO NOT mention any numerical scores, point values, or letter grades.
                 EDUCATIONAL DESIGN KNOWLEDGE RULES FOR RECOMMENDATIONS ("Design Tips"):
                 Provide 2 celebratory, practical synthesis tips:
-                1. Flow & Clearance: Celebrate the percentage improvement in open circulation and elimination of bottlenecks.
+                1. Flow & Clearance: Celebrate the improvement in open circulation and elimination of bottlenecks without quoting scores.
                 2. Real-World AR Walkthrough: Encourage launching the 1:1 Life-Size AR Walkthrough to experience the newly designed clearances in physical space.
 
                 Return ONLY a raw JSON object with this exact schema:
                 {
                   "canAdvance": true/false,
-                  "score": 0-100 integer,
                   "title": "Short punchy evaluation title (2-4 words, e.g. 'Spatial Harmony Achieved')",
                   "dialogue": "1-2 short, punchy sentences celebrating the spatial transformation and flow improvement (under 35 words).",
                   "recommendations": ["Insight on improved walking clearance and zoning (1 sentence)", "Suggestion to test walkways with the 1:1 AR Walkthrough (1 sentence)"],

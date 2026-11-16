@@ -10,7 +10,7 @@ public struct StageCardView: View {
         stage: StageType,
         isUnlocked: Bool,
         isCompleted: Bool,
-        score: Int
+        score: Int = 0
     ) {
         self.stage = stage
         self.isUnlocked = isUnlocked
@@ -44,7 +44,7 @@ public struct StageCardView: View {
                         )
 
                     if isCompleted {
-                        Text("Score: \(score)/100")
+                        Text("Completed")
                             .font(.caption.bold())
                             .foregroundStyle(.green)
                     }

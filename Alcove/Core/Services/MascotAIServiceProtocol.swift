@@ -50,7 +50,7 @@ public struct StageEvaluationResult: Sendable {
 
     public init(
         canAdvance: Bool,
-        score: Int,
+        score: Int = 100,
         title: String,
         dialogue: String,
         bottlenecks: [SpatialBottleneck],
