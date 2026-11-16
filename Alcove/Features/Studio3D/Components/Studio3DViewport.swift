@@ -104,6 +104,7 @@ public struct Studio3DViewport: UIViewRepresentable {
     }
 
     public func updateUIView(_ arView: ARView, context: Context) {
+        let previousSelection = context.coordinator.selectedFurnitureID
         context.coordinator.viewportSize = viewportSize
         context.coordinator.selectedFurnitureID = selectedFurnitureID
         context.coordinator.ghostFurnitureID = ghostFurnitureID
@@ -118,6 +119,9 @@ public struct Studio3DViewport: UIViewRepresentable {
         context.coordinator.updateSelectionHalos()
         context.coordinator.updateSelectedProjection()
         context.coordinator.onTapBackground = onTapBackground
+        if let selectedFurnitureID, selectedFurnitureID != previousSelection {
+            context.coordinator.focusMascot(onFurnitureID: selectedFurnitureID)
+        }
 
         onFloorRaycasterResolved? { [weak coordinator = context.coordinator, weak arView] screenPoint in
             guard let coordinator, let arView else { return nil }
@@ -180,6 +184,7 @@ public struct Studio3DViewport: UIViewRepresentable {
         var updateSubscription: (any Cancellable)?
         var animationTask: Task<Void, Never>? = nil
         private var entitySignatures: [UUID: String] = [:]
+        let mascotController = MascotRoamController()
 
         // Camera Orbit & Distance
         var yaw: Float = 0.0
@@ -280,6 +285,13 @@ public struct Studio3DViewport: UIViewRepresentable {
             }
             root.addChild(furnitureGroup)
 
+            // 3D Roaming Otter Mascot
+            root.addChild(mascotController.rootEntity)
+            mascotController.configureInitialPosition(
+                roomSize: roomSizeVector(),
+                obstacles: currentObstacles()
+            )
+
             updateCamera()
             updateWallCutaways()
         }
@@ -292,9 +304,46 @@ public struct Studio3DViewport: UIViewRepresentable {
 
             setupGestures(in: view)
 
-            updateSubscription = view.scene.subscribe(to: SceneEvents.Update.self) { [weak self] _ in
+            updateSubscription = view.scene.subscribe(to: SceneEvents.Update.self) { [weak self] event in
                 self?.updateSelectedProjection()
+                self?.updateMascot(dt: Float(event.deltaTime))
             }
+        }
+
+        private func roomSizeVector() -> SIMD2<Float> {
+            SIMD2<Float>(Float(room.dimensionsWidth), Float(room.dimensionsLength))
+        }
+
+        private func currentObstacles() -> [MascotRoamingEngine.Obstacle] {
+            let layout = room.workingLayout ?? room.baselineLayout
+            return (layout?.furnitures ?? [])
+                .filter { !$0.isArchived }
+                .map { item in
+                    MascotRoamingEngine.Obstacle(
+                        id: item.id,
+                        center: SIMD2<Float>(Float(item.positionX), Float(item.positionZ)),
+                        size: SIMD2<Float>(Float(item.width), Float(item.length)),
+                        yaw: Float(item.rotationYaw)
+                    )
+                }
+        }
+
+        func focusMascot(onFurnitureID id: UUID) {
+            let obstacles = currentObstacles()
+            guard let target = obstacles.first(where: { $0.id == id }) else { return }
+            mascotController.focusOnFurniture(
+                target,
+                roomSize: roomSizeVector(),
+                obstacles: obstacles
+            )
+        }
+
+        func updateMascot(dt: Float) {
+            mascotController.update(
+                dt: dt,
+                roomSize: roomSizeVector(),
+                obstacles: currentObstacles()
+            )
         }
 
         // MARK: - Camera & Dynamic Cutaways
@@ -473,12 +522,17 @@ public struct Studio3DViewport: UIViewRepresentable {
                     if let id = UUID(uuidString: uuidStr) {
                         selectedFurnitureID = id
                         onSelectFurniture?(id)
+                        focusMascot(onFurnitureID: id)
                         updateSelectionHalos()
                         updateSelectedProjection()
                         playTapFeedback()
                         return
                     }
                 }
+            }
+
+            if mascotController.handleScreenTap(at: point, in: arView) {
+                return
             }
 
             // Tapped empty space (or Stage 1 inspection mode) -> deselect
@@ -576,6 +630,7 @@ public struct Studio3DViewport: UIViewRepresentable {
                     let newPos = (x: item.positionX, z: item.positionZ)
 
                     playTapFeedback()
+                    focusMascot(onFurnitureID: id)
                     onFurnitureMoved?(FurnitureMoveEvent(
                         furnitureName: item.name,
                         category: item.category,
