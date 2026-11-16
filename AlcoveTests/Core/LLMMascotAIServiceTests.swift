@@ -231,5 +231,25 @@ struct LLMMascotAIServiceTests {
         #expect(reply.contains("zero pressure") || reply.contains("overwhelming"))
         #expect(reply.contains("step by step"))
     }
+
+    @Test @MainActor func offlineMascotExplainsStage1And2ControlsAndCatalogActions() async {
+        let mascot = MockMascotAIService()
+        let room = SampleData.createStarterRoom()
+
+        let stage1Rearrange = await mascot.askMascot(
+            question: "Can I rearrange my room now?",
+            currentStage: .audit,
+            room: room
+        )
+        #expect(stage1Rearrange.contains("Proceed"))
+
+        let stage2Swap = await mascot.askMascot(
+            question: "What else can I do here?",
+            currentStage: .rearrangement,
+            room: room
+        )
+        #expect(stage2Swap.contains("swap") || stage2Swap.contains("change"))
+        #expect(stage2Swap.contains("'+'"))
+    }
 }
 

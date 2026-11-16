@@ -58,9 +58,17 @@ public final class LLMMascotAIService: MascotAIServiceProtocol {
         if !Self.hardcodedDeveloperKey.isEmpty {
             rawSources.append(Self.hardcodedDeveloperKey)
         }
-        if !Self.bypassFileSecretLoading,
-           let envKey = ProcessInfo.processInfo.environment["GEMINI_API_KEY"], !envKey.isEmpty {
-            rawSources.append(envKey)
+        if !Self.bypassFileSecretLoading {
+            #if DEBUG
+            if let secretURL = Bundle.main.url(forResource: "developer", withExtension: "secret"),
+               let content = try? String(contentsOf: secretURL, encoding: .utf8),
+               !content.isEmpty {
+                rawSources.append(content)
+            }
+            #endif
+            if let envKey = ProcessInfo.processInfo.environment["GEMINI_API_KEY"], !envKey.isEmpty {
+                rawSources.append(envKey)
+            }
         }
         if let userKey = loadStoredAPIKey(), !userKey.isEmpty {
             rawSources.append(userKey)
@@ -368,8 +376,9 @@ public final class LLMMascotAIService: MascotAIServiceProtocol {
                     let dist = sqrt(pow(a.positionX - b.positionX, 2) + pow(a.positionZ - b.positionZ, 2))
                     let radiusSum = (a.width + a.length) / 4.0 + (b.width + b.length) / 4.0
                     let clearance = max(0.0, dist - radiusSum)
-                    let isCompanionPair = AnthropometricStandards.isFunctionalCompanionPair(a: a, b: b)
-                    if clearance < AnthropometricStandards.minimumCirculation && !isCompanionPair {
+                    let isExempt = AnthropometricStandards.isFunctionalCompanionPair(a: a, b: b) ||
+                        AnthropometricStandards.isSideBySideNonBlocking(a: a, b: b)
+                    if clearance < AnthropometricStandards.minimumCirculation && !isExempt {
                         bottleneckNote = " Also, I noticed in \(room.name) that \(a.name) and \(b.name) are sitting a little tight for walking comfortably—no worries at all, try sliding one slightly when you're ready to open up that path!"
                         break
                     }

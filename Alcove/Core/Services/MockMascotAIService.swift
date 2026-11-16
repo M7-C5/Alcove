@@ -90,8 +90,9 @@ public final class MockMascotAIService: MascotAIServiceProtocol {
                     let footprintRadiusSum = (a.width + a.length) / 4.0 + (b.width + b.length) / 4.0
                     let clearance = max(0.0, centerDist - footprintRadiusSum)
 
-                    // Ignore functional pairs (bed + nightstand, desk + chair, lamp + seating/desk/bed)
-                    if AnthropometricStandards.isFunctionalCompanionPair(a: a, b: b) {
+                    // Ignore functional pairs and non-blocking side-by-side placements (e.g. wardrobe beside desk/chair)
+                    if AnthropometricStandards.isFunctionalCompanionPair(a: a, b: b) ||
+                        AnthropometricStandards.isSideBySideNonBlocking(a: a, b: b) {
                         continue
                     }
 
@@ -294,6 +295,25 @@ public final class MockMascotAIService: MascotAIServiceProtocol {
             q.contains("unsure") || q.contains("don't know") || q.contains("dont know") ||
             q.contains("awkward") || q.contains("weird") {
             return "Totally understandable—arranging a room can feel overwhelming at first, and there's zero pressure to get it perfect in one shot! Let's start with just one anchor piece like your bed or desk, and I'll help you map out the rest step by step."
+        } else if q.contains("rearrange") && q.contains("now") {
+            if currentStage == .audit {
+                return "Almost! In Stage 1 we inspect your scanned room first so nothing moves by accident—try orbiting and zooming around to spot tight walkways, then tap Proceed whenever you're ready to unlock Stage 2 rearranging!"
+            }
+            return "Yes, you're all set to rearrange right now! Just drag any piece across the floor, or tap it to rotate, archive, or swap it for another item—and feel free to add new pieces with the '+' button at the top right."
+        } else if q.contains("what else") || (q.contains("what can i do") && !q.contains("lighting")) {
+            switch currentStage {
+            case .audit:
+                return "Right now you can drag empty space to rotate around your scanned room, pinch to zoom in or out, tap the POV button at top-right to snap views, or ask me about any tight corner before tapping Proceed!"
+            case .rearrangement:
+                return "You can drag furniture to test new zones, tap any piece to rotate, archive, or swap/change it into another furniture item (like turning a lamp into a bed!), or tap the '+' button at top-right to add new pieces from the catalog."
+            case .illumination:
+                return "Try sliding the daylight hour control to test morning-to-night shadows, and balance overhead ambient glow with focused desk and bedside task lamps!"
+            case .harmony:
+                return "Drag the Before/After split slider to compare your transformation, review your Room Harmony Scorecard, or jump into the 1:1 AR Walkthrough!"
+            }
+        } else if q.contains("swap") || q.contains("change") || q.contains("catalog") ||
+                    (q.contains("add") && q.contains("furniture")) {
+            return "Easy! Tap any furniture piece in your room to open its ring menu, then tap the swap arrows button to change it into another piece from the catalog (like changing a lamp to a bed!). You can also tap the '+' button at the top right to add brand-new furniture."
         } else if (q.contains("where") || q.contains("place") || q.contains("move") || q.contains("put")) &&
             (q.contains("bed") || q.contains("desk")) {
             return placementGuidance(for: q, room: room)

@@ -106,7 +106,8 @@ public struct HarmonySynthesisEngine: Sendable {
                     let a = items[i]
                     let b = items[j]
 
-                    if AnthropometricStandards.isFunctionalCompanionPair(a: a, b: b) {
+                    if AnthropometricStandards.isFunctionalCompanionPair(a: a, b: b) ||
+                        AnthropometricStandards.isSideBySideNonBlocking(a: a, b: b) {
                         continue
                     }
 
@@ -153,7 +154,8 @@ public struct HarmonySynthesisEngine: Sendable {
                 let a = items[i]
                 let b = items[j]
 
-                if AnthropometricStandards.isFunctionalCompanionPair(a: a, b: b) {
+                if AnthropometricStandards.isFunctionalCompanionPair(a: a, b: b) ||
+                    AnthropometricStandards.isSideBySideNonBlocking(a: a, b: b) {
                     continue
                 }
 
