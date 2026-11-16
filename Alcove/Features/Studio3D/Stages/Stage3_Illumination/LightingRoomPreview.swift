@@ -77,9 +77,10 @@ struct LightingRoomPreview: UIViewRepresentable {
         context.coordinator.isSelectingMultiple = isSelectingMultiple
         context.coordinator.apply(settings, preset: preset, in: view)
         let coordinator = context.coordinator
-        coordinator.badgeSubscription = view.scene.subscribe(to: SceneEvents.Update.self) { [weak coordinator, weak view] _ in
+        coordinator.badgeSubscription = view.scene.subscribe(to: SceneEvents.Update.self) { [weak coordinator, weak view] event in
             guard let view else { return }
             coordinator?.updateMoveBadges(in: view)
+            coordinator?.updateMascot(dt: Float(event.deltaTime))
         }
         return view
     }
@@ -186,8 +187,25 @@ final class LightingRoomScene: NSObject {
     private var placementHeight: Float { Float(snapshot.geometry.height) + 0.04 }
 
     var badgeSubscription: Cancellable?
+    private let mascotController = MascotRoamController()
     private var selectedIDs: Set<UUID> = []
     private var moveBadges: [UUID: UIImageView] = [:]
+
+    private func lightingObstacles() -> [MascotRoamingEngine.Obstacle] {
+        snapshot.furnishings.map { item in
+            MascotRoamingEngine.Obstacle(
+                id: item.id,
+                center: SIMD2<Float>(item.position.x, item.position.z),
+                size: SIMD2<Float>(item.dimensions.x, item.dimensions.z),
+                yaw: item.yaw
+            )
+        }
+    }
+
+    func updateMascot(dt: Float) {
+        let size = SIMD2<Float>(Float(snapshot.geometry.width), Float(snapshot.geometry.length))
+        mascotController.update(dt: dt, roomSize: size, obstacles: lightingObstacles())
+    }
     private var drag: (id: UUID, height: Float, offset: SIMD2<Float>)?
 
     func removeMoveBadges() {
@@ -286,6 +304,9 @@ final class LightingRoomScene: NSObject {
             model.orientation = simd_quatf(angle: item.yaw, axis: [0, 1, 0])
             root.addChild(model)
         }
+        root.addChild(mascotController.rootEntity)
+        let size = SIMD2<Float>(Float(snapshot.geometry.width), Float(snapshot.geometry.length))
+        mascotController.configureInitialPosition(roomSize: size, obstacles: lightingObstacles())
     }
 
     /// Reconcile fixtures while retaining the room meshes, camera and unchanged light identities.
@@ -422,6 +443,9 @@ final class LightingRoomScene: NSObject {
         let point = gesture.location(in: view)
         if let id = fixtureID(at: point, in: view) {
             onSelectLight?(id)
+            return
+        }
+        if !isPlacementMode, mascotController.handleScreenTap(at: point, in: view) {
             return
         }
         if !selectedIDs.isEmpty || isSelectingMultiple || !isPlacementMode {
