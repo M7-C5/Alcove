@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add a full-screen lighting workspace with independently collapsing panels and captured magnetic north indicators.
+- Share orbit camera presets and AR presentation between Audit and Lighting.
+
 - Update Otter walkthrough and chat UI and side-by-side clearance rules.
 - Align mascot prompt and dialogues with seven AI vibes.
 - Integrate roaming Otter mascot across 3D studio stages.
@@ -67,6 +70,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Implement swiftdata domain models and mascot ai service.
 
 ### Changed
+
+- Align lighting controls with the shared tactile buttons, MainBackground artwork, and five-step progress header.
+- Keep lighting placement framed between inspectors and allow scrolling only within the light-source list.
 
 - Use SwiftUI openURL environment action.
 - Share view model warning severities with 3D viewport.

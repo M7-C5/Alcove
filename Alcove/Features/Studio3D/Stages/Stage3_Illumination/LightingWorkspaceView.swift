@@ -15,6 +15,7 @@ struct LightingWorkspaceView: View {
     @State private var cameraRequestID = 0
     @State private var placement = LightingPlacementState()
     @State private var showingDelete = false
+    @State private var headerActionsWidth: CGFloat = 300
     @State private var headerOverlapped = false
     @State private var sourcesExpanded = true
     @State private var previewExpanded = true
@@ -35,7 +36,7 @@ struct LightingWorkspaceView: View {
 
     var body: some View {
         GeometryReader { proxy in
-            let panelWidth = min(288.0, max(240.0, proxy.size.width * 0.21))
+            let panelWidth = min(300.0, max(240.0, proxy.size.width * 0.22))
             ZStack {
                 if !isARPresented {
                     lightingPreview
@@ -62,14 +63,18 @@ struct LightingWorkspaceView: View {
                     Text(room.compassOrientation == nil ? "Sunlight preview · Sample direction" : "Sunlight preview · Aligned to magnetic north")
                         .font(.caption2)
                 }
-                .padding(20)
+                .padding(.horizontal, 20)
+                .padding(.top, max(52, proxy.safeAreaInsets.top + 20))
+                .padding(.bottom, max(32, proxy.safeAreaInsets.bottom + 12))
 
-                floatingPanels(width: panelWidth, height: max(200, proxy.size.height - 230))
-                    .padding(.top, 160)
+                floatingPanels(width: panelWidth, height: max(200, proxy.size.height - 262))
+                    .padding(.top, 192)
                     .padding(.bottom, 70)
             }
 
         }
+        .clipped()
+        .ignoresSafeArea()
         .background { LightingWorkspaceBackground() }
         .foregroundStyle(LightingTheme.ink)
         .tint(LightingTheme.ink)
@@ -87,41 +92,49 @@ struct LightingWorkspaceView: View {
     }
 
     private var header: some View {
-        HStack(spacing: 16) {
-            Button(action: onBack) {
-                Image(systemName: "chevron.left")
-                    .font(.headline.bold())
-                    .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
-                    .frame(width: 44, height: 44)
-                    .background(LightingTheme.row, in: Circle())
-                    .overlay(Circle().stroke(LightingTheme.ink, lineWidth: 2))
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Back")
-            Text("Stage 3: Mark & Simulate Your Room Lighting")
-                .font(.system(.headline, design: .rounded, weight: .heavy))
+        ZStack {
+            Text("Stage 4: Mark & Simulate Your Room Lighting")
+                .font(.custom("Cleanow", size: 36, relativeTo: .largeTitle))
                 .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity)
+                .padding(.horizontal, headerActionsWidth + 16)
                 .opacity(headerOverlapped ? 0 : 1)
                 .accessibilityHidden(headerOverlapped)
-            Button(action: save) {
-                Label("Save", systemImage: "checkmark")
+
+            HStack {
+                Button(action: onBack) {
+                    Image(systemName: "chevron.left")
+                        .font(.headline.bold())
+                        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+                        .frame(width: 44, height: 44)
+                        .background(LightingTheme.row, in: Circle())
+                        .overlay(Circle().stroke(LightingTheme.ink, lineWidth: 2))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Back")
+                Spacer(minLength: 0)
+                HStack(spacing: 16) {
+                    TactilePillButton(title: "Save", size: .compact, systemImage: "checkmark", action: save)
+                        .disabled(!editor.hasUnsavedChanges)
+                        .opacity(editor.hasUnsavedChanges ? 1 : 0.55)
+                    StudioViewportActions(
+                        onSelectPreset: { preset = $0; cameraRequestID += 1 },
+                        onOpenAR: onOpenAR,
+                        cameraDisabled: placement.isActive,
+                        layoutOnly: $settings.layoutOnly
+                    )
+                }
+                .fixedSize(horizontal: true, vertical: false)
+                .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { headerActionsWidth = $0 }
             }
-            .buttonStyle(LightingPrimaryButtonStyle())
-            .disabled(!editor.hasUnsavedChanges)
-            .opacity(editor.hasUnsavedChanges ? 1 : 0.55)
-            StudioViewportActions(
-                onSelectPreset: { preset = $0; cameraRequestID += 1 },
-                onOpenAR: onOpenAR,
-                cameraDisabled: placement.isActive,
-                layoutOnly: $settings.layoutOnly
-            )
         }
+        .frame(maxWidth: .infinity)
     }
 
     @ViewBuilder private var stageProgress: some View {
         if dynamicTypeSize.isAccessibilitySize {
-            Text("Step 3 of 4 · Lighting")
+            Text("Step 4 of 5 · Lighting")
                 .font(.headline)
                 .frame(maxWidth: .infinity)
         } else {
@@ -130,62 +143,69 @@ struct LightingWorkspaceView: View {
     }
 
     private var stageBadges: some View {
-        HStack(alignment: .top, spacing: 8) {
-            ForEach(StageType.allCases) { stage in
-                let completed = room.isCompleted(stage)
-                let active = stage == .illumination
+        let titles = ["Scan", "Check", "Rearrange", "Lighting", "AR"]
+        let completedColor = Color(red: 0.87, green: 0.87, blue: 0.69)
+        let upcomingColor = Color(red: 0.91, green: 0.91, blue: 0.91)
+        let upcomingInk = Color(red: 0.71, green: 0.71, blue: 0.71)
+        return HStack(alignment: .top, spacing: 8) {
+            ForEach(titles.indices, id: \.self) { index in
+                let completed = index < 3
+                let active = index == 3
                 VStack(spacing: 8) {
                     ZStack {
-                        Circle().fill(active ? LightingTheme.accent : completed ? Color.green.opacity(0.2) : LightingTheme.border)
-                        Circle().stroke(LightingTheme.ink.opacity(0.7), lineWidth: 1.5)
+                        Circle().fill(completed ? completedColor : active ? Color.alcovePrimaryFill : upcomingColor)
+                        Circle().stroke(active || completed ? LightingTheme.ink : upcomingInk, lineWidth: 2)
                         if completed {
-                            Image(systemName: "checkmark").font(.headline.bold())
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 23, weight: .semibold))
                         } else {
-                            Text("\(stage.stageNumber)").font(.system(.headline, design: .rounded, weight: .bold))
+                            Text("\(index + 1)")
+                                .font(.custom("Cleanow", size: 24, relativeTo: .title2))
                         }
                     }
-                    .frame(width: 40, height: 40)
-                    Text(progressTitle(stage)).font(.caption)
+                    .foregroundStyle(active || completed ? LightingTheme.ink : upcomingInk)
+                    .frame(width: 56, height: 56)
+                    Text(titles[index])
+                        .font(.system(size: 14, weight: .semibold))
                 }
-                .frame(maxWidth: .infinity)
-                .accessibilityElement(children: .combine)
+                .frame(width: 76)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Step \(index + 1), \(titles[index]), \(completed ? "completed" : active ? "current" : "upcoming")")
                 .accessibilityAddTraits(active ? .isSelected : [])
-                if stage != .harmony {
-                    Capsule().fill(LightingTheme.border).frame(maxWidth: 56).frame(height: 2).padding(.top, 20)
+                if index < titles.count - 1 {
+                    Capsule()
+                        .fill(index < 3 ? completedColor : upcomingInk)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 3)
+                        .padding(.top, 27)
                 }
             }
         }
-        .frame(maxWidth: 520)
+        .frame(maxWidth: 760)
         .frame(maxWidth: .infinity)
     }
 
     private func floatingPanels(width: Double, height: Double) -> some View {
         HStack(alignment: .top, spacing: 0) {
-            LightingCollapsiblePanel(title: "Your lights", expanded: $sourcesExpanded, edge: .leading) {
+            LightingCollapsiblePanel(title: "Your lights", expanded: $sourcesExpanded, edge: .leading, width: width) {
                 LightingSourcePanel(editor: editor, isAdding: placement.isActive, onAdd: togglePlacement)
                     .frame(width: width, height: height)
             }
             .frame(height: height)
             Spacer(minLength: 0)
             VStack(alignment: .trailing, spacing: 20) {
-                LightingCollapsiblePanel(title: "Lighting preview", expanded: $previewExpanded, edge: .trailing) {
-                    ScrollView {
-                        LightingSimulationPanel(settings: $settings,
-                            activeFixtureCount: editor.drafts.filter { settings.output(for: $0) > 0 }.count)
-                    }
-                    .scrollClipDisabled()
-                    .frame(width: width, height: min(245, height * 0.42))
+                LightingCollapsiblePanel(title: "Lighting preview", expanded: $previewExpanded, edge: .trailing, width: width) {
+                    LightingSimulationPanel(settings: $settings,
+                        activeFixtureCount: editor.drafts.filter { settings.output(for: $0) > 0 }.count)
+                    .frame(width: width, height: min(225, height * 0.38))
                 }
-                .frame(height: min(245, height * 0.42))
-                LightingCollapsiblePanel(title: "Light settings", expanded: $editingExpanded, edge: .trailing) {
-                    ScrollView {
-                        LightingEditPanel(editor: editor, minimumHeight: max(160, height - min(245, height * 0.42) - 20),
-                                          onDelete: { showingDelete = true })
-                    }
-                    .scrollClipDisabled()
-                    .frame(width: width, height: max(160, height - min(245, height * 0.42) - 20))
+                .frame(height: min(225, height * 0.38))
+                LightingCollapsiblePanel(title: "Light settings", expanded: $editingExpanded, edge: .trailing, width: width) {
+                    LightingEditPanel(editor: editor, minimumHeight: max(160, height - min(225, height * 0.38) - 20),
+                                      onDelete: { showingDelete = true })
+                    .frame(width: width, height: max(160, height - min(225, height * 0.38) - 20))
                 }
-                .frame(height: max(160, height - min(245, height * 0.42) - 20))
+                .frame(height: max(160, height - min(225, height * 0.38) - 20))
             }
         }
         .padding(.horizontal, 16)
@@ -242,15 +262,6 @@ struct LightingWorkspaceView: View {
         if placement.isActive { return "Tap to add a light. Drag a selected light to move it." }
         if editor.drafts.isEmpty { return "Tap Add light to get started." }
         return "Tap a light to edit it. Drag the move icon to reposition it."
-    }
-
-    private func progressTitle(_ stage: StageType) -> String {
-        switch stage {
-        case .audit: return "Audit"
-        case .rearrangement: return "Rearrange"
-        case .illumination: return "Lighting"
-        case .harmony: return "Harmony"
-        }
     }
 
     private func save() {
