@@ -8,17 +8,22 @@ struct LightingWorkspaceView: View {
     let room: Room
     @Binding var settings: LightingSimulationSettings
     let onBack: () -> Void
+    let isARPresented: Bool
+    let onOpenAR: () -> Void
     @State private var editor: LightingSetupViewModel
     @State private var preset: ViewportPreset = .top
+    @State private var cameraRequestID = 0
     @State private var placement = LightingPlacementState()
     @State private var showingDelete = false
     @State private var saveError: String?
-    @State private var showingARWalkthrough = false
 
-    init(room: Room, settings: Binding<LightingSimulationSettings>, onBack: @escaping () -> Void) {
+    init(room: Room, settings: Binding<LightingSimulationSettings>, isARPresented: Bool,
+         onOpenAR: @escaping () -> Void, onBack: @escaping () -> Void) {
         self.room = room
         self._settings = settings
         self.onBack = onBack
+        self.isARPresented = isARPresented
+        self.onOpenAR = onOpenAR
         let editor = LightingSetupViewModel(room: room)
         editor.selectedID = editor.drafts.first?.id
         _editor = State(initialValue: editor)
@@ -52,9 +57,6 @@ struct LightingWorkspaceView: View {
         )) {
             Button("OK", role: .cancel) { saveError = nil }
         } message: { Text(saveError ?? "Please try again.") }
-        .fullScreenCover(isPresented: $showingARWalkthrough) {
-            ARWalkthroughView(room: room)
-        }
         .sensoryFeedback(.impact(weight: .light), trigger: editor.drafts.count)
     }
 
@@ -80,36 +82,13 @@ struct LightingWorkspaceView: View {
             .buttonStyle(LightingPrimaryButtonStyle())
             .disabled(!editor.hasUnsavedChanges)
             .opacity(editor.hasUnsavedChanges ? 1 : 0.55)
-            Button { showingARWalkthrough = true } label: {
-                Label("AR", systemImage: "arkit")
-                    .font(.subheadline.bold())
-                    .padding(.horizontal, 16)
-                    .frame(minWidth: 44, minHeight: 44)
-                    .background(LightingTheme.row, in: Capsule())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Life-size AR walkthrough")
-            cameraMenu
+            StudioViewportActions(
+                onSelectPreset: { preset = $0; cameraRequestID += 1 },
+                onOpenAR: onOpenAR,
+                cameraDisabled: placement.isActive,
+                layoutOnly: $settings.layoutOnly
+            )
         }
-    }
-
-    private var cameraMenu: some View {
-        Menu {
-            ForEach(ViewportPreset.allCases) { angle in
-                Button { preset = angle } label: { Label(angle.title, systemImage: angle.systemImage) }
-            }
-            Divider()
-            Toggle("Show room clearly", isOn: $settings.layoutOnly)
-        } label: {
-            Image(systemName: "cube")
-                .font(.title3)
-                .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
-                .frame(width: 44, height: 44)
-                .background(LightingTheme.row, in: Circle())
-                .overlay(Circle().stroke(LightingTheme.ink, lineWidth: 2))
-        }
-        .accessibilityLabel("Camera view")
-        .disabled(placement.isActive)
     }
 
     @ViewBuilder private var stageProgress: some View {
@@ -188,7 +167,7 @@ struct LightingWorkspaceView: View {
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
             Group {
-                if !showingARWalkthrough {
+                if !isARPresented {
                     lightingPreview
                 }
             }
@@ -214,6 +193,7 @@ struct LightingWorkspaceView: View {
             snapshot: LightingRoomSnapshot(room: room, fixtures: editor.drafts),
             settings: settings,
             preset: preset,
+            cameraRequestID: cameraRequestID,
             backgroundColor: UIColor(LightingTheme.canvas),
             onPlaceLight: { point in
                     guard !editor.isSelectingMultiple else { return }

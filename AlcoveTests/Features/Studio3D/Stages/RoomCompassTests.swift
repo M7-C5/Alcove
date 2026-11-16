@@ -88,10 +88,10 @@ struct RoomCompassTests {
     }
 
     @Test func lightingUsesPrimaryViewportPresetAngles() {
-        let geometry = LightingRoomGeometry(width: 4, length: 5, height: 2.6)
-        let camera = LightingCameraNavigation()
+        let camera = StudioOrbitCameraController(width: 4, length: 5, height: 2.6)
         for preset in ViewportPreset.allCases {
-            let offset = camera.position(preset: preset, geometry: geometry) - camera.target(in: geometry)
+            camera.snap(to: preset, animated: false) {}
+            let offset = camera.position - camera.target
             let azimuth = atan2(offset.x, offset.z)
             #expect(abs(sin(azimuth - preset.targetYaw)) < 0.001)
             #expect(abs(atan2(offset.y, hypot(offset.x, offset.z)) - preset.targetPitch) < 0.001)

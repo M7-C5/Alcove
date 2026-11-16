@@ -209,38 +209,37 @@ struct LightingWorkspaceTests {
     }
 
     @Test func horizontalSwipeTurnsRoomWithTheFinger() {
-        let bounds = LightingRoomGeometry(width: 4, length: 5, height: 2.6)
-        var navigation = LightingCameraNavigation()
-        navigation.orbit(deltaX: 80, deltaY: 0)
-        #expect(navigation.yaw < 0)
-        #expect(navigation.position(preset: .front, geometry: bounds).x < 0)
-        navigation.reset()
-        navigation.orbit(deltaX: -80, deltaY: 0)
-        #expect(navigation.yaw > 0)
-        #expect(navigation.position(preset: .front, geometry: bounds).x > 0)
+        let camera = StudioOrbitCameraController(width: 4, length: 5, height: 2.6)
+        camera.snap(to: .front, animated: false) {}
+        camera.orbit(fromYaw: camera.yaw, pitch: camera.pitch, deltaX: 80, deltaY: 0)
+        #expect(camera.yaw < 0 && camera.position.x < 0)
+        camera.snap(to: .front, animated: false) {}
+        camera.orbit(fromYaw: camera.yaw, pitch: camera.pitch, deltaX: -80, deltaY: 0)
+        #expect(camera.yaw > 0 && camera.position.x > 0)
     }
 
     @Test func placementLocksTopViewAndRestoresChosenPreset() {
-        let bounds = LightingRoomGeometry(width: 4, length: 5, height: 2.6)
+        let room = SampleData.createStarterRoom()
+        let scene = LightingRoomScene(snapshot: LightingRoomSnapshot(room: room))
+        let view = ARView(frame: .zero, cameraMode: .nonAR, automaticallyConfigureSession: false)
         var placement = LightingPlacementState()
         placement.begin(from: .right)
         placement.begin(from: .top)
+        scene.apply(LightingSimulationSettings(), preset: .right, in: view)
+        scene.cameraController.magnify(from: scene.cameraController.distance, scale: 2)
+        let distance = scene.cameraController.distance
+        scene.setPlacementMode(true)
+        scene.apply(LightingSimulationSettings(), preset: .right, in: view)
         #expect(placement.isActive)
-        var navigation = LightingCameraNavigation()
-        navigation.orbit(deltaX: 120, deltaY: 90)
-        navigation.setLocked(true)
-        let locked = navigation.position(preset: .right, geometry: bounds)
-        #expect(locked.y > Float(bounds.height))
-        #expect(locked.x == 0 && locked.z == 0)
-        navigation.orbit(deltaX: 300, deltaY: 100)
-        navigation.magnify(by: 2)
-        navigation.reset()
-        #expect(navigation.position(preset: .front, geometry: bounds) == locked)
-        #expect(placement.finish() == .right)
+        #expect(scene.cameraController.yaw == ViewportPreset.top.targetYaw)
+        #expect(scene.cameraController.pitch == ViewportPreset.top.targetPitch)
+        #expect(scene.cameraController.position.y > Float(room.dimensionsHeight))
+        #expect(scene.cameraController.distance == scene.cameraController.initialDistance)
+        scene.setPlacementMode(false)
+        scene.apply(LightingSimulationSettings(), preset: placement.finish(), in: view)
         #expect(!placement.isActive)
-        navigation.setLocked(false)
-        navigation.orbit(deltaX: 80, deltaY: 0)
-        #expect(navigation.yaw < 0)
+        #expect(scene.cameraController.yaw == ViewportPreset.right.targetYaw)
+        #expect(scene.cameraController.distance == distance)
     }
 
     @Test func whitePlacementLayerKeepsDragAvailableAndDisablesCameraNavigation() {
@@ -545,31 +544,33 @@ struct LightingWorkspaceTests {
         #expect(!vm.lightingSettings.artificialLightsOn)
     }
 
-    @Test func cameraNavigationClampsZoomKeepsCameraAboveFloorAndResets() {
-        let bounds = LightingRoomGeometry(width: 4, length: 5, height: 2.6)
-        var navigation = LightingCameraNavigation()
-        let initial = navigation.position(preset: .dollhouseIsometric, geometry: bounds)
-        navigation.magnify(by: 100)
-        #expect(navigation.zoom == 3)
-        #expect(simd_distance(navigation.position(preset: .dollhouseIsometric, geometry: bounds), navigation.target(in: bounds))
-                < simd_distance(initial, navigation.target(in: bounds)))
-        navigation.orbit(deltaX: 200, deltaY: -10000)
-        for preset in ViewportPreset.allCases {
-            #expect(navigation.position(preset: preset, geometry: bounds).y > 0)
-        }
-        navigation.magnify(by: 0.001)
-        #expect(navigation.zoom == 0.5)
-        navigation.reset()
-        #expect(navigation.position(preset: .dollhouseIsometric, geometry: bounds) == initial)
+    @Test func cameraNavigationUsesAuditZoomBoundsAndPresetsPreserveZoom() {
+        let camera = StudioOrbitCameraController(width: 4, length: 5, height: 2.6)
+        camera.magnify(from: camera.distance, scale: 100)
+        #expect(camera.distance == camera.span * 0.6)
+        camera.orbit(fromYaw: camera.yaw, pitch: camera.pitch, deltaX: 200, deltaY: -10000)
+        #expect(camera.position.y > 0)
+        camera.magnify(from: camera.distance, scale: 0.1)
+        #expect(camera.distance == camera.span * 3.5)
+        let distance = camera.distance
+        camera.snap(to: .dollhouse, animated: false) {}
+        #expect(camera.distance == distance)
+        #expect(camera.yaw == ViewportPreset.dollhouse.targetYaw)
+        #expect(camera.pitch == ViewportPreset.dollhouse.targetPitch)
     }
 
     @Test func lightingCameraSupportsAllArchitecturalPresetsFromDev() {
-        let bounds = LightingRoomGeometry(width: 4, length: 5, height: 2.6)
-        let navigation = LightingCameraNavigation()
-        #expect(navigation.position(preset: .front, geometry: bounds).z > 0)
-        #expect(navigation.position(preset: .back, geometry: bounds).z < 0)
-        #expect(navigation.position(preset: .left, geometry: bounds).x < 0)
-        #expect(navigation.position(preset: .right, geometry: bounds).x > 0)
-        #expect(navigation.position(preset: .top, geometry: bounds).y > Float(bounds.height))
+        let camera = StudioOrbitCameraController(width: 4, length: 5, height: 2.6)
+        camera.snap(to: .front, animated: false) {}
+        #expect(camera.position.z > 0)
+        camera.snap(to: .back, animated: false) {}
+        #expect(camera.position.z < 0)
+        camera.snap(to: .left, animated: false) {}
+        #expect(camera.position.x < 0)
+        camera.snap(to: .right, animated: false) {}
+        #expect(camera.position.x > 0)
+        camera.snap(to: .top, animated: false) {}
+        #expect(camera.position.y > 2.6)
     }
+
 }

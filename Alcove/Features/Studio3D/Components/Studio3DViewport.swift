@@ -182,15 +182,26 @@ public struct Studio3DViewport: UIViewRepresentable {
         let fill = DirectionalLight()
 
         var updateSubscription: (any Cancellable)?
-        var animationTask: Task<Void, Never>? = nil
         private var entitySignatures: [UUID: String] = [:]
         let mascotController = MascotRoamController()
-
-        // Camera Orbit & Distance
-        var yaw: Float = 0.0
-        var pitch: Float = 0.62
-        var distance: Float = 10.0
-        var cameraTarget: SIMD3<Float> = [0, 0.6, 0]
+        let cameraController: StudioOrbitCameraController
+        var animationTask: Task<Void, Never>? { cameraController.animationTask }
+        var yaw: Float {
+            get { cameraController.yaw }
+            set { cameraController.yaw = newValue }
+        }
+        var pitch: Float {
+            get { cameraController.pitch }
+            set { cameraController.pitch = newValue }
+        }
+        var distance: Float {
+            get { cameraController.distance }
+            set { cameraController.distance = newValue }
+        }
+        var cameraTarget: SIMD3<Float> {
+            get { cameraController.target }
+            set { cameraController.target = newValue }
+        }
 
         private var pinchStartDistance: Float = 10.0
 
@@ -221,11 +232,9 @@ public struct Studio3DViewport: UIViewRepresentable {
             self.onFurnitureDragging = onFurnitureDragging
             self.onComputeWarningSeverities = onComputeWarningSeverities
             self.onTapBackground = onTapBackground
+            cameraController = StudioOrbitCameraController(width: room.dimensionsWidth, length: room.dimensionsLength,
+                                                           height: room.dimensionsHeight)
             super.init()
-
-            let span = Float(max(room.dimensionsWidth, room.dimensionsLength, 3.0))
-            distance = min(20, max(5, span * 1.5))
-            cameraTarget = SIMD3<Float>(0, Float(room.dimensionsHeight) * 0.35, 0)
 
             setupScene()
         }
@@ -240,9 +249,7 @@ public struct Studio3DViewport: UIViewRepresentable {
 
             // Realistic Perspective Camera
             camera.name = "OrbitCamera"
-            camera.camera.fieldOfViewInDegrees = 40
-            camera.camera.near = 0.1
-            camera.camera.far = 60
+            cameraController.configure(camera)
             root.addChild(camera)
 
             // Directional Sunlight pouring in fixed projection through the window opening
@@ -349,14 +356,7 @@ public struct Studio3DViewport: UIViewRepresentable {
         // MARK: - Camera & Dynamic Cutaways
 
         func updateCamera() {
-            let cosPitch = cos(pitch)
-            let sinPitch = sin(pitch)
-            let offset = SIMD3<Float>(
-                distance * cosPitch * sin(yaw),
-                distance * sinPitch,
-                distance * cosPitch * cos(yaw)
-            )
-            camera.look(at: cameraTarget, from: cameraTarget + offset, relativeTo: nil)
+            cameraController.apply(to: camera)
             if currentStage == .harmony {
                 updateFurnitureEntities(from: room)
             }
@@ -400,45 +400,10 @@ public struct Studio3DViewport: UIViewRepresentable {
 
         /// Snaps the orbit camera to an architectural viewport preset, smoothly interpolating by default.
         public func snapToViewport(_ preset: ViewportPreset, animated: Bool = true) {
-            let startYaw = self.yaw
-            let startPitch = self.pitch
-            let targetYaw = preset.targetYaw
-            let targetPitch = preset.targetPitch
-
-            if !animated {
-                animationTask?.cancel()
-                self.yaw = targetYaw
-                self.pitch = targetPitch
-                updateCamera()
-                updateWallCutaways()
-                updateSelectedProjection()
-                return
-            }
-
-            animationTask?.cancel()
-            animationTask = Task { @MainActor [weak self] in
-                guard let self else { return }
-                let duration: Double = 0.35
-                let startTime = CACurrentMediaTime()
-
-                var deltaYaw = (targetYaw - startYaw).truncatingRemainder(dividingBy: .pi * 2)
-                if deltaYaw > .pi { deltaYaw -= .pi * 2 }
-                if deltaYaw < -.pi { deltaYaw += .pi * 2 }
-
-                while !Task.isCancelled {
-                    let elapsed = CACurrentMediaTime() - startTime
-                    let progress = min(1.0, elapsed / duration)
-                    let t = Float(progress < 0.5 ? 2 * progress * progress : 1 - pow(-2 * progress + 2, 2) / 2)
-
-                    self.yaw = startYaw + deltaYaw * t
-                    self.pitch = startPitch + (targetPitch - startPitch) * t
-                    self.updateCamera()
-                    self.updateWallCutaways()
-                    self.updateSelectedProjection()
-
-                    if progress >= 1.0 { break }
-                    try? await Task.sleep(nanoseconds: 16_000_000)
-                }
+            cameraController.snap(to: preset, animated: animated) { [weak self] in
+                self?.updateCamera()
+                self?.updateWallCutaways()
+                self?.updateSelectedProjection()
             }
         }
 
@@ -605,9 +570,8 @@ public struct Studio3DViewport: UIViewRepresentable {
 
                 case .orbiting(let startYaw, let startPitch):
                     let translation = gesture.translation(in: arView)
-                    yaw = startYaw - Float(translation.x) * 0.007
-                    let rawPitch = startPitch + Float(translation.y) * 0.007
-                    pitch = min(1.55, max(0.12, rawPitch))
+                    cameraController.orbit(fromYaw: startYaw, pitch: startPitch,
+                                           deltaX: translation.x, deltaY: translation.y)
                     updateCamera()
                     updateWallCutaways()
                     updateSelectedProjection()
@@ -659,9 +623,7 @@ public struct Studio3DViewport: UIViewRepresentable {
             case .changed:
                 let scale = Float(gesture.scale)
                 if scale > 0.05 {
-                    let maxDim = Float(max(room.dimensionsWidth, room.dimensionsLength, 3.0))
-                    let newDist = pinchStartDistance / scale
-                    distance = min(maxDim * 3.5, max(maxDim * 0.6, newDist))
+                    cameraController.magnify(from: pinchStartDistance, scale: scale)
                     updateCamera()
                     updateSelectedProjection()
                 }

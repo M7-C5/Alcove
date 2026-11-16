@@ -29,8 +29,10 @@ outside this change's scope.
 - Rotate the educational east–south–west sunlight arc into room coordinates. This
   is magnetic north alignment, not a geographic solar calculation: no latitude,
   longitude, date, magnetic declination, or window-specific irradiance is modeled.
-- Read camera preset angles from the existing `ViewportPreset` used by the primary
-  viewport. Do not change AR walkthrough or its camera/session configuration.
+- Reuse the primary viewport's camera through `StudioOrbitCameraController`,
+  extracted from Audit's existing camera implementation. Audit and Lighting share
+  `StudioViewportActions` and the single AR presentation in `Studio3DView`.
+  AR walkthrough and its camera/session configuration remain unchanged.
 
 ## Consequences and future scan integration
 
