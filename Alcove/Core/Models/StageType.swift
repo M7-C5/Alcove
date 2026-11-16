@@ -32,7 +32,7 @@ public enum StageType: String, Codable, CaseIterable, Sendable, Identifiable {
         case .audit: return "Understand your space & bottlenecks"
         case .rearrangement: return "Circulation, clearance & focal points"
         case .illumination: return "Daylight simulation & lighting layers"
-        case .harmony: return "Before/After synthesis & final score"
+        case .harmony: return "Before/After synthesis & evaluation"
         }
     }
 

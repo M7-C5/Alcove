@@ -23,15 +23,13 @@ public struct StageListView: View {
                         ForEach(StageType.allCases) { stage in
                             let isUnlocked = room.isUnlocked(stage)
                             let isCompleted = room.isCompleted(stage)
-                            let progress = room.progress(for: stage)
 
                             if isUnlocked {
                                 NavigationLink(value: AlcoveRoute.studio(room: room, stage: stage)) {
                                     StageCardView(
                                         stage: stage,
                                         isUnlocked: true,
-                                        isCompleted: isCompleted,
-                                        score: progress?.score ?? 0
+                                        isCompleted: isCompleted
                                     )
                                 }
                                 .buttonStyle(.plain)
@@ -39,8 +37,7 @@ public struct StageListView: View {
                                 StageCardView(
                                     stage: stage,
                                     isUnlocked: false,
-                                    isCompleted: false,
-                                    score: 0
+                                    isCompleted: false
                                 )
                                 .opacity(0.55)
                             }

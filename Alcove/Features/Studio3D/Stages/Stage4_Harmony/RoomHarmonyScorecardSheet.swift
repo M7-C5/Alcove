@@ -28,13 +28,13 @@ public struct RoomHarmonyScorecardSheet: View {
         self.onCompleteCurriculum = onCompleteCurriculum
     }
 
-    private var gradeText: (letter: String, label: String, color: Color) {
+    private var evaluationStatus: (icon: String, label: String, color: Color) {
         if metrics.overallHarmonyScore >= 85 {
-            return ("A+", "Exceptional Spatial Harmony", .green)
+            return ("sparkles", "Exceptional Spatial Harmony", .green)
         } else if metrics.overallHarmonyScore >= 70 {
-            return ("A", "Well-Balanced Layout", .indigo)
+            return ("checkmark.seal.fill", "Well-Balanced Layout", .indigo)
         } else {
-            return ("B", "Solid Flow Improvement", .orange)
+            return ("arrow.up.right.circle.fill", "Solid Flow Improvement", .orange)
         }
     }
 
@@ -42,7 +42,7 @@ public struct RoomHarmonyScorecardSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 24) {
-                    // Hero Scorecard Header
+                    // Hero Evaluation Header
                     scorecardHeroSection
 
                     // 2-Column Metrics Grid for iPad Landscape
@@ -59,7 +59,7 @@ public struct RoomHarmonyScorecardSheet: View {
                 .padding(24)
             }
             .background(Color(uiColor: .systemGroupedBackground))
-            .navigationTitle("Room Harmony Scorecard")
+            .navigationTitle("Room Harmony Evaluation")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -72,53 +72,40 @@ public struct RoomHarmonyScorecardSheet: View {
         }
     }
 
-    // MARK: - Hero Score Section
+    // MARK: - Hero Evaluation Section
 
     private var scorecardHeroSection: some View {
         HStack(spacing: 28) {
-            // Circular Score Dial
+            // Circular Evaluation Status Icon Badge
             ZStack {
                 Circle()
-                    .stroke(Color.secondary.opacity(0.18), lineWidth: 12)
-                    .frame(width: 120, height: 120)
+                    .fill(evaluationStatus.color.opacity(0.14))
+                    .frame(width: 108, height: 108)
 
                 Circle()
-                    .trim(from: 0.0, to: CGFloat(metrics.overallHarmonyScore) / 100.0)
                     .stroke(
                         LinearGradient(
-                            colors: [gradeText.color, .indigo],
+                            colors: [evaluationStatus.color, .indigo],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         ),
-                        style: StrokeStyle(lineWidth: 12, lineCap: .round)
+                        lineWidth: 6
                     )
-                    .frame(width: 120, height: 120)
-                    .rotationEffect(.degrees(-90))
+                    .frame(width: 108, height: 108)
 
-                VStack(spacing: 2) {
-                    Text("\(metrics.overallHarmonyScore)")
-                        .font(.system(.largeTitle, design: .rounded).weight(.bold))
-                        .foregroundStyle(.primary)
-                    Text("out of 100")
-                        .font(.caption2.weight(.medium))
-                        .foregroundStyle(.secondary)
-                }
+                Image(systemName: evaluationStatus.icon)
+                    .font(.system(size: 40, weight: .semibold))
+                    .foregroundStyle(evaluationStatus.color)
             }
 
             // Room Title & Mascot Verdict
             VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 10) {
-                    Text(gradeText.letter)
-                        .font(.headline.weight(.black))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 4)
-                        .background(gradeText.color, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-
-                    Text(gradeText.label)
-                        .font(.headline.bold())
-                        .foregroundStyle(.primary)
-                }
+                Text(evaluationStatus.label)
+                    .font(.headline.bold())
+                    .foregroundStyle(evaluationStatus.color)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 5)
+                    .background(evaluationStatus.color.opacity(0.12), in: Capsule())
 
                 Text(room.name)
                     .font(.title3.weight(.semibold))
@@ -303,7 +290,7 @@ public struct RoomHarmonyScorecardSheet: View {
                     .font(.headline.bold())
                     .foregroundStyle(.primary)
                 Spacer()
-                Text("\(metrics.illuminationScore)/100")
+                Text(metrics.illuminationScore >= 70 ? "Balanced" : "Needs Layers")
                     .font(.subheadline.bold())
                     .foregroundStyle(metrics.illuminationScore >= 70 ? .green : .orange)
                     .padding(.horizontal, 8)

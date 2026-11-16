@@ -247,7 +247,7 @@ public struct StudioToolbars: View {
                     // Summary and Add Lights
                     if let report = illuminationReport {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("Layers Status: \(report.balanceScore)/100")
+                            Text(report.isPassingScore ? "Layers Status: Balanced" : "Layers Status: Needs Layers")
                                 .font(.caption2.bold())
                                 .foregroundStyle(report.isPassingScore ? .green : .orange)
 
@@ -321,12 +321,12 @@ public struct StudioToolbars: View {
                 if let metrics = harmonyMetrics {
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Harmony Score")
+                            Text("Bottlenecks")
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
-                            Text("\(metrics.overallHarmonyScore)%")
+                            Text("\(metrics.workingBottlenecksCount) left")
                                 .font(.headline.bold())
-                                .foregroundStyle(.indigo)
+                                .foregroundStyle(metrics.workingBottlenecksCount == 0 ? .green : .orange)
                         }
                         Spacer()
                         VStack(alignment: .trailing, spacing: 2) {
