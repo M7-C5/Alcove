@@ -12,8 +12,8 @@ enum LightingTheme {
 
 extension View {
     func lightingPanel() -> some View {
-        background(LightingTheme.panel, in: RoundedRectangle(cornerRadius: 32, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 32, style: .continuous).stroke(LightingTheme.border, lineWidth: 3))
+        background(LightingTheme.panel, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).stroke(LightingTheme.ink, lineWidth: 1.5))
     }
 }
 

@@ -76,6 +76,25 @@ public struct RoomScanSheet: View {
 
     private var compassSection: some View {
         Section {
+            if let orientation = compass.orientation {
+                HStack(spacing: 16) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color.alcoveInk.opacity(0.25), lineWidth: 2)
+                            .frame(width: 76, height: 86)
+                        VStack(spacing: 0) {
+                            Text("N").font(.caption.bold())
+                            Image(systemName: "arrow.up").font(.title2.bold())
+                        }
+                        .rotationEffect(.degrees(-orientation.magneticForwardBearingDegrees))
+                        .foregroundStyle(Color.alcoveInk)
+                    }
+                    .frame(width: 100, height: 110)
+                    .accessibilityLabel("Magnetic north relative to your room")
+                    Text("North found")
+                        .font(.subheadline.weight(.semibold))
+                }
+            }
             Label(compassMessage, systemImage: "location.north.circle")
                 .font(.subheadline)
                 .fixedSize(horizontal: false, vertical: true)
