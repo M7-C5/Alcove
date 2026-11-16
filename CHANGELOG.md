@@ -9,7 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Update Otter walkthrough and chat UI and side-by-side clearance rules.
 - Align mascot prompt and dialogues with seven AI vibes.
+- Integrate roaming Otter mascot across 3D studio stages.
+- Add animated Otter mascot 3D model.
 - Add furniture catalog, add, remove, and swap actions.
 - Add real-time collision highlights, top warning banner, and audit lock.
 - Preserve multi-turn chat history and add zone occupancy context.
@@ -75,6 +78,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Update Otter 3D model face details and remove duplicate asset.
 - Store API key in Keychain, use header auth, and decouple chat badge.
 - Compute wall proximity from boundary extents and sanitize flowery placement wording.
 - Generate room-aware dynamic recommendations naming active furniture.
