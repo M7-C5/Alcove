@@ -79,9 +79,11 @@ public struct FastPathRulebook: Sendable {
                                           (item.category == .bed && event.furnitureName.localizedCaseInsensitiveContains("nightstand"))
                 if isNightstandBedPair && dist >= 0.30 { continue }
 
-                // Table/Desk + Chair/Seating
-                let isDeskChairPair = (event.category == .table && item.category == .seating) ||
-                                      (item.category == .table && event.category == .seating)
+                // Table/Desk + Chair/Seating (tucked or adjacent seating is intentional, not crowding)
+                let isDeskChairPair = ((event.category == .table || event.furnitureName.localizedCaseInsensitiveContains("desk") || event.furnitureName.localizedCaseInsensitiveContains("table")) &&
+                                       (item.category == .seating || item.name.localizedCaseInsensitiveContains("chair") || item.name.localizedCaseInsensitiveContains("stool"))) ||
+                                      ((item.category == .table || item.name.localizedCaseInsensitiveContains("desk") || item.name.localizedCaseInsensitiveContains("table")) &&
+                                       (event.category == .seating || event.furnitureName.localizedCaseInsensitiveContains("chair") || event.furnitureName.localizedCaseInsensitiveContains("stool")))
                 if isDeskChairPair && dist >= 0.35 { continue }
             }
 
@@ -92,6 +94,11 @@ public struct FastPathRulebook: Sendable {
                                        item.name.localizedCaseInsensitiveContains("pendant") ||
                                        item.name.localizedCaseInsensitiveContains("sconce")
             if isSuspendedOrMounted {
+                continue
+            }
+
+            if let moved = allFurnitures.first(where: { $0.name == event.furnitureName && !$0.isArchived }),
+               AnthropometricStandards.isSideBySideNonBlocking(a: moved, b: item) {
                 continue
             }
 
@@ -197,7 +204,7 @@ public struct FastPathRulebook: Sendable {
         for i in 0..<active.count {
             let a = active[i]
             if isSuspendedOrWallMounted(a) { continue }
-            let extA = halfExtents(for: a)
+            let extA = AnthropometricStandards.halfExtents(for: a)
 
             for j in (i + 1)..<active.count {
                 let b = active[j]
@@ -206,15 +213,17 @@ public struct FastPathRulebook: Sendable {
                     continue
                 }
 
-                let extB = halfExtents(for: b)
+                let extB = AnthropometricStandards.halfExtents(for: b)
                 let gapX = abs(a.positionX - b.positionX) - (extA.x + extB.x)
                 let gapZ = abs(a.positionZ - b.positionZ) - (extA.z + extB.z)
                 let edgeGap = hypot(max(0.0, gapX), max(0.0, gapZ))
 
                 if AnthropometricStandards.isFunctionalCompanionPair(a: a, b: b) {
                     let isDeskChair = (a.category == .table && b.category == .seating) ||
-                        (b.category == .table && a.category == .seating)
-                    let tolerance = isDeskChair ? 0.22 : 0.06
+                        (b.category == .table && a.category == .seating) ||
+                        (a.name.localizedCaseInsensitiveContains("desk") && b.name.localizedCaseInsensitiveContains("chair")) ||
+                        (b.name.localizedCaseInsensitiveContains("desk") && a.name.localizedCaseInsensitiveContains("chair"))
+                    let tolerance = isDeskChair ? 0.45 : 0.06
                     if gapX < -tolerance && gapZ < -tolerance {
                         warnings.append(
                             SpatialWarning(
@@ -240,13 +249,30 @@ public struct FastPathRulebook: Sendable {
                         )
                     )
                 } else if edgeGap < AnthropometricStandards.minimumCirculation {
+                    // Side-by-side storage + desk/table/chair do not need a walkway between their sides
+                    if AnthropometricStandards.isSideBySideNonBlocking(a: a, b: b) {
+                        continue
+                    }
+
+                    let message: String
+                    if AnthropometricStandards.blocksFrontOpening(of: a, by: b) {
+                        message = "The front opening of \(a.name) is too tight against \(b.name) — leave walkway space in front for easy access."
+                    } else if AnthropometricStandards.blocksFrontOpening(of: b, by: a) {
+                        message = "The front opening of \(b.name) is too tight against \(a.name) — leave walkway space in front for easy access."
+                    } else if AnthropometricStandards.blocksSeatingRearEgress(of: a, by: b) ||
+                              AnthropometricStandards.blocksSeatingRearEgress(of: b, by: a) {
+                        message = "Not enough pull-out room behind seating between \(a.name) and \(b.name) — slide one back for comfortable egress."
+                    } else {
+                        message = "Tight walkway between \(a.name) and \(b.name) — leave a bit more breathing room for easy flow."
+                    }
+
                     warnings.append(
                         SpatialWarning(
                             id: "tight_\(a.id.uuidString)_\(b.id.uuidString)",
                             severity: .caution,
                             furnitureIDs: [a.id, b.id],
                             title: "Can Be Better",
-                            message: "Tight walkway between \(a.name) and \(b.name) — leave a bit more breathing room for easy flow."
+                            message: message
                         )
                     )
                 }
@@ -257,7 +283,7 @@ public struct FastPathRulebook: Sendable {
         let doorX = -halfW * 0.35
         for f in active {
             if isSuspendedOrWallMounted(f) { continue }
-            let ext = halfExtents(for: f)
+            let ext = AnthropometricStandards.halfExtents(for: f)
 
             // Red: Entrance door blocked on Front-Left wall
             if (f.positionZ + ext.z) > (halfL - 0.55) &&
@@ -337,15 +363,6 @@ public struct FastPathRulebook: Sendable {
     ) -> [UUID: SpatialWarningSeverity] {
         let warnings = evaluateSpatialWarnings(furnitures: furnitures, roomDimensions: roomDimensions)
         return Self.warningSeverityMap(from: warnings)
-    }
-
-    private func halfExtents(for f: Furniture) -> (x: Double, z: Double) {
-        let absCos = abs(cos(f.rotationYaw))
-        let absSin = abs(sin(f.rotationYaw))
-        return (
-            x: (absCos * f.width + absSin * f.length) / 2.0,
-            z: (absSin * f.width + absCos * f.length) / 2.0
-        )
     }
 
     private func isSuspendedOrWallMounted(_ f: Furniture) -> Bool {

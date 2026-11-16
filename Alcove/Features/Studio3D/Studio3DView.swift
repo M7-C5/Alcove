@@ -2,11 +2,11 @@ import SwiftUI
 import SwiftData
 import AudioToolbox
 
-/// 3D Studio workspace rendering the low-poly RealityKit room and furniture layout,
-/// featuring Resign's circular Sims Action HUD where the rotate button glides along the orbit rim,
-/// accompanied by the pedagogical Mascot AI Companion bottom HUD and contextual chat drawer.
+/// 3D Studio workspace rendering the framed RealityKit room, 5-step stage header,
+/// circular Sims Action HUD, Otter walkthrough & chat overlays, and bottom-left Otter trigger.
 public struct Studio3DView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(NavigationRouter.self) private var router: NavigationRouter?
     public let room: Room
     public let stage: StageType
@@ -18,6 +18,7 @@ public struct Studio3DView: View {
     @State private var ghostFurnitureID: UUID? = nil
     @State private var ghostFloorPosition: SIMD3<Float>? = nil
     @State private var isARWalkthroughPresented: Bool = false
+    @State private var viewportFrame: CGRect = .zero
 
     public init(room: Room, stage: StageType = .rearrangement) {
         self.room = room
@@ -38,331 +39,55 @@ public struct Studio3DView: View {
         }
     }
 
+    private var stageHeaderTitle: String {
+        switch viewModel.currentStage {
+        case .audit:
+            return "Stage 2: Check Your Room"
+        case .rearrangement:
+            return "Stage 3: Rearrange Your Room"
+        case .illumination:
+            return "Stage 4: Light Your Room"
+        case .harmony:
+            return "Stage 5: Harmony Reveal"
+        }
+    }
+
     @ViewBuilder private var furnitureStudio: some View {
         @Bindable var bindableVM = viewModel
         let warningSeverities = viewModel.warningSeverityByFurnitureID
 
-        GeometryReader { geometry in
-            ZStack(alignment: .topLeading) {
-                // Interactive 3D RealityKit Viewport (unmounted during AR Walkthrough to prevent camera/Metal device contention)
-                if !isARWalkthroughPresented {
-                    Studio3DViewport(
-                        room: room,
+        GeometryReader { outerGeometry in
+            ZStack(alignment: .bottomLeading) {
+                LightingWorkspaceBackground()
+
+                VStack(spacing: 12) {
+                    studioHeader
+                    stageProgressBar
+
+                    Spacer(minLength: 4)
+
+                    // Centered Framed 3D Room Viewport matching Light Stage UI
+                    framedRoomViewport(
+                        outerSize: outerGeometry.size,
                         selectedFurnitureID: $bindableVM.selectedFurnitureID,
-                        selectedFurnitureScreenPosition: $selectedFurnitureScreenPosition,
-                        viewportSize: geometry.size,
-                        ghostFurnitureID: ghostFurnitureID,
-                        ghostFloorPosition: ghostFloorPosition,
-                        currentStage: viewModel.currentStage,
-                        beforeAfterSplit: viewModel.beforeAfterSplit,
-                        revealMode: viewModel.revealMode,
-                        furnitureWarningSeverities: warningSeverities,
-                        onFurnitureMoved: { event in
-                            viewModel.handleFurnitureMoved(event)
-                        },
-                        onFurnitureDragging: {
-                            viewModel.notifyLiveFurnitureDrag()
-                        },
-                        onComputeWarningSeverities: {
-                            viewModel.warningSeverityByFurnitureID
-                        },
-                        onFloorRaycasterResolved: { raycaster in
-                            viewModel.floorRaycaster = raycaster
-                        },
-                        onSnapToViewportResolved: { snapper in
-                            viewModel.snapToViewport = snapper
-                        },
-                        onTapBackground: {
-                            if viewModel.isArchiveListPresented {
-                                withAnimation(.spring(response: 0.35, dampingFraction: 0.78)) {
-                                    viewModel.isArchiveListPresented = false
-                                }
-                                playSnapFeedback()
-                            }
-                        }
+                        beforeAfterSplit: $bindableVM.beforeAfterSplit,
+                        warningSeverities: warningSeverities
                     )
+
+                    Spacer(minLength: 8)
                 }
-
-                // Resign-style Circular Sims Action HUD projected over selected furniture
-                if viewModel.currentStage.unlockedTools.contains(.rotateFurniture),
-                   viewModel.currentStage != .harmony,
-                   let furniture = viewModel.selectedFurniture,
-                   let projected = selectedFurnitureScreenPosition,
-                   !viewModel.isArchiveListPresented {
-                    let clamped = FurnitureSimsActionHUD.clampedPosition(
-                        projected: projected,
-                        in: geometry.size
-                    )
-                    let currentWarningSeverity = warningSeverities[furniture.id]
-                    FurnitureSimsActionHUD(
-                        furniture: furniture,
-                        isColliding: currentWarningSeverity == .collision,
-                        warningSeverity: currentWarningSeverity,
-                        onStepRotate: {
-                            handleStepRotate(for: furniture)
-                        },
-                        onCircularRotate: { deltaAngle in
-                            handleCircularRotate(for: furniture, deltaAngle: deltaAngle)
-                        },
-                        onDragRotateEnded: {
-                            handleDragRotateEnded(for: furniture)
-                        },
-                        onArchive: {
-                            handleArchive(for: furniture)
-                        },
-                        onSwap: {
-                            playSnapFeedback()
-                            viewModel.openSwapFurnitureCatalog(for: furniture)
-                        },
-                        onRemove: furniture.isUserAdded ? {
-                            handleRemove(for: furniture)
-                        } : nil
-                    )
-                    .position(clamped)
-                    .transition(.scale(scale: 0.85).combined(with: .opacity))
-                    .zIndex(10)
-                }
-
-                // Top Navigation HUD: Back button, Mascot Feedback, and Circular Archive Button
-                HStack(spacing: 12) {
-                    Button {
-                        if let router, !router.isEmpty {
-                            router.pop()
-                        } else {
-                            dismiss()
-                        }
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: "chevron.left")
-                                .font(.body.weight(.semibold))
-                            Text("Stages")
-                                .font(.subheadline.weight(.medium))
-                        }
-                        .foregroundStyle(.primary)
-                        .padding(.horizontal, 14)
-                        .frame(minHeight: 44)
-                        .background(.regularMaterial, in: Capsule())
-                    }
-
-                    Spacer()
-
-                    // Top Warning Notification Banner (Red: Collision, Yellow: Can Be Better)
-                    if let warning = viewModel.activeTopWarning {
-                        let isCollision = warning.severity == .collision
-                        let accentTint: Color = isCollision ? .red : .yellow
-                        let badgeTint: Color = isCollision ? .red : Color(red: 0.78, green: 0.48, blue: 0.0)
-
-                        Button {
-                            if let targetID = warning.furnitureIDs.first {
-                                viewModel.selectFurniture(id: targetID)
-                            }
-                        } label: {
-                            HStack(spacing: 10) {
-                                Image(systemName: isCollision ? "exclamationmark.triangle.fill" : "exclamationmark.circle.fill")
-                                    .font(.body.weight(.semibold))
-                                    .foregroundStyle(badgeTint)
-
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(warning.title.uppercased())
-                                        .font(.caption2.weight(.bold))
-                                        .foregroundStyle(badgeTint)
-                                        .tracking(0.6)
-
-                                    Text(warning.message)
-                                        .font(.caption.weight(.medium))
-                                        .foregroundStyle(.primary)
-                                        .lineLimit(2)
-                                        .multilineTextAlignment(.leading)
-                                        .fixedSize(horizontal: false, vertical: true)
-                                }
-                            }
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 8)
-                            .frame(minHeight: 44)
-                            .frame(maxWidth: 460, alignment: .leading)
-                            .background {
-                                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                    .fill(.regularMaterial)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                            .fill(accentTint.opacity(isCollision ? 0.14 : 0.18))
-                                    )
-                            }
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                    .stroke(accentTint.opacity(isCollision ? 0.65 : 0.80), lineWidth: 1.5)
-                            )
-                            .shadow(color: accentTint.opacity(0.18), radius: 8, y: 2)
-                        }
-                        .buttonStyle(.plain)
-                        .transition(.move(edge: .top).combined(with: .opacity))
-                        .animation(.easeInOut(duration: 0.2), value: warning.id)
-                    } else if viewModel.currentStage != .harmony {
-                        HStack(spacing: 8) {
-                            Image(systemName: "checkmark.circle.fill")
-                                .font(.subheadline)
-                                .foregroundStyle(.green)
-                            Text("No collisions or tight walkways")
-                                .font(.caption.weight(.medium))
-                                .foregroundStyle(.primary)
-                                .lineLimit(1)
-                        }
-                        .padding(.horizontal, 14)
-                        .frame(minHeight: 44)
-                        .background(.regularMaterial, in: Capsule())
-                        .overlay(
-                            Capsule()
-                                .stroke(Color.green.opacity(0.30), lineWidth: 1)
-                        )
-                        .transition(.move(edge: .top).combined(with: .opacity))
-                    }
-
-                    Spacer()
-
-                    // Trailing Controls: Point of View (POV) Snap Menu & Circular Archive Button
-                    HStack(spacing: 8) {
-                        Menu {
-                            ForEach(ViewportPreset.allCases) { preset in
-                                if preset == .dollhouse {
-                                    Divider()
-                                }
-                                Button {
-                                    viewModel.snapToViewport?(preset)
-                                    playSnapFeedback()
-                                } label: {
-                                    Label(preset.title, systemImage: preset.systemImage)
-                                }
-                            }
-                        } label: {
-                            Image(systemName: "rotate.3d")
-                                .font(.body.weight(.semibold))
-                                .foregroundStyle(.primary)
-                                .frame(width: 44, height: 44)
-                                .background(.regularMaterial, in: Circle())
-                                .overlay(
-                                    Circle()
-                                        .stroke(Color.primary.opacity(0.08), lineWidth: 1)
-                                )
-                                .shadow(
-                                    color: Color.black.opacity(0.04),
-                                    radius: 8,
-                                    y: 2
-                                )
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Point of View")
-
-                        // 1:1 Life-Size AR Walkthrough Button
-                        Button {
-                            isARWalkthroughPresented = true
-                            playSnapFeedback()
-                        } label: {
-                            Text("AR")
-                                .font(.system(size: 15, weight: .bold, design: .rounded))
-                                .foregroundStyle(.primary)
-                                .frame(width: 44, height: 44)
-                                .background(.regularMaterial, in: Circle())
-                                .overlay(
-                                    Circle().stroke(Color.primary.opacity(0.08), lineWidth: 1)
-                                )
-                                .shadow(
-                                    color: Color.black.opacity(0.04),
-                                    radius: 8,
-                                    y: 2
-                                )
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Launch 1:1 Life-Size AR Walkthrough")
-
-                        // Circular Add Furniture Button (Stage 2)
-                        if viewModel.canManipulateFurniture {
-                            Button {
-                                playSnapFeedback()
-                                viewModel.openAddFurnitureCatalog()
-                            } label: {
-                                Image(systemName: "plus")
-                                    .font(.body.weight(.semibold))
-                                    .foregroundStyle(Color.alcoveInk)
-                                    .frame(width: 44, height: 44)
-                                    .background(Color.alcoveSurface, in: Circle())
-                                    .overlay(
-                                        Circle()
-                                            .stroke(Color.alcoveInk.opacity(0.16), lineWidth: 1)
-                                    )
-                                    .shadow(color: Color.black.opacity(0.04), radius: 8, y: 2)
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel("Add furniture")
-                        }
-
-                        // Circular Archive Button (Icon + number badge pinned on top right)
-                        if viewModel.currentStage.unlockedTools.contains(.inventoryArchive) && viewModel.currentStage != .harmony {
-                            Button {
-                                withAnimation(.spring(response: 0.35, dampingFraction: 0.78)) {
-                                    viewModel.isArchiveListPresented.toggle()
-                                }
-                                playSnapFeedback()
-                            } label: {
-                                ZStack(alignment: .topTrailing) {
-                                    Image(systemName: viewModel.isArchiveListPresented ? "archivebox.fill" : "archivebox")
-                                        .font(.body.weight(.semibold))
-                                        .foregroundStyle(viewModel.isArchiveListPresented ? .white : .primary)
-                                        .frame(width: 44, height: 44)
-                                        .background {
-                                            if viewModel.isArchiveListPresented {
-                                                Circle().fill(Color.accentColor)
-                                            } else {
-                                                Circle().fill(.regularMaterial)
-                                            }
-                                        }
-                                        .overlay(
-                                            Circle()
-                                                .stroke(viewModel.isArchiveListPresented ? Color.accentColor : Color.primary.opacity(0.08), lineWidth: 1)
-                                        )
-                                        .shadow(
-                                            color: viewModel.isArchiveListPresented ? Color.accentColor.opacity(0.40) : Color.black.opacity(0.04),
-                                            radius: 8,
-                                            y: 2
-                                        )
-
-                                    if !viewModel.archivedFurnitures.isEmpty {
-                                        Text("\(viewModel.archivedFurnitures.count)")
-                                            .font(.caption2.weight(.bold))
-                                            .foregroundStyle(.white)
-                                            .padding(.horizontal, 5)
-                                            .padding(.vertical, 2)
-                                            .background(Color.accentColor, in: Capsule())
-                                            .offset(x: 4, y: -4)
-                                    }
-                                }
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel(viewModel.isArchiveListPresented ? "Close archive inventory" : "Open archive inventory, \(viewModel.archivedFurnitures.count) items archived")
-                        }
-                    }
-                }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, 28)
                 .padding(.top, 16)
+                .padding(.bottom, 16)
                 .safeAreaPadding(.top)
 
-                // Stage 4 Harmony: Full-Screen Interactive Split Divider Curtain (Like phone photo editing before/after sliders)
-                if viewModel.currentStage == .harmony && !viewModel.isArchiveListPresented {
-                    SplitCurtainDividerView(
-                        splitFraction: $bindableVM.beforeAfterSplit,
-                        totalWidth: geometry.size.width,
-                        totalHeight: geometry.size.height
-                    )
-                    .transition(.opacity)
-                    .zIndex(14)
-                }
-
-                // Freeform Pen Selection Style Bottom Center Furniture Archive Dock (60% screen width)
+                // Bottom-Center Furniture Archive Dock (when archive open)
                 if viewModel.isArchiveListPresented && viewModel.currentStage.unlockedTools.contains(.inventoryArchive) && viewModel.currentStage != .harmony {
                     VStack {
                         Spacer()
                         FurnitureInventoryDock(
                             archivedFurnitures: viewModel.archivedFurnitures,
-                            dockWidth: geometry.size.width * 0.60,
+                            dockWidth: outerGeometry.size.width * 0.60,
                             onRestoreItem: { item, screenPoint in
                                 restoreFurnitureItem(item, at: screenPoint)
                             },
@@ -377,7 +102,7 @@ public struct Studio3DView: View {
                                 }
                             },
                             onCardDragEnded: { item, point in
-                                let dockTopThreshold = geometry.size.height - 120
+                                let dockTopThreshold = outerGeometry.size.height - 120
                                 if point.y < dockTopThreshold {
                                     restoreFurnitureItem(item, at: point)
                                 }
@@ -398,7 +123,7 @@ public struct Studio3DView: View {
                     .zIndex(20)
                 }
 
-                // Bottom Mascot & Dialogue Controls (Visible when archive drawer is closed)
+                // Bottom-Left Floating Otter Logo (kept visible behind scrim just like Figma)
                 if !viewModel.isArchiveListPresented {
                     VStack {
                         Spacer()
@@ -406,14 +131,18 @@ public struct Studio3DView: View {
                             mascotEmotion: viewModel.mascotEmotion,
                             mascotMessage: viewModel.mascotMessage,
                             onTriggerEvaluation: { viewModel.triggerStageEvaluation() },
-                            onOpenChat: { viewModel.showingChatDrawer = true }
+                            onOpenChat: {
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    viewModel.showingChatDrawer = true
+                                }
+                            }
                         )
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
                     .zIndex(15)
                 }
 
-                // Stage Walkthrough Dialogue Overlay (Figma Image 1 & 2)
+                // Stage Walkthrough Dialogue Overlay
                 if viewModel.isWalkthroughActive {
                     StageWalkthroughOverlay(
                         steps: viewModel.walkthroughSteps,
@@ -424,31 +153,43 @@ public struct Studio3DView: View {
                     .transition(.opacity)
                     .zIndex(30)
                 }
+
+                // Inline Otter Chat Overlay over the 3D Room
+                if viewModel.showingChatDrawer {
+                    MascotChatDrawer(
+                        mascotService: viewModel.mascotService,
+                        feedbackService: viewModel.feedbackService,
+                        currentStage: viewModel.currentStage,
+                        room: viewModel.room,
+                        initialHistory: viewModel.chatHistory,
+                        onHistoryUpdated: { updated in
+                            viewModel.chatHistory = updated
+                        },
+                        onClose: {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                viewModel.showingChatDrawer = false
+                            }
+                        }
+                    )
+                    .transition(.opacity)
+                    .zIndex(32)
+                }
             }
             .coordinateSpace(name: "Studio3DViewportSpace")
         }
         .ignoresSafeArea()
         .navigationBarBackButtonHidden(true)
+        .toolbar(.hidden, for: .navigationBar)
         .onAppear {
             viewModel.updateMascotGreeting()
-            if viewModel.currentStage == .audit {
+            if viewModel.currentStage == .audit || viewModel.currentStage == .rearrangement {
                 viewModel.startWalkthrough()
             }
         }
-        .sheet(isPresented: $viewModel.showingChatDrawer) {
-            MascotChatDrawer(
-                mascotService: viewModel.mascotService,
-                feedbackService: viewModel.feedbackService,
-                currentStage: viewModel.currentStage,
-                room: viewModel.room,
-                initialHistory: viewModel.chatHistory,
-                onHistoryUpdated: { updated in
-                    viewModel.chatHistory = updated
-                }
-            )
-            .presentationDetents([.fraction(0.55), .fraction(0.85), .large])
-            .presentationDragIndicator(.visible)
-            .presentationBackgroundInteraction(.enabled(upThrough: .fraction(0.55)))
+        .onChange(of: viewModel.currentStage) { _, newStage in
+            if newStage == .rearrangement {
+                viewModel.startWalkthrough()
+            }
         }
         .sheet(isPresented: $viewModel.showingEvaluationSheet) {
             if let result = viewModel.evaluationResult {
@@ -476,7 +217,7 @@ public struct Studio3DView: View {
                 room: viewModel.room,
                 metrics: viewModel.currentHarmonyMetrics,
                 onInteractiveSplitTapped: {
-                    // Scorecard dismisses automatically, leaving user to scrub 3D split
+                    // Scorecard dismisses automatically
                 },
                 onStartGuidedTour: {
                     viewModel.startCinematicWalkthroughTour()
@@ -525,9 +266,444 @@ public struct Studio3DView: View {
         }
     }
 
+    // MARK: - Top Header & 5-Step Stage Stepper (Figma / Light Stage Style)
+
+    private var studioHeader: some View {
+        HStack(spacing: 12) {
+            Button {
+                if let router, !router.isEmpty {
+                    router.pop()
+                } else {
+                    dismiss()
+                }
+            } label: {
+                Image(systemName: "chevron.left")
+                    .font(.headline.bold())
+                    .foregroundStyle(Color.alcoveText)
+                    .frame(width: 44, height: 44)
+                    .background(Color.alcoveBackground, in: Circle())
+                    .overlay(Circle().stroke(Color.alcoveBorder, lineWidth: 2))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Back to Stages")
+
+            Text(stageHeaderTitle)
+                .font(.custom("Cleanow", size: 32, relativeTo: .title))
+                .foregroundStyle(Color.alcoveText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .frame(maxWidth: .infinity)
+
+            HStack(spacing: 10) {
+                if viewModel.canManipulateFurniture {
+                    Button {
+                        playSnapFeedback()
+                        viewModel.openAddFurnitureCatalog()
+                    } label: {
+                        Image(systemName: "plus")
+                            .font(.headline.bold())
+                            .foregroundStyle(Color.alcoveText)
+                            .frame(width: 44, height: 44)
+                            .background(Color.alcoveBackground, in: Circle())
+                            .overlay(Circle().stroke(Color.alcoveBorder, lineWidth: 2))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Add furniture")
+                }
+
+                if viewModel.currentStage.unlockedTools.contains(.inventoryArchive) && viewModel.currentStage != .harmony {
+                    Button {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.78)) {
+                            viewModel.isArchiveListPresented.toggle()
+                        }
+                        playSnapFeedback()
+                    } label: {
+                        ZStack(alignment: .topTrailing) {
+                            Image(systemName: viewModel.isArchiveListPresented ? "archivebox.fill" : "archivebox")
+                                .font(.headline.bold())
+                                .foregroundStyle(Color.alcoveText)
+                                .frame(width: 44, height: 44)
+                                .background(
+                                    viewModel.isArchiveListPresented ? Color.alcovePrimaryFill : Color.alcoveBackground,
+                                    in: Circle()
+                                )
+                                .overlay(Circle().stroke(Color.alcoveBorder, lineWidth: 2))
+
+                            if !viewModel.archivedFurnitures.isEmpty {
+                                Text("\(viewModel.archivedFurnitures.count)")
+                                    .font(.system(.caption2, design: .rounded, weight: .bold))
+                                    .foregroundStyle(Color.alcoveText)
+                                    .padding(.horizontal, 5)
+                                    .padding(.vertical, 2)
+                                    .background(Color.alcovePrimaryFill, in: Capsule())
+                                    .overlay(Capsule().stroke(Color.alcoveBorder, lineWidth: 1.5))
+                                    .offset(x: 4, y: -4)
+                            }
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(viewModel.isArchiveListPresented ? "Close archive inventory" : "Open archive inventory, \(viewModel.archivedFurnitures.count) items archived")
+                }
+
+                Button {
+                    isARWalkthroughPresented = true
+                    playSnapFeedback()
+                } label: {
+                    Text("AR")
+                        .font(.system(.caption, design: .rounded, weight: .heavy))
+                        .foregroundStyle(Color.alcoveText)
+                        .frame(width: 44, height: 44)
+                        .background(Color.alcoveBackground, in: Circle())
+                        .overlay(Circle().stroke(Color.alcoveBorder, lineWidth: 2))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Launch 1:1 Life-Size AR Walkthrough")
+
+                Menu {
+                    ForEach(ViewportPreset.allCases) { preset in
+                        if preset == .dollhouse {
+                            Divider()
+                        }
+                        Button {
+                            viewModel.snapToViewport?(preset)
+                            playSnapFeedback()
+                        } label: {
+                            Label(preset.title, systemImage: preset.systemImage)
+                        }
+                    }
+                } label: {
+                    Image(systemName: "cube")
+                        .font(.title3)
+                        .foregroundStyle(Color.alcoveText)
+                        .frame(width: 44, height: 44)
+                        .background(Color.alcoveBackground, in: Circle())
+                        .overlay(Circle().stroke(Color.alcoveBorder, lineWidth: 2))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Camera view")
+            }
+        }
+    }
+
+    private enum StepStatus {
+        case done
+        case active(Int)
+        case upcoming(Int)
+    }
+
+    private var progressSteps: [(title: String, status: StepStatus)] {
+        switch viewModel.currentStage {
+        case .audit:
+            return [
+                ("Scan", .done),
+                ("Check", .active(2)),
+                ("Rearrange", .upcoming(3)),
+                ("Lighting", .upcoming(4)),
+                ("AR", .upcoming(5))
+            ]
+        case .rearrangement:
+            return [
+                ("Scan", .done),
+                ("Check", .done),
+                ("Rearrange", .active(3)),
+                ("Lighting", .upcoming(4)),
+                ("AR", .upcoming(5))
+            ]
+        case .illumination:
+            return [
+                ("Scan", .done),
+                ("Check", .done),
+                ("Rearrange", .done),
+                ("Lighting", .active(4)),
+                ("AR", .upcoming(5))
+            ]
+        case .harmony:
+            return [
+                ("Scan", .done),
+                ("Check", .done),
+                ("Rearrange", .done),
+                ("Lighting", .done),
+                ("AR", .active(5))
+            ]
+        }
+    }
+
+    @ViewBuilder
+    private var stageProgressBar: some View {
+        if dynamicTypeSize.isAccessibilitySize {
+            Text(stageHeaderTitle)
+                .font(.custom("Cleanow", size: 22, relativeTo: .headline))
+                .foregroundStyle(Color.alcoveText)
+        } else {
+            let steps = progressSteps
+            HStack(alignment: .top, spacing: 6) {
+                ForEach(Array(steps.enumerated()), id: \.offset) { index, step in
+                    VStack(spacing: 6) {
+                        ZStack {
+                            switch step.status {
+                            case .done:
+                                Circle()
+                                    .fill(Color.alcoveProgressDone)
+                                Circle()
+                                    .stroke(Color.alcoveBorder, lineWidth: 2)
+                                Image(systemName: "checkmark")
+                                    .font(.system(.subheadline, design: .rounded, weight: .heavy))
+                                    .foregroundStyle(Color.alcoveText)
+                            case .active(let number):
+                                Circle()
+                                    .fill(Color.alcovePrimaryFill)
+                                Circle()
+                                    .stroke(Color.alcoveBorder, lineWidth: 2)
+                                Text("\(number)")
+                                    .font(.system(.headline, design: .rounded, weight: .bold))
+                                    .foregroundStyle(Color.alcoveText)
+                            case .upcoming(let number):
+                                Circle()
+                                    .fill(Color.alcoveProgressInactive)
+                                Circle()
+                                    .stroke(Color.alcoveMutedInk.opacity(0.45), lineWidth: 1.5)
+                                Text("\(number)")
+                                    .font(.system(.headline, design: .rounded, weight: .bold))
+                                    .foregroundStyle(Color.alcoveMutedInk.opacity(0.65))
+                            }
+                        }
+                        .frame(width: 40, height: 40)
+
+                        Text(step.title)
+                            .font(.system(.caption, design: .rounded, weight: .semibold))
+                            .foregroundStyle({
+                                switch step.status {
+                                case .done, .active: return Color.alcoveText
+                                case .upcoming: return Color.alcoveMutedInk.opacity(0.7)
+                                }
+                            }())
+                    }
+                    .frame(width: 66)
+
+                    if index < steps.count - 1 {
+                        let lineDone: Bool = {
+                            if case .done = step.status { return true }
+                            return false
+                        }()
+                        Capsule()
+                            .fill(lineDone ? Color.alcoveProgressDone : Color.alcoveMutedInk.opacity(0.3))
+                            .frame(maxWidth: 72)
+                            .frame(height: 2)
+                            .padding(.top, 19)
+                    }
+                }
+            }
+            .frame(maxWidth: 660)
+            .frame(maxWidth: .infinity)
+        }
+    }
+
+    // MARK: - Centered Framed 3D Room Viewport
+
+    @ViewBuilder
+    private func framedRoomViewport(
+        outerSize: CGSize,
+        selectedFurnitureID: Binding<UUID?>,
+        beforeAfterSplit: Binding<Double>,
+        warningSeverities: [UUID: SpatialWarningSeverity]
+    ) -> some View {
+        let panelWidth = min(760, max(320, outerSize.width - 140))
+
+        ZStack {
+            GeometryReader { viewportGeometry in
+                ZStack(alignment: .top) {
+                    if !isARWalkthroughPresented {
+                        Studio3DViewport(
+                            room: room,
+                            selectedFurnitureID: selectedFurnitureID,
+                            selectedFurnitureScreenPosition: $selectedFurnitureScreenPosition,
+                            viewportSize: viewportGeometry.size,
+                            ghostFurnitureID: ghostFurnitureID,
+                            ghostFloorPosition: ghostFloorPosition,
+                            currentStage: viewModel.currentStage,
+                            beforeAfterSplit: viewModel.beforeAfterSplit,
+                            revealMode: viewModel.revealMode,
+                            furnitureWarningSeverities: warningSeverities,
+                            onFurnitureMoved: { event in
+                                viewModel.handleFurnitureMoved(event)
+                            },
+                            onFurnitureDragging: {
+                                viewModel.notifyLiveFurnitureDrag()
+                            },
+                            onComputeWarningSeverities: {
+                                viewModel.warningSeverityByFurnitureID
+                            },
+                            onFloorRaycasterResolved: { raycaster in
+                                viewModel.floorRaycaster = raycaster
+                            },
+                            onSnapToViewportResolved: { snapper in
+                                viewModel.snapToViewport = snapper
+                            },
+                            onTapBackground: {
+                                if viewModel.isArchiveListPresented {
+                                    withAnimation(.spring(response: 0.35, dampingFraction: 0.78)) {
+                                        viewModel.isArchiveListPresented = false
+                                    }
+                                    playSnapFeedback()
+                                }
+                            }
+                        )
+                        .background {
+                            GeometryReader { frameProxy in
+                                Color.clear
+                                    .onAppear {
+                                        viewportFrame = frameProxy.frame(in: .named("Studio3DViewportSpace"))
+                                    }
+                                    .onChange(of: frameProxy.size) {
+                                        viewportFrame = frameProxy.frame(in: .named("Studio3DViewportSpace"))
+                                    }
+                            }
+                        }
+                    }
+
+                    // Resign-style Circular Sims Action HUD projected inside framed viewport
+                    if viewModel.currentStage.unlockedTools.contains(.rotateFurniture),
+                       viewModel.currentStage != .harmony,
+                       let furniture = viewModel.selectedFurniture,
+                       let projected = selectedFurnitureScreenPosition,
+                       !viewModel.isArchiveListPresented {
+                        let clamped = FurnitureSimsActionHUD.clampedPosition(
+                            projected: projected,
+                            in: viewportGeometry.size
+                        )
+                        let currentWarningSeverity = warningSeverities[furniture.id]
+                        FurnitureSimsActionHUD(
+                            furniture: furniture,
+                            isColliding: currentWarningSeverity == .collision,
+                            warningSeverity: currentWarningSeverity,
+                            onStepRotate: {
+                                handleStepRotate(for: furniture)
+                            },
+                            onCircularRotate: { deltaAngle in
+                                handleCircularRotate(for: furniture, deltaAngle: deltaAngle)
+                            },
+                            onDragRotateEnded: {
+                                handleDragRotateEnded(for: furniture)
+                            },
+                            onArchive: {
+                                handleArchive(for: furniture)
+                            },
+                            onSwap: {
+                                viewModel.openSwapFurnitureCatalog(for: furniture)
+                            },
+                            onRemove: furniture.isUserAdded ? {
+                                handleRemove(for: furniture)
+                            } : nil
+                        )
+                        .position(clamped)
+                        .transition(.scale(scale: 0.85).combined(with: .opacity))
+                        .zIndex(10)
+                    }
+
+                    // Stage 4 Harmony: Split Curtain Divider inside framed viewport
+                    if viewModel.currentStage == .harmony && !viewModel.isArchiveListPresented {
+                        SplitCurtainDividerView(
+                            splitFraction: beforeAfterSplit,
+                            totalWidth: viewportGeometry.size.width,
+                            totalHeight: viewportGeometry.size.height
+                        )
+                        .transition(.opacity)
+                        .zIndex(14)
+                    }
+
+                    // Top Warning Banner inside the framed room
+                    if !viewModel.isWalkthroughActive && !viewModel.showingChatDrawer {
+                        warningBanner
+                            .padding(.top, 10)
+                            .padding(.horizontal, 12)
+                            .zIndex(16)
+                    }
+                }
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .padding(10)
+        .lightingPanel()
+        .frame(maxWidth: panelWidth, maxHeight: .infinity)
+    }
+
+    @ViewBuilder
+    private var warningBanner: some View {
+        if let warning = viewModel.activeTopWarning {
+            let isCollision = warning.severity == .collision
+            let accentTint: Color = isCollision ? .red : .yellow
+            let badgeTint: Color = isCollision ? .red : Color(red: 0.78, green: 0.48, blue: 0.0)
+
+            Button {
+                if let targetID = warning.furnitureIDs.first {
+                    viewModel.selectFurniture(id: targetID)
+                }
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: isCollision ? "exclamationmark.triangle.fill" : "exclamationmark.circle.fill")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(badgeTint)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(warning.title.uppercased())
+                            .font(.system(.caption2, design: .rounded, weight: .bold))
+                            .foregroundStyle(badgeTint)
+                            .tracking(0.6)
+
+                        Text(warning.message)
+                            .font(.system(.caption, design: .rounded, weight: .medium))
+                            .foregroundStyle(Color.alcoveText)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .frame(minHeight: 44)
+                .frame(maxWidth: 460, alignment: .leading)
+                .background {
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .fill(Color.alcoveBubbleFill)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                .fill(accentTint.opacity(isCollision ? 0.14 : 0.18))
+                        )
+                }
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .stroke(accentTint.opacity(isCollision ? 0.65 : 0.80), lineWidth: 1.5)
+                )
+            }
+            .buttonStyle(.plain)
+            .transition(.move(edge: .top).combined(with: .opacity))
+            .animation(.easeInOut(duration: 0.2), value: warning.id)
+        } else if viewModel.currentStage != .harmony {
+            HStack(spacing: 8) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.subheadline)
+                    .foregroundStyle(.green)
+                Text("No collisions or tight walkways")
+                    .font(.system(.caption, design: .rounded, weight: .medium))
+                    .foregroundStyle(Color.alcoveText)
+                    .lineLimit(1)
+            }
+            .padding(.horizontal, 14)
+            .frame(minHeight: 44)
+            .background(Color.alcoveBubbleFill, in: Capsule())
+            .overlay(
+                Capsule()
+                    .stroke(Color.alcoveBorder.opacity(0.28), lineWidth: 1.2)
+            )
+            .transition(.move(edge: .top).combined(with: .opacity))
+        }
+    }
+
+    // MARK: - Interaction Helpers
+
     private func handleStepRotate(for furniture: Furniture) {
         withAnimation(.spring(response: 0.28, dampingFraction: 0.7)) {
-            viewModel.rotateSelectedFurniture(delta: -.pi / 4.0) // 45° step clockwise
+            viewModel.rotateSelectedFurniture(delta: -.pi / 4.0)
             playSnapFeedback()
         }
     }
@@ -537,7 +713,6 @@ public struct Studio3DView: View {
         if rotateDragStartYaw == nil {
             rotateDragStartYaw = startYaw
         }
-        // Clockwise motion on screen decreases yaw in RealityKit
         let targetYaw = startYaw - deltaAngle
         let snapResult = FurnitureTransformEngine.snapYaw(
             rawYaw: targetYaw,
@@ -582,8 +757,16 @@ public struct Studio3DView: View {
         }
     }
 
+    private func viewportLocalPoint(from screenPoint: CGPoint) -> CGPoint {
+        guard viewportFrame.width > 0 else { return screenPoint }
+        return CGPoint(
+            x: screenPoint.x - viewportFrame.minX,
+            y: screenPoint.y - viewportFrame.minY
+        )
+    }
+
     private func updateGhostFloorPosition(for furniture: Furniture, at point: CGPoint, roomSize: (Float, Float)) {
-        if let p = viewModel.floorRaycaster?(point) {
+        if let p = viewModel.floorRaycaster?(viewportLocalPoint(from: point)) {
             let clamped = FurnitureTransformEngine.clampPosition(
                 position: SIMD3<Float>(p.x, 0.0, p.z),
                 furnitureWidth: Float(furniture.width),
@@ -599,7 +782,7 @@ public struct Studio3DView: View {
     private func restoreFurnitureItem(_ furniture: Furniture, at screenPoint: CGPoint?) {
         playSnapFeedback()
         let targetPos: SIMD3<Float>
-        if let screenPoint, let p = viewModel.floorRaycaster?(screenPoint) {
+        if let screenPoint, let p = viewModel.floorRaycaster?(viewportLocalPoint(from: screenPoint)) {
             let clamped = FurnitureTransformEngine.clampPosition(
                 position: SIMD3<Float>(p.x, 0.0, p.z),
                 furnitureWidth: Float(furniture.width),
@@ -622,9 +805,7 @@ public struct Studio3DView: View {
     }
 
     private func playSnapFeedback() {
-        // System audio click cue (vital for iPad which has no vibration motor)
         AudioServicesPlaySystemSound(1104)
-        // Physical haptic impact (for iPhone and Apple Pencil Pro)
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
     }
 }

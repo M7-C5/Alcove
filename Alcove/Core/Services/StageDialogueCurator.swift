@@ -23,22 +23,30 @@ public struct StageDialogueCurator: Sendable {
         case .audit:
             return [
                 WalkthroughStep(
-                    text: "Hey there, welcome in! Are you excited to start rearranging your room together?",
+                    text: "Hey there! Are you excited to start rearranging your room?",
                     emotion: .happy
                 ),
                 WalkthroughStep(
-                    text: "First, let's take a gentle look at your baseline condition and natural pathways—zero pressure, we're just getting to know your space.",
+                    text: "But first, take a look at your scanned room!",
                     emotion: .neutral
+                ),
+                WalkthroughStep(
+                    text: "Then, try to rotate, zoom in, or zoom out to get a better room view!",
+                    emotion: .curious
                 )
             ]
         case .rearrangement:
             return [
                 WalkthroughStep(
-                    text: "Stage 2: The Rearrangement! Let's get hands-on and experiment freely.",
+                    text: "Drag a furniture to move it around!",
+                    emotion: .happy
+                ),
+                WalkthroughStep(
+                    text: "Now, tap a furniture to rotate, archive, or change it into another piece — like swapping a lamp for a bed!",
                     emotion: .curious
                 ),
                 WalkthroughStep(
-                    text: "Drag pieces across the floor or tap to rotate them until it feels just right—nothing is permanent, and small nudges go a long way!",
+                    text: "Want more pieces? Tap the '+' button at the top right to add new furniture to your room!",
                     emotion: .happy
                 )
             ]
@@ -80,7 +88,8 @@ public struct StageDialogueCurator: Sendable {
                     let a = furnitures[i]
                     let b = furnitures[j]
 
-                    if AnthropometricStandards.isFunctionalCompanionPair(a: a, b: b) {
+                    if AnthropometricStandards.isFunctionalCompanionPair(a: a, b: b) ||
+                        AnthropometricStandards.isSideBySideNonBlocking(a: a, b: b) {
                         continue
                     }
 
@@ -119,7 +128,8 @@ public struct StageDialogueCurator: Sendable {
                     let a = furnitures[i]
                     let b = furnitures[j]
 
-                    if AnthropometricStandards.isFunctionalCompanionPair(a: a, b: b) {
+                    if AnthropometricStandards.isFunctionalCompanionPair(a: a, b: b) ||
+                        AnthropometricStandards.isSideBySideNonBlocking(a: a, b: b) {
                         continue
                     }
 

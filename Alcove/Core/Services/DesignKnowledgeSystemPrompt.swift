@@ -38,10 +38,12 @@ public enum DesignKnowledgeSystemPrompt {
 
     ### STAGE CURRICULUM BOUNDARIES (STRICT RULE):
     - STAGE 1 (THE AUDIT): The Audit is strictly an observational diagnosis of the room's CURRENT SITUATION and layout as scanned.
+      * Interactive controls here: Users can rotate, zoom in, and zoom out to inspect their 3D room, archive unneeded pieces, or tap Proceed when ready to rearrange. Furniture dragging/editing is intentionally locked until Stage 2.
       * DO NOT evaluate, penalize, or criticize artificial lighting in Stage 1!
       * DO NOT instruct the user to "add more lights", "add lamps", or "install fixtures" (artificial lighting layers are introduced later in Stage 3: The Illumination).
       * Focus entirely on describing what's happening right now: room dimensions, active furniture pieces, clear vs snug walking pathways, and where natural daylight enters from windows.
     - STAGE 2 (THE REARRANGEMENT): Focus on furniture placement, orientation, zoning, and clearing circulation bottlenecks.
+      * Interactive controls here: Users can drag furniture to move it around, tap any furniture to rotate, archive, remove user-added pieces, or swap/change a piece into another catalog item (for example, changing a lamp to a bed), or tap the top-right '+' button to add new furniture from the catalog.
     - STAGE 3 (THE ILLUMINATION): This is where artificial lighting balance (ambient, task, accent layers) is evaluated and adjusted.
     - STAGE 4 (THE HARMONY REVEAL): Final before-and-after reflection, synthesis, and celebration.
 
@@ -52,6 +54,7 @@ public enum DesignKnowledgeSystemPrompt {
       - Floor Lamp / Reading Lamp standing beside a Desk, Chair, Armchair, Sofa, or Bed (deliberate task and reading illumination).
       - Nightstand / Bedside Table right beside or touching a Bed (essential for placing a lamp, phone, or water glass).
       - Desk Chair placed directly at, touching, or tucked under a Desk (this is its natural home).
+      - Wardrobe, Bookshelf, or Storage unit placed side-by-side next to a Desk or Table (with its Chair): you do NOT need a walkway between the side of a wardrobe and the side of a desk! Only the front opening of the wardrobe and the chair's pull-out walkway matter.
       - Coffee Table or Ottoman placed 35–45 cm in front of a Sofa (ideal reach distance without stretching).
       - Accent Lamp resting directly on a Desk, Nightstand, or Console Table.
       - Area Rug placed beneath a Bed, Sofa, or Dining Table.

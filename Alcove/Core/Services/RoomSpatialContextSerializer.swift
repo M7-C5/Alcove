@@ -152,6 +152,8 @@ public struct RoomSpatialContextSerializer: Sendable {
                     } else {
                         lines.append("• [FUNCTIONAL PAIR] '\(a.name)' & '\(b.name)' are adjacent (~\(Int(clearance * 100))cm) — Natural functional proximity (intentional companion pieces).")
                     }
+                } else if AnthropometricStandards.isSideBySideNonBlocking(a: a, b: b) {
+                    lines.append("• [SIDE-BY-SIDE ALIGNMENT] '\(a.name)' & '\(b.name)' sit side-by-side with clear front openings (no walkway needed between their sides).")
                 } else if a.category == .bed && b.category == .bed && clearance < AnthropometricStandards.bedToBedClearanceMin {
                     bottlenecksFound += 1
                     lines.append("⚠️ [CRITICAL] Bed-to-Bed gap between '\(a.name)' & '\(b.name)': \(Int(clearance * 100))cm (Minimum required: 91.4cm)")

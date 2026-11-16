@@ -1,10 +1,10 @@
 import SwiftUI
 
-/// Mascot interior design chat drawer
+/// Inline Otter chat overlay matching Alcove's 3D Figma inspector design.
 public struct MascotChatDrawer: View {
     @Environment(\.dismiss) private var dismiss
     @State private var viewModel: MascotChatViewModel
-    @State private var showingConfigSheet: Bool = false
+    private let onClose: (() -> Void)?
 
     public init(
         mascotService: any MascotAIServiceProtocol,
@@ -12,7 +12,8 @@ public struct MascotChatDrawer: View {
         currentStage: StageType,
         room: Room,
         initialHistory: [ChatMessage] = [],
-        onHistoryUpdated: (([ChatMessage]) -> Void)? = nil
+        onHistoryUpdated: (([ChatMessage]) -> Void)? = nil,
+        onClose: (() -> Void)? = nil
     ) {
         self._viewModel = State(
             initialValue: MascotChatViewModel(
@@ -24,136 +25,291 @@ public struct MascotChatDrawer: View {
                 onHistoryUpdated: onHistoryUpdated
             )
         )
+        self.onClose = onClose
     }
 
-    public init(viewModel: MascotChatViewModel) {
+    public init(viewModel: MascotChatViewModel, onClose: (() -> Void)? = nil) {
         self._viewModel = State(initialValue: viewModel)
+        self.onClose = onClose
+    }
+
+    private var stageSuggestions: [String] {
+        switch viewModel.currentStage {
+        case .audit:
+            return [
+                "Can I rearrange my room now?",
+                "What else can I do here?"
+            ]
+        case .rearrangement:
+            return [
+                "How do I add or swap furniture?",
+                "Where should I place my bed?",
+                "What clearance do I need?"
+            ]
+        case .illumination:
+            return [
+                "Tips for window lighting",
+                "How do I balance ambient & task light?",
+                "Where should I add lamps?"
+            ]
+        case .harmony:
+            return [
+                "How did my room flow improve?",
+                "What should I check in AR?"
+            ]
+        }
+    }
+
+    private var canSend: Bool {
+        !viewModel.inputPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !viewModel.isThinking
+    }
+
+    private func closeDrawer() {
+        if let onClose {
+            onClose()
+        } else {
+            dismiss()
+        }
     }
 
     public var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 16) {
-                        chatBubble(
-                            isUser: false,
-                            text: "Hey there, so glad you're here! I'm your Alcove design buddy—tell me what feels good or tricky in \(viewModel.room.name) right now, and we'll figure out \(viewModel.currentStage.title) together at your own pace."
-                        )
+        ZStack {
+            // Dimmed backdrop over the 3D room (tap outside to close)
+            Color.black.opacity(0.38)
+                .ignoresSafeArea()
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    closeDrawer()
+                }
 
-                        ForEach(viewModel.chatHistory) { entry in
-                            chatBubble(isUser: entry.isUser, text: entry.text, modelBadge: entry.modelBadge)
-                        }
+            VStack {
+                Spacer()
 
-                        if viewModel.isThinking {
-                            HStack(spacing: 6) {
-                                Text("Thinking...")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                ProgressView()
-                                    .scaleEffect(0.7)
+                // Main 3D Cream Chat Card
+                VStack(alignment: .leading, spacing: 14) {
+                    // Header / Conversation Area
+                    if viewModel.chatHistory.isEmpty && !viewModel.isThinking {
+                        Text("Hey! What can I help you with?")
+                            .font(.custom("Cleanow", size: 24, relativeTo: .title3))
+                            .foregroundStyle(Color.alcoveText)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    } else {
+                        ScrollViewReader { proxy in
+                            ScrollView {
+                                VStack(alignment: .leading, spacing: 10) {
+                                    ForEach(viewModel.chatHistory) { entry in
+                                        chatBubble(
+                                            isUser: entry.isUser,
+                                            text: entry.text,
+                                            modelBadge: entry.modelBadge
+                                        )
+                                        .id(entry.id)
+                                    }
+
+                                    if viewModel.isThinking {
+                                        HStack(spacing: 8) {
+                                            ProgressView()
+                                                .tint(Color.alcoveBorder)
+                                                .scaleEffect(0.85)
+                                            Text("Otter is thinking...")
+                                                .font(.system(.subheadline, design: .rounded, weight: .bold))
+                                                .foregroundStyle(Color.alcoveMutedInk)
+                                        }
+                                        .padding(.vertical, 4)
+                                        .id("thinkingIndicator")
+                                    }
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
                             }
-                            .padding(12)
+                            .frame(maxHeight: 156)
+                            .onChange(of: viewModel.chatHistory.count) {
+                                if let lastID = viewModel.chatHistory.last?.id {
+                                    withAnimation(.easeOut(duration: 0.2)) {
+                                        proxy.scrollTo(lastID, anchor: .bottom)
+                                    }
+                                }
+                            }
+                            .onChange(of: viewModel.isThinking) {
+                                if viewModel.isThinking {
+                                    withAnimation(.easeOut(duration: 0.2)) {
+                                        proxy.scrollTo("thinkingIndicator", anchor: .bottom)
+                                    }
+                                }
+                            }
                         }
                     }
-                    .padding(20)
-                }
 
-                // Quick suggestions
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        suggestionChip("What clearance do I need?")
-                        suggestionChip("How to orient seating?")
-                        suggestionChip("Tips for window lighting")
+                    // 3D Peach Suggestion Chips (Cleanow font + inner highlight/lip)
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 14) {
+                            ForEach(stageSuggestions, id: \.self) { query in
+                                suggestionChip(query)
+                            }
+                        }
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                }
-                .background(Color(uiColor: .secondarySystemGroupedBackground))
 
-                Divider()
+                    // 3D Rounded Input Box with Bottom-Right Paperplane Button
+                    ZStack(alignment: .bottomTrailing) {
+                        TextField("Type your thoughts here...", text: $viewModel.inputPrompt, axis: .vertical)
+                            .font(.system(.body, design: .rounded, weight: .medium))
+                            .foregroundStyle(Color.alcoveText)
+                            .lineLimit(2...4)
+                            .padding(.leading, 20)
+                            .padding(.trailing, 58)
+                            .padding(.top, 16)
+                            .padding(.bottom, 34)
+                            .frame(maxWidth: .infinity, minHeight: 108, alignment: .topLeading)
+                            .onSubmit {
+                                viewModel.sendMessage()
+                            }
 
-                // Input bar
-                HStack(spacing: 12) {
-                    TextField("Ask mascot about room design...", text: $viewModel.inputPrompt)
-                        .textFieldStyle(.roundedBorder)
-                        .onSubmit { viewModel.sendMessage() }
-
-                    Button {
-                        viewModel.sendMessage()
-                    } label: {
-                        Image(systemName: "arrow.up.circle.fill")
-                            .font(.title2)
+                        Button {
+                            viewModel.sendMessage()
+                        } label: {
+                            Image(systemName: "paperplane")
+                                .font(.subheadline.weight(.bold))
+                                .foregroundStyle(canSend ? Color.alcoveText : Color.alcoveSecondaryShadow)
+                                .frame(width: 38, height: 38)
+                                .background(
+                                    canSend ? Color.alcoveBadgeGold : Color.alcoveBackground,
+                                    in: Circle()
+                                )
+                                .overlay(
+                                    Circle()
+                                        .stroke(canSend ? Color.alcoveBorder : Color.alcoveSecondaryShadow, lineWidth: 2)
+                                )
+                        }
+                        .buttonStyle(.plain)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Circle())
+                        .disabled(!canSend)
+                        .accessibilityLabel("Send message")
+                        .padding(.trailing, 10)
+                        .padding(.bottom, 10)
                     }
-                    .disabled(viewModel.inputPrompt.trimmingCharacters(in: .whitespaces).isEmpty)
-                }
-                .padding(16)
-                .background(Color(uiColor: .systemBackground))
-            }
-            .navigationTitle("Ask Design Mascot")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Done") { dismiss() }
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        showingConfigSheet = true
-                    } label: {
-                        Label("AI Model", systemImage: "sparkles")
+                    .background {
+                        AlcoveTactileCardBackground(
+                            cornerRadius: 22,
+                            borderWidth: 3,
+                            topHighlightColor: .alcoveBackground,
+                            bottomLipColor: .alcoveSecondaryShadow,
+                            faceColor: .alcoveBackground,
+                            topBevel: 0,
+                            bottomBevel: 4.5
+                        )
+                    }
+
+                    // Bottom-Right Chevron Row to Dismiss Chat
+                    HStack {
+                        Spacer()
+                        Button(action: closeDrawer) {
+                            Image(systemName: "chevron.right")
+                                .font(.system(.title3, design: .rounded, weight: .bold))
+                                .foregroundStyle(Color.alcoveText)
+                                .frame(width: 44, height: 44)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Close chat")
                     }
                 }
-            }
-            .sheet(isPresented: $showingConfigSheet) {
-                AIModelConfigSheet(room: viewModel.room, currentStage: viewModel.currentStage)
+                .padding(.horizontal, 44)
+                .padding(.top, 38)
+                .padding(.bottom, 12)
+                .frame(maxWidth: 980, alignment: .leading)
+                .background {
+                    AlcoveTactileCardBackground(
+                        cornerRadius: 24,
+                        borderWidth: 3,
+                        topHighlightColor: .alcoveSurfaceElevated,
+                        bottomLipColor: .alcoveSecondaryShadow,
+                        faceColor: .alcoveSurfaceElevated,
+                        topBevel: 0,
+                        bottomBevel: 4
+                    )
+                }
+                // Background applied after card fill renders Otter BEHIND both card and name pill
+                .background(alignment: .topLeading) {
+                    MascotFigureView(emotion: viewModel.isThinking ? .thinking : .happy, showsTablet: true)
+                        .offset(x: -4, y: -196)
+                        .allowsHitTesting(false)
+                }
+                .overlay(alignment: .topLeading) {
+                    OtterNamePill()
+                        .offset(x: 44, y: -22)
+                        .allowsHitTesting(false)
+                }
+                .padding(.horizontal, 40)
+                .padding(.bottom, 24)
+                .safeAreaPadding(.bottom)
             }
         }
     }
 
     private func chatBubble(isUser: Bool, text: String, modelBadge: String? = nil) -> some View {
         HStack {
-            if isUser { Spacer(minLength: 40) }
-            VStack(alignment: isUser ? .trailing : .leading, spacing: 4) {
+            if isUser { Spacer(minLength: 48) }
+            VStack(alignment: isUser ? .trailing : .leading, spacing: 3) {
                 if let modelBadge, !isUser {
                     Text(modelBadge)
-                        .font(.caption2.bold())
-                        .foregroundStyle(.indigo)
+                        .font(.system(.caption2, design: .rounded, weight: .bold))
+                        .foregroundStyle(Color.alcoveMutedInk)
                         .padding(.horizontal, 4)
                 }
 
-                if let attributed = try? AttributedString(markdown: text, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)) {
-                    Text(attributed)
-                        .font(.body)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 12)
-                        .background(
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .fill(isUser ? Color.indigo : Color(uiColor: .secondarySystemGroupedBackground))
-                        )
-                        .foregroundStyle(isUser ? .white : .primary)
-                } else {
-                    Text(text)
-                        .font(.body)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 12)
-                        .background(
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .fill(isUser ? Color.indigo : Color(uiColor: .secondarySystemGroupedBackground))
-                        )
-                        .foregroundStyle(isUser ? .white : .primary)
-                }
+                let bubbleShape = RoundedRectangle(cornerRadius: 14, style: .continuous)
+                Text(text)
+                    .font(.system(.subheadline, design: .rounded, weight: isUser ? .semibold : .bold))
+                    .foregroundStyle(Color.alcoveText)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 9)
+                    .background(
+                        bubbleShape
+                            .fill(isUser ? Color.alcoveBadgeGold : Color.alcoveSurface)
+                    )
+                    .overlay(
+                        bubbleShape
+                            .stroke(Color.alcoveBorder.opacity(isUser ? 0.8 : 0.28), lineWidth: 1.5)
+                    )
             }
-            if !isUser { Spacer(minLength: 40) }
+            if !isUser { Spacer(minLength: 48) }
         }
     }
 
     private func suggestionChip(_ query: String) -> some View {
-        Button(query) {
+        Button {
             viewModel.selectSuggestion(query)
+        } label: {
+            Text(query)
+                .font(.custom("Cleanow", size: 20, relativeTo: .headline))
+                .foregroundStyle(Color.alcoveText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+                .padding(.horizontal, 26)
+                .frame(height: 46)
+                .background {
+                    ZStack {
+                        Capsule()
+                            .fill(Color.alcoveBorder)
+
+                        ZStack {
+                            VStack(spacing: 0) {
+                                Color.alcoveChipHighlight
+                                Color.alcoveChipShadow
+                            }
+
+                            Capsule()
+                                .fill(Color.alcoveChipFill)
+                                .padding(.top, 3)
+                                .padding(.bottom, 5)
+                        }
+                        .clipShape(Capsule())
+                        .padding(3)
+                    }
+                }
+                .contentShape(Capsule())
         }
-        .font(.caption)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
-        .background(Capsule().fill(Color.indigo.opacity(0.12)))
-        .foregroundStyle(.indigo)
+        .buttonStyle(.plain)
     }
 }

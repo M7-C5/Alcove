@@ -179,7 +179,13 @@ extension AnthropometricStandards {
         }
 
         // 3. Work/Dining Surface + Seating (Desk/Table + Chair/Sofa)
-        if (isSurfaceA && isSeatingB) || (isSurfaceB && isSeatingA) {
+        let isWorkSurfaceA = categoryA == .table ||
+            nameA.localizedCaseInsensitiveContains("table") ||
+            nameA.localizedCaseInsensitiveContains("desk")
+        let isWorkSurfaceB = categoryB == .table ||
+            nameB.localizedCaseInsensitiveContains("table") ||
+            nameB.localizedCaseInsensitiveContains("desk")
+        if (isWorkSurfaceA && isSeatingB) || (isWorkSurfaceB && isSeatingA) {
             return true
         }
 
@@ -194,6 +200,121 @@ extension AnthropometricStandards {
             categoryB: b.category,
             nameB: b.name
         )
+    }
+
+    // MARK: - Rotated Footprint & Opening / Side-by-Side Geometry
+
+    /// Returns world-space rotated axis-aligned half extents for a furniture piece.
+    public static func halfExtents(for f: Furniture) -> (x: Double, z: Double) {
+        let absCos = abs(cos(f.rotationYaw))
+        let absSin = abs(sin(f.rotationYaw))
+        return (
+            x: (absCos * f.width + absSin * f.length) / 2.0,
+            z: (absSin * f.width + absCos * f.length) / 2.0
+        )
+    }
+
+    private static func localProjectionGaps(
+        from target: Furniture,
+        to obstacle: Furniture
+    ) -> (projForward: Double, targetHalfForward: Double, forwardGap: Double, backwardGap: Double, lateralGap: Double) {
+        let forwardX = sin(target.rotationYaw)
+        let forwardZ = cos(target.rotationYaw)
+        let rightX = cos(target.rotationYaw)
+        let rightZ = -sin(target.rotationYaw)
+
+        let dx = obstacle.positionX - target.positionX
+        let dz = obstacle.positionZ - target.positionZ
+        let projForward = dx * forwardX + dz * forwardZ
+        let projRight = dx * rightX + dz * rightZ
+
+        let targetHalfForward = target.length / 2.0
+        let targetHalfRight = target.width / 2.0
+
+        let relYaw = obstacle.rotationYaw - target.rotationYaw
+        let absCos = abs(cos(relYaw))
+        let absSin = abs(sin(relYaw))
+        let obsHalfForward = (absSin * obstacle.width + absCos * obstacle.length) / 2.0
+        let obsHalfRight = (absCos * obstacle.width + absSin * obstacle.length) / 2.0
+
+        let sumForward = targetHalfForward + obsHalfForward
+        let forwardGap = projForward - sumForward
+        let backwardGap = -projForward - sumForward
+        let lateralGap = abs(projRight) - (targetHalfRight + obsHalfRight)
+        return (projForward, targetHalfForward, forwardGap, backwardGap, lateralGap)
+    }
+
+    /// True when `obstacle` sits directly in front of `target`'s functional front opening/access side
+    /// within `minOpeningClearance` meters.
+    public static func blocksFrontOpening(
+        of target: Furniture,
+        by obstacle: Furniture,
+        minOpeningClearance: Double = minimumCirculation
+    ) -> Bool {
+        let gaps = localProjectionGaps(from: target, to: obstacle)
+        return gaps.projForward > gaps.targetHalfForward * 0.25 &&
+            gaps.lateralGap < -0.08 &&
+            gaps.forwardGap >= -0.05 &&
+            gaps.forwardGap < minOpeningClearance
+    }
+
+    /// True when `obstacle` blocks a chair/seating piece's rear pull-out egress clearance.
+    public static func blocksSeatingRearEgress(
+        of seat: Furniture,
+        by obstacle: Furniture,
+        minClearance: Double = deskRearCirculationMin
+    ) -> Bool {
+        let isSeat = seat.category == .seating ||
+            seat.name.localizedCaseInsensitiveContains("chair") ||
+            seat.name.localizedCaseInsensitiveContains("stool")
+        guard isSeat else { return false }
+        let gaps = localProjectionGaps(from: seat, to: obstacle)
+        return gaps.projForward < -gaps.targetHalfForward * 0.25 &&
+            gaps.lateralGap < -0.08 &&
+            gaps.backwardGap >= -0.05 &&
+            gaps.backwardGap < minClearance
+    }
+
+    /// True when two furniture items sit cleanly side-by-side (non-colliding) such that no pedestrian
+    /// walkway is needed between their touching/adjacent sides (e.g. a wardrobe beside a desk + chair),
+    /// and neither blocks the other's front opening or seating pull-out clearance.
+    public static func isSideBySideNonBlocking(a: Furniture, b: Furniture) -> Bool {
+        let extA = halfExtents(for: a)
+        let extB = halfExtents(for: b)
+        let gapX = abs(a.positionX - b.positionX) - (extA.x + extB.x)
+        let gapZ = abs(a.positionZ - b.positionZ) - (extA.z + extB.z)
+
+        // Interpenetrating on both axes means physical collision, never side-by-side
+        guard gapX >= -0.02 || gapZ >= -0.02 else { return false }
+
+        let isStorage: (Furniture) -> Bool = { f in
+            f.category == .storage ||
+            f.name.localizedCaseInsensitiveContains("wardrobe") ||
+            f.name.localizedCaseInsensitiveContains("bookshelf") ||
+            f.name.localizedCaseInsensitiveContains("cabinet") ||
+            f.name.localizedCaseInsensitiveContains("cupboard") ||
+            f.name.localizedCaseInsensitiveContains("dresser") ||
+            f.name.localizedCaseInsensitiveContains("nightstand")
+        }
+        let isTableOrDesk: (Furniture) -> Bool = { f in
+            f.category == .table ||
+            f.name.localizedCaseInsensitiveContains("desk") ||
+            f.name.localizedCaseInsensitiveContains("table")
+        }
+        let isSeating: (Furniture) -> Bool = { f in
+            f.category == .seating ||
+            f.name.localizedCaseInsensitiveContains("chair") ||
+            f.name.localizedCaseInsensitiveContains("stool")
+        }
+
+        let eligiblePair = (isStorage(a) && (isTableOrDesk(b) || isStorage(b) || isSeating(b))) ||
+                           (isStorage(b) && (isTableOrDesk(a) || isStorage(a) || isSeating(a)))
+        guard eligiblePair else { return false }
+
+        return !blocksFrontOpening(of: a, by: b) &&
+            !blocksFrontOpening(of: b, by: a) &&
+            !blocksSeatingRearEgress(of: a, by: b) &&
+            !blocksSeatingRearEgress(of: b, by: a)
     }
 }
 

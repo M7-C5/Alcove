@@ -383,4 +383,67 @@ struct AlcoveCoreTests {
         )
         #expect(doorWarnings.contains { $0.severity == .collision && $0.title == "Door Blocked" && $0.furnitureIDs.contains(blocker.id) })
     }
+
+    @Test func wardrobeBesideDeskAndChairDoesNotTriggerWalkwayOrCollisionWarning() {
+        let rulebook = FastPathRulebook()
+        let roomDims = (width: 4.5, length: 5.5)
+
+        // Wardrobe and Work Desk sit side-by-side along the Back Wall (10cm side gap),
+        // with Ergonomic Chair tucked into the Work Desk (20cm overlap).
+        let wardrobe = Furniture(
+            name: "Wardrobe",
+            category: .storage,
+            positionX: -0.95,
+            positionY: 0.0,
+            positionZ: -2.35,
+            rotationYaw: 0.0,
+            width: 1.2,
+            length: 0.6
+        )
+        let desk = Furniture(
+            name: "Work Desk",
+            category: .table,
+            positionX: 0.35,
+            positionY: 0.0,
+            positionZ: -2.30,
+            rotationYaw: 0.0,
+            width: 1.2,
+            length: 0.7
+        )
+        let tuckedChair = Furniture(
+            name: "Ergonomic Chair",
+            category: .seating,
+            positionX: 0.35,
+            positionY: 0.0,
+            positionZ: -1.85,
+            rotationYaw: Double.pi,
+            width: 0.6,
+            length: 0.6
+        )
+
+        let sideBySideWarnings = rulebook.evaluateSpatialWarnings(
+            furnitures: [wardrobe, desk, tuckedChair],
+            roomDimensions: roomDims
+        )
+        #expect(sideBySideWarnings.isEmpty)
+
+        // Now move a Chair directly in front of the Wardrobe's opening (< 76.2cm in front)
+        let chairInFrontOfWardrobe = Furniture(
+            name: "Ergonomic Chair",
+            category: .seating,
+            positionX: -0.95,
+            positionY: 0.0,
+            positionZ: -1.60,
+            rotationYaw: 0.0,
+            width: 0.6,
+            length: 0.6
+        )
+        let openingBlockedWarnings = rulebook.evaluateSpatialWarnings(
+            furnitures: [wardrobe, chairInFrontOfWardrobe],
+            roomDimensions: roomDims
+        )
+        #expect(openingBlockedWarnings.contains {
+            $0.severity == .caution && $0.message.contains("front opening of Wardrobe")
+        })
+    }
 }

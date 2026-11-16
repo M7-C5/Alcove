@@ -20,11 +20,12 @@ struct StageDialogueCuratorTests {
         let curator = StageDialogueCurator()
 
         let steps = curator.buildSteps(for: .audit, room: room)
-        #expect(steps.count == 3)
-        #expect(steps[0].text.contains("excited to start rearranging"))
-        #expect(steps[1].text.contains("baseline condition"))
-        #expect(steps[2].emotion == .warning)
-        #expect(steps[2].text.contains("tight"))
+        #expect(steps.count == 4)
+        #expect(steps[0].text == "Hey there! Are you excited to start rearranging your room?")
+        #expect(steps[1].text == "But first, take a look at your scanned room!")
+        #expect(steps[2].text == "Then, try to rotate, zoom in, or zoom out to get a better room view!")
+        #expect(steps[3].emotion == .warning)
+        #expect(steps[3].text.contains("tight"))
     }
 
     @Test @MainActor func stage2RearrangementProvidesActionableGoal() {
@@ -32,9 +33,12 @@ struct StageDialogueCuratorTests {
         let curator = StageDialogueCurator()
 
         let steps = curator.buildSteps(for: .rearrangement, room: room)
-        #expect(steps.count == 3)
-        #expect(steps[0].text.contains("Stage 2"))
-        #expect(steps[2].text.contains("mission") || steps[2].text.contains("breathing room") || steps[2].text.contains("Scoot"))
+        #expect(steps.count == 4)
+        #expect(steps[0].text == "Drag a furniture to move it around!")
+        #expect(steps[1].text.contains("rotate, archive, or change"))
+        #expect(steps[1].text.contains("swapping a lamp for a bed"))
+        #expect(steps[2].text.contains("'+' button at the top right"))
+        #expect(steps[3].text.contains("mission") || steps[3].text.contains("breathing room") || steps[3].text.contains("Scoot"))
     }
 
     @Test @MainActor func stage3IlluminationRecommendsLightingNeed() {
