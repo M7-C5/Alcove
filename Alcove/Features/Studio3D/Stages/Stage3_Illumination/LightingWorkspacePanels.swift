@@ -6,16 +6,14 @@ struct LightingSourcePanel: View {
     let onAdd: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 12) {
             sourceHeader
-            Button(action: onAdd) {
-                Label(isAdding ? "Done adding" : "Add light", systemImage: isAdding ? "checkmark" : "plus.circle")
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(LightingPrimaryButtonStyle(isCream: true))
+            TactilePillButton(title: isAdding ? "Done adding" : "Add light", size: .compact,
+                              appearance: .cream, systemImage: isAdding ? "checkmark" : "plus.circle",
+                              fillsWidth: true, action: onAdd)
             if editor.isSelectingMultiple { selectionControls }
             ScrollView {
-                LazyVStack(spacing: 16) {
+                LazyVStack(spacing: 12) {
                     if editor.drafts.isEmpty {
                         Text(isAdding ? "Tap the room to place a light." : "Tap Add light to get started.")
                             .font(.subheadline)
@@ -26,13 +24,15 @@ struct LightingSourcePanel: View {
                         sourceButton(fixture)
                     }
                 }
+                .padding(2)
             }
+            .frame(maxHeight: .infinity)
             if editor.hasUnsavedChanges {
                 Label("Unsaved changes", systemImage: "circle.fill")
                     .font(.caption)
             }
         }
-        .padding(24)
+        .padding(20)
         .lightingPanel()
     }
 
@@ -110,7 +110,7 @@ struct LightingSimulationPanel: View {
     let activeFixtureCount: Int
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 12) {
             Label("Lighting preview", systemImage: "sun.max")
                 .font(.system(.headline, design: .rounded, weight: .heavy))
                 .fixedSize(horizontal: false, vertical: true)
@@ -140,7 +140,7 @@ struct LightingSimulationPanel: View {
                 Text("Showing your seven brightest lights.").font(.caption)
             }
         }
-        .padding(24)
+        .padding(20)
         .lightingPanel()
     }
     private func lightToggle(_ title: String, isOn: Binding<Bool>) -> some View {
@@ -162,7 +162,7 @@ struct LightingEditPanel: View {
     let onDelete: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Label("Light settings", systemImage: "lamp.desk.fill")
                     .font(.system(.headline, design: .rounded, weight: .heavy))
@@ -184,8 +184,8 @@ struct LightingEditPanel: View {
                     .padding(.bottom, 16)
             }
         }
-        .frame(minHeight: max(0, minimumHeight - 48), alignment: .top)
-        .padding(24)
+        .frame(minHeight: max(0, minimumHeight - 40), alignment: .top)
+        .padding(20)
         .lightingPanel()
     }
 
@@ -228,7 +228,7 @@ struct LightingEditPanel: View {
     private func fixtureControls(_ fixture: LightFixture) -> some View {
         let colorValue = editor.commonTemperature.map { "\($0) K" } ?? "Mixed"
         let brightnessValue = editor.commonBrightness.map { "\(Int($0)) lm" } ?? "Mixed"
-        return VStack(alignment: .leading, spacing: 16) {
+        return VStack(alignment: .leading, spacing: 12) {
             VStack(spacing: 0) {
                 HStack {
                     Text("Light color").font(.subheadline.bold())

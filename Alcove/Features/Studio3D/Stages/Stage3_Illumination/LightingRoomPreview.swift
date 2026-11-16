@@ -84,7 +84,7 @@ struct LightingRoomPreview: UIViewRepresentable {
         let coordinator = context.coordinator
         coordinator.badgeSubscription = view.scene.subscribe(to: SceneEvents.Update.self) { [weak coordinator, weak view] event in
             guard let view else { return }
-            coordinator?.updateViewportOverlay(in: view)
+            coordinator?.updateViewportProjection(in: view)
             coordinator?.updateMoveBadges(in: view)
             coordinator?.updateMascot(dt: Float(event.deltaTime))
         }
@@ -109,7 +109,6 @@ struct LightingRoomPreview: UIViewRepresentable {
         coordinator.cameraController.cancelAnimation()
         coordinator.badgeSubscription?.cancel()
         coordinator.removeMoveBadges()
-        coordinator.viewportOverlay.removeFromSuperview()
         view.scene.anchors.removeAll()
     }
 
@@ -121,7 +120,6 @@ struct LightingRoomPreview: UIViewRepresentable {
 @MainActor
 final class LightingRoomScene: NSObject {
     let root = AnchorEntity(world: .zero)
-    let viewportOverlay = LightingViewportOverlay()
     var onHeaderOverlap: ((Bool) -> Void)?
     private var headerOverlap = false
     private var hasInitialFraming = false
@@ -288,10 +286,9 @@ final class LightingRoomScene: NSObject {
         positionCamera()
     }
 
-    func updateViewportOverlay(in view: ARView) {
+    func updateViewportProjection(in view: ARView) {
         initializeFraming(in: view)
         if isPlacementMode, view.bounds.width > 0 { fitPlacement(in: view) }
-        if viewportOverlay.superview !== view { view.addSubview(viewportOverlay) }
         let w = Float(snapshot.geometry.width / 2)
         let l = Float(snapshot.geometry.length / 2)
         let h = Float(snapshot.geometry.height)
@@ -300,7 +297,7 @@ final class LightingRoomScene: NSObject {
                 [-l, l].compactMap { z in view.project(root.convert(position: [x, y, z], to: nil)) }
             }
         }
-        let overlap = viewportOverlay.update(points: points, bounds: view.bounds) && !isPlacementMode
+        let overlap = LightingViewportGeometry.overlapsHeader(points) && !isPlacementMode
         if headerOverlap != overlap {
             headerOverlap = overlap
             onHeaderOverlap?(overlap)

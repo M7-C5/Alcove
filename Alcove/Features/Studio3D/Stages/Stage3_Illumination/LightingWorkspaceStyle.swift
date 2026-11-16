@@ -12,34 +12,23 @@ enum LightingTheme {
 
 extension View {
     func lightingPanel() -> some View {
-        background(LightingTheme.panel, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).stroke(LightingTheme.ink, lineWidth: 1.5))
+        background(LightingTheme.panel, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 28, style: .continuous).stroke(LightingTheme.ink, lineWidth: 2.5))
     }
 }
 
 struct LightingWorkspaceBackground: View {
     var body: some View {
-        LightingTheme.background
-            .overlay {
-                Canvas { context, size in
-                    let symbols = ["bed.double", "sofa", "lamp.desk", "sun.max", "cube", "table.furniture"]
-                    for row in 0..<6 {
-                        for column in 0..<9 {
-                            var drawing = context
-                            drawing.translateBy(x: CGFloat(column) * 176 + (row.isMultiple(of: 2) ? 48 : 112),
-                                                y: CGFloat(row) * 176 + 56)
-                            drawing.rotate(by: .degrees(Double((row + column) % 3 - 1) * 12))
-                            let symbol = Text(Image(systemName: symbols[(row * 3 + column) % symbols.count]))
-                                .font(.largeTitle)
-                                .foregroundColor(LightingTheme.border.opacity(0.6))
-                            drawing.draw(symbol, at: .zero)
-                        }
-                    }
-                }
-                .accessibilityHidden(true)
-                .allowsHitTesting(false)
-            }
-            .ignoresSafeArea()
+        GeometryReader { proxy in
+            Image(decorative: "MainBackground")
+                .resizable()
+                .scaledToFill()
+                .frame(width: proxy.size.width, height: proxy.size.height)
+                .clipped()
+        }
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 }
 
@@ -100,28 +89,3 @@ struct LightingGradientSlider: View {
 }
 
 /// Warm raised capsule shared by the lighting workspace's primary actions.
-struct LightingPrimaryButtonStyle: ButtonStyle {
-    var isCream = false
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.system(.headline, design: .rounded, weight: .heavy))
-            .foregroundStyle(LightingTheme.ink)
-            .padding(.horizontal, 20)
-            .padding(.vertical, 12)
-            .frame(minHeight: 48)
-            .background {
-                ZStack {
-                    Capsule().fill(isCream ? Color(red: 0.91, green: 0.78, blue: 0.63) : Color(red: 1, green: 0.66, blue: 0))
-                    Capsule().fill(isCream ? Color(red: 1, green: 247.0 / 255, blue: 231.0 / 255) : Color(red: 1, green: 0.86, blue: 0.39))
-                        .padding(.bottom, 6)
-                    Capsule().strokeBorder(Color(red: 1, green: 0.94, blue: 0.73), lineWidth: 2)
-                        .padding(5)
-                        .padding(.bottom, 5)
-                }
-            }
-            .overlay(Capsule().strokeBorder(LightingTheme.ink, lineWidth: 2))
-            .contentShape(Capsule())
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
-    }
-}

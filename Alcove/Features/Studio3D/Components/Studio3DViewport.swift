@@ -185,7 +185,6 @@ public struct Studio3DViewport: UIViewRepresentable {
         let northIndicator = RoomNorthIndicator()
         var updateSubscription: (any Cancellable)?
         private var entitySignatures: [UUID: String] = [:]
-        let mascotController = MascotRoamController()
         let cameraController: StudioOrbitCameraController
         var animationTask: Task<Void, Never>? { cameraController.animationTask }
         var yaw: Float {
@@ -204,6 +203,8 @@ public struct Studio3DViewport: UIViewRepresentable {
             get { cameraController.target }
             set { cameraController.target = newValue }
         }
+        let mascotController = MascotRoamController()
+
 
         private var pinchStartDistance: Float = 10.0
 
