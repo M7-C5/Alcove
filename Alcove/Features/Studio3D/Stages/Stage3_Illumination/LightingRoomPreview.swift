@@ -39,6 +39,7 @@ struct LightingRoomPreview: UIViewRepresentable {
     let snapshot: LightingRoomSnapshot
     let settings: LightingSimulationSettings
     let preset: ViewportPreset
+    var cameraRequestID = 0
     var backgroundColor: UIColor = .init(white: 0.08, alpha: 1)
     var onPlaceLight: ((SIMD2<Float>) -> Void)?
     var onSelectLight: ((UUID) -> Void)?
@@ -75,7 +76,7 @@ struct LightingRoomPreview: UIViewRepresentable {
         context.coordinator.setPlacementMode(isPlacementMode)
         context.coordinator.setSelection(selectedFixtureIDs)
         context.coordinator.isSelectingMultiple = isSelectingMultiple
-        context.coordinator.apply(settings, preset: preset, in: view)
+        context.coordinator.apply(settings, preset: preset, in: view, animated: true, requestID: cameraRequestID)
         let coordinator = context.coordinator
         coordinator.badgeSubscription = view.scene.subscribe(to: SceneEvents.Update.self) { [weak coordinator, weak view] event in
             guard let view else { return }
@@ -95,10 +96,11 @@ struct LightingRoomPreview: UIViewRepresentable {
         context.coordinator.updateFixtures(snapshot.fixtures)
         context.coordinator.setSelection(selectedFixtureIDs)
         context.coordinator.isSelectingMultiple = isSelectingMultiple
-        context.coordinator.apply(settings, preset: preset, in: view)
+        context.coordinator.apply(settings, preset: preset, in: view, animated: true, requestID: cameraRequestID)
     }
 
     static func dismantleUIView(_ view: ARView, coordinator: LightingRoomScene) {
+        coordinator.cameraController.cancelAnimation()
         coordinator.badgeSubscription?.cancel()
         coordinator.removeMoveBadges()
         view.scene.anchors.removeAll()
@@ -118,7 +120,9 @@ final class LightingRoomScene: NSObject {
     private var fixtures: [(definition: LightFixture, light: LightingFixtureLight, model: LightingFixtureModel)] = []
     private var previousSettings: LightingSimulationSettings?
     private var previousPreset: ViewportPreset?
-    private var navigation = LightingCameraNavigation()
+    let cameraController: StudioOrbitCameraController
+    private var previousCameraRequestID: Int?
+    private var placementCameraDistance: Float?
     private var walls: [(entity: Entity, normal: SIMD3<Float>)] = []
     private var fixtureDefinitions: [LightFixture] = []
     let placementOverlay = ModelEntity()
@@ -134,11 +138,14 @@ final class LightingRoomScene: NSObject {
 
     init(snapshot: LightingRoomSnapshot) {
         self.snapshot = snapshot
+        cameraController = StudioOrbitCameraController(width: snapshot.geometry.width, length: snapshot.geometry.length,
+                                                       height: snapshot.geometry.height)
         super.init()
         buildRoom()
         buildPlacementOverlay()
         updateFixtures(snapshot.fixtures)
-        camera.camera.fieldOfViewInDegrees = 50
+        camera.name = "LightingCamera"
+        cameraController.configure(camera)
         root.addChild(camera)
         sun.name = "Sunlight"
         sun.light.intensity = 0
@@ -153,12 +160,16 @@ final class LightingRoomScene: NSObject {
         root.addChild(sun)
     }
 
-    func apply(_ settings: LightingSimulationSettings, preset: ViewportPreset, in view: ARView) {
+    func apply(_ settings: LightingSimulationSettings, preset: ViewportPreset, in view: ARView,
+               animated: Bool = false, requestID: Int = 0) {
         let effectivePreset: ViewportPreset = isPlacementMode ? .top : preset
-        if previousPreset != effectivePreset {
-            navigation.reset()
-            positionCamera(effectivePreset)
+        if previousPreset != effectivePreset || previousCameraRequestID != requestID {
+            let animate = animated && previousPreset != nil && !isPlacementMode
             previousPreset = effectivePreset
+            previousCameraRequestID = requestID
+            cameraController.snap(to: effectivePreset, animated: animate) { [weak self] in
+                self?.positionCamera()
+            }
         }
         guard previousSettings != settings else { return }
         previousSettings = settings
@@ -257,7 +268,14 @@ final class LightingRoomScene: NSObject {
     func setPlacementMode(_ enabled: Bool) {
         guard isPlacementMode != enabled else { return }
         isPlacementMode = enabled
-        navigation.setLocked(enabled)
+        cameraController.cancelAnimation()
+        if enabled {
+            placementCameraDistance = cameraController.distance
+            cameraController.distance = cameraController.initialDistance
+        } else if let distance = placementCameraDistance {
+            cameraController.distance = distance
+            placementCameraDistance = nil
+        }
         panGesture?.isEnabled = true
         pinchGesture?.isEnabled = !enabled
         resetGesture?.isEnabled = !enabled
@@ -347,13 +365,10 @@ final class LightingRoomScene: NSObject {
         previousSettings = nil
     }
 
-    private func positionCamera(_ preset: ViewportPreset) {
-        let target = navigation.target(in: snapshot.geometry)
-        let position = navigation.position(preset: preset, geometry: snapshot.geometry)
-        camera.look(at: target, from: position, upVector: isPlacementMode ? [0, 0, -1] : [0, 1, 0], relativeTo: root)
-        let offset = position - target
-        let yaw = atan2(offset.x, offset.z)
-        let pitch = atan2(offset.y, hypot(offset.x, offset.z))
+    private func positionCamera() {
+        cameraController.apply(to: camera, relativeTo: root)
+        let yaw = cameraController.yaw
+        let pitch = cameraController.pitch
         let orientation = simd_quatf(angle: pitch, axis: [1, 0, 0]) * simd_quatf(angle: -yaw, axis: [0, 1, 0])
         for wall in walls {
             let hidden = WallCutawayEvaluator.isWallHidden(wallNormal: wall.normal,
@@ -378,6 +393,7 @@ final class LightingRoomScene: NSObject {
         let point = gesture.location(in: view)
         switch gesture.state {
         case .began:
+            cameraController.cancelAnimation()
             if let id = fixtureID(at: point, in: view), selectedIDs.contains(id),
                let fixture = fixtures.first(where: { $0.definition.id == id }) {
                 let height = fixture.model.root.position(relativeTo: nil).y
@@ -392,8 +408,9 @@ final class LightingRoomScene: NSObject {
                 }
             } else if !isPlacementMode {
                 let delta = gesture.translation(in: view)
-                navigation.orbit(deltaX: delta.x, deltaY: delta.y)
-                positionCamera(previousPreset ?? .dollhouseIsometric)
+                cameraController.orbit(fromYaw: cameraController.yaw, pitch: cameraController.pitch,
+                                       deltaX: delta.x, deltaY: delta.y)
+                positionCamera()
             }
             gesture.setTranslation(.zero, in: view)
         case .ended, .cancelled, .failed:
@@ -427,15 +444,16 @@ final class LightingRoomScene: NSObject {
 
     @objc func magnify(_ gesture: UIPinchGestureRecognizer) {
         guard !isPlacementMode, gesture.state == .changed else { return }
-        navigation.magnify(by: gesture.scale)
+        cameraController.magnify(from: cameraController.distance, scale: Float(gesture.scale))
         gesture.scale = 1
-        positionCamera(previousPreset ?? .dollhouseIsometric)
+        positionCamera()
     }
 
     @objc func resetCamera() {
         guard !isPlacementMode else { return }
-        navigation.reset()
-        positionCamera(previousPreset ?? .dollhouseIsometric)
+        cameraController.snap(to: previousPreset ?? .dollhouse, animated: true) { [weak self] in
+            self?.positionCamera()
+        }
     }
 
     @objc func tapLayout(_ gesture: UITapGestureRecognizer) {

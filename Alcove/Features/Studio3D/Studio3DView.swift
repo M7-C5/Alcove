@@ -29,13 +29,18 @@ public struct Studio3DView: View {
     public var body: some View {
         Group {
             if viewModel.currentStage == .illumination {
-                LightingWorkspaceView(room: room, settings: $viewModel.lightingSettings) {
+                LightingWorkspaceView(room: room, settings: $viewModel.lightingSettings,
+                                      isARPresented: isARWalkthroughPresented,
+                                      onOpenAR: { isARWalkthroughPresented = true }) {
                     if let router, !router.isEmpty { router.pop() }
                     else { dismiss() }
                 }
             } else {
                 furnitureStudio
             }
+        }
+        .fullScreenCover(isPresented: $isARWalkthroughPresented) {
+            ARWalkthroughView(room: room)
         }
     }
 
@@ -256,9 +261,6 @@ public struct Studio3DView: View {
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
         }
-        .fullScreenCover(isPresented: $isARWalkthroughPresented) {
-            ARWalkthroughView(room: room)
-        }
         .alert("AR Room Walkthrough", isPresented: $viewModel.showingARPlaceholder) {
             Button("Got it!", role: .cancel) {}
         } message: {
@@ -345,42 +347,10 @@ public struct Studio3DView: View {
                     .accessibilityLabel(viewModel.isArchiveListPresented ? "Close archive inventory" : "Open archive inventory, \(viewModel.archivedFurnitures.count) items archived")
                 }
 
-                Button {
-                    isARWalkthroughPresented = true
-                    playSnapFeedback()
-                } label: {
-                    Text("AR")
-                        .font(.system(.caption, design: .rounded, weight: .heavy))
-                        .foregroundStyle(Color.alcoveText)
-                        .frame(width: 44, height: 44)
-                        .background(Color.alcoveBackground, in: Circle())
-                        .overlay(Circle().stroke(Color.alcoveBorder, lineWidth: 2))
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Launch 1:1 Life-Size AR Walkthrough")
-
-                Menu {
-                    ForEach(ViewportPreset.allCases) { preset in
-                        if preset == .dollhouse {
-                            Divider()
-                        }
-                        Button {
-                            viewModel.snapToViewport?(preset)
-                            playSnapFeedback()
-                        } label: {
-                            Label(preset.title, systemImage: preset.systemImage)
-                        }
-                    }
-                } label: {
-                    Image(systemName: "cube")
-                        .font(.title3)
-                        .foregroundStyle(Color.alcoveText)
-                        .frame(width: 44, height: 44)
-                        .background(Color.alcoveBackground, in: Circle())
-                        .overlay(Circle().stroke(Color.alcoveBorder, lineWidth: 2))
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Camera view")
+                StudioViewportActions(
+                    onSelectPreset: { viewModel.snapToViewport?($0) },
+                    onOpenAR: { isARWalkthroughPresented = true }
+                )
             }
         }
     }
@@ -805,8 +775,7 @@ public struct Studio3DView: View {
     }
 
     private func playSnapFeedback() {
-        AudioServicesPlaySystemSound(1104)
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        StudioViewportFeedback.snap()
     }
 }
 
