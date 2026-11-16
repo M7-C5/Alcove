@@ -36,12 +36,12 @@ struct LightingFixtureModelTests {
         let back = try #require(scene.root.findEntity(named: "BackWallGroup"))
         scene.apply(LightingSimulationSettings(), preset: .front, in: view)
         #expect(front.isEnabled && back.isEnabled)
-        #expect(front.components[OpacityComponent.self]?.opacity == 0)
+        #expect(front.components[OpacityComponent.self]?.opacity == 0.001)
         #expect(back.components[OpacityComponent.self] == nil)
         scene.apply(LightingSimulationSettings(), preset: .back, in: view)
         #expect(front.isEnabled && back.isEnabled)
         #expect(front.components[OpacityComponent.self] == nil)
-        #expect(back.components[OpacityComponent.self]?.opacity == 0)
+        #expect(back.components[OpacityComponent.self]?.opacity == 0.001)
     }
 
     @Test(arguments: LightKind.allCases)

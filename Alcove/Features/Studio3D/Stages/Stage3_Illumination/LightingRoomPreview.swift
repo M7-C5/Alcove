@@ -40,6 +40,7 @@ struct LightingRoomPreview: UIViewRepresentable {
     let settings: LightingSimulationSettings
     let preset: ViewportPreset
     var cameraRequestID = 0
+    var onHeaderOverlap: ((Bool) -> Void)?
     var backgroundColor: UIColor = .init(white: 0.08, alpha: 1)
     var onPlaceLight: ((SIMD2<Float>) -> Void)?
     var onSelectLight: ((UUID) -> Void)?
@@ -53,6 +54,8 @@ struct LightingRoomPreview: UIViewRepresentable {
 
     func makeUIView(context: Context) -> ARView {
         let view = ARView(frame: .zero, cameraMode: .nonAR, automaticallyConfigureSession: false)
+        view.isOpaque = false
+        view.backgroundColor = .clear
         view.environment.background = .color(resolvedBackground)
         view.scene.addAnchor(context.coordinator.root)
         let pan = UIPanGestureRecognizer(target: context.coordinator, action: #selector(LightingRoomScene.orbit(_:)))
@@ -69,6 +72,7 @@ struct LightingRoomPreview: UIViewRepresentable {
         let tap = UITapGestureRecognizer(target: context.coordinator, action: #selector(LightingRoomScene.tapLayout(_:)))
         tap.require(toFail: reset)
         view.addGestureRecognizer(tap)
+        context.coordinator.onHeaderOverlap = onHeaderOverlap
         context.coordinator.onPlaceLight = onPlaceLight
         context.coordinator.onSelectLight = onSelectLight
         context.coordinator.onClearSelection = onClearSelection
@@ -80,6 +84,7 @@ struct LightingRoomPreview: UIViewRepresentable {
         let coordinator = context.coordinator
         coordinator.badgeSubscription = view.scene.subscribe(to: SceneEvents.Update.self) { [weak coordinator, weak view] event in
             guard let view else { return }
+            coordinator?.updateViewportOverlay(in: view)
             coordinator?.updateMoveBadges(in: view)
             coordinator?.updateMascot(dt: Float(event.deltaTime))
         }
@@ -88,6 +93,7 @@ struct LightingRoomPreview: UIViewRepresentable {
 
     func updateUIView(_ view: ARView, context: Context) {
         view.environment.background = .color(resolvedBackground)
+        context.coordinator.onHeaderOverlap = onHeaderOverlap
         context.coordinator.onPlaceLight = onPlaceLight
         context.coordinator.onSelectLight = onSelectLight
         context.coordinator.onClearSelection = onClearSelection
@@ -103,6 +109,7 @@ struct LightingRoomPreview: UIViewRepresentable {
         coordinator.cameraController.cancelAnimation()
         coordinator.badgeSubscription?.cancel()
         coordinator.removeMoveBadges()
+        coordinator.viewportOverlay.removeFromSuperview()
         view.scene.anchors.removeAll()
     }
 
@@ -114,6 +121,10 @@ struct LightingRoomPreview: UIViewRepresentable {
 @MainActor
 final class LightingRoomScene: NSObject {
     let root = AnchorEntity(world: .zero)
+    let viewportOverlay = LightingViewportOverlay()
+    var onHeaderOverlap: ((Bool) -> Void)?
+    private var headerOverlap = false
+    private var hasInitialFraming = false
     private let snapshot: LightingRoomSnapshot
     private let camera = PerspectiveCamera()
     private let sun = DirectionalLight()
@@ -162,6 +173,10 @@ final class LightingRoomScene: NSObject {
 
     func apply(_ settings: LightingSimulationSettings, preset: ViewportPreset, in view: ARView,
                animated: Bool = false, requestID: Int = 0) {
+        initializeFraming(in: view)
+        if isPlacementMode, view.bounds.width > 0, view.bounds.height > 0 {
+            fitPlacement(in: view)
+        }
         let effectivePreset: ViewportPreset = isPlacementMode ? .top : preset
         if previousPreset != effectivePreset || previousCameraRequestID != requestID {
             let animate = animated && previousPreset != nil && !isPlacementMode
@@ -260,6 +275,38 @@ final class LightingRoomScene: NSObject {
         }
     }
 
+    private func initializeFraming(in view: ARView) {
+        guard !hasInitialFraming, view.bounds.width > 0, view.bounds.height > 0 else { return }
+        hasInitialFraming = true
+        // Fit only on entry. Subsequent updates preserve the user's zoom and camera controls.
+        if !isPlacementMode { fitPlacement(in: view) }
+    }
+
+    private func fitPlacement(in view: ARView) {
+        cameraController.distance = LightingPlacementFraming.distance(width: snapshot.geometry.width,
+            length: snapshot.geometry.length, height: snapshot.geometry.height, viewport: view.bounds.size)
+        positionCamera()
+    }
+
+    func updateViewportOverlay(in view: ARView) {
+        initializeFraming(in: view)
+        if isPlacementMode, view.bounds.width > 0 { fitPlacement(in: view) }
+        if viewportOverlay.superview !== view { view.addSubview(viewportOverlay) }
+        let w = Float(snapshot.geometry.width / 2)
+        let l = Float(snapshot.geometry.length / 2)
+        let h = Float(snapshot.geometry.height)
+        let points = [-w, w].flatMap { x in
+            [Float(0), h].flatMap { y in
+                [-l, l].compactMap { z in view.project(root.convert(position: [x, y, z], to: nil)) }
+            }
+        }
+        let overlap = viewportOverlay.update(points: points, bounds: view.bounds) && !isPlacementMode
+        if headerOverlap != overlap {
+            headerOverlap = overlap
+            onHeaderOverlap?(overlap)
+        }
+    }
+
     func setSelection(_ ids: Set<UUID>) {
         selectedIDs = ids
         for fixture in fixtures { fixture.model.setSelected(ids.contains(fixture.definition.id)) }
@@ -304,6 +351,9 @@ final class LightingRoomScene: NSObject {
         let shell = ProceduralRoomShellBuilder.buildShell(width: geometry.width, length: geometry.length,
                                                         height: geometry.height, includeCeiling: false)
         root.addChild(shell)
+        if let orientation = snapshot.compassOrientation {
+            root.addChild(RoomNorthMarker.build(orientation: orientation, width: geometry.width, length: geometry.length))
+        }
         let wallGroups: [(String, SIMD3<Float>)] = [
             ("FrontWallGroup", WallCutawayEvaluator.frontNormal),
             ("BackWallGroup", WallCutawayEvaluator.backNormal),
@@ -374,10 +424,11 @@ final class LightingRoomScene: NSObject {
             let hidden = WallCutawayEvaluator.isWallHidden(wallNormal: wall.normal,
                                                            orientation: orientation, pitch: pitch)
             if #available(iOS 18.0, *) {
-                // Keep the complete wall group active for the shadow depth pass.
+                // Avoid zero opacity: the renderer may discard the wall from the shadow pass.
+                // A visually imperceptible opacity keeps its geometry contributing to shadows.
                 wall.entity.isEnabled = true
                 if hidden {
-                    wall.entity.components.set(OpacityComponent(opacity: 0))
+                    wall.entity.components.set(OpacityComponent(opacity: 0.001))
                 } else {
                     wall.entity.components.remove(OpacityComponent.self)
                 }

@@ -134,6 +134,7 @@ public struct Studio3DViewport: UIViewRepresentable {
     }
 
     public static func dismantleUIView(_ view: ARView, coordinator: Coordinator) {
+        coordinator.northIndicator.removeFromSuperview()
         coordinator.animationTask?.cancel()
         coordinator.updateSubscription?.cancel()
         view.scene.anchors.removeAll()
@@ -181,6 +182,7 @@ public struct Studio3DViewport: UIViewRepresentable {
         let sun = DirectionalLight()
         let fill = DirectionalLight()
 
+        let northIndicator = RoomNorthIndicator()
         var updateSubscription: (any Cancellable)?
         private var entitySignatures: [UUID: String] = [:]
         let mascotController = MascotRoamController()
@@ -278,6 +280,10 @@ public struct Studio3DViewport: UIViewRepresentable {
             // Procedural Room Shell: Floor and 4 Cardinal Walls
             let shell = ProceduralRoomShellBuilder.buildShell(for: room, includeCeiling: false)
             root.addChild(shell)
+            if let orientation = room.compassOrientation {
+                root.addChild(RoomNorthMarker.build(orientation: orientation, width: room.dimensionsWidth,
+                                                   length: room.dimensionsLength))
+            }
 
             // Procedural Low-Poly Furniture Entities
             let furnitureGroup = Entity()
@@ -305,6 +311,7 @@ public struct Studio3DViewport: UIViewRepresentable {
 
         func install(in view: ARView) {
             self.arView = view
+            view.addSubview(northIndicator)
             let anchor = AnchorEntity(world: .zero)
             anchor.addChild(root)
             view.scene.addAnchor(anchor)
@@ -410,6 +417,10 @@ public struct Studio3DViewport: UIViewRepresentable {
         // MARK: - 3D to 2D Screen Projection (Native RealityKit Hardware Matrix)
 
         func updateSelectedProjection() {
+            if let arView {
+                northIndicator.update(in: arView, orientation: room.compassOrientation,
+                                      cameraOrientation: camera.orientation(relativeTo: nil))
+            }
             guard let arView = arView,
                   let id = selectedFurnitureID,
                   let container = arView.scene.findEntity(named: "Furniture_\(id.uuidString)") else {

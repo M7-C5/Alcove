@@ -131,7 +131,7 @@ struct LightingSimulationPanel: View {
                 Slider(value: Binding(get: { Double(settings.clampedMinute) },
                                       set: { settings.minuteOfDay = Int($0) }), in: 0...1439, step: 1)
                     .frame(minHeight: 44)
-                    .tint(.blue)
+                    .tint(LightingTheme.accent)
                     .accessibilityLabel("Time of day")
                     .accessibilityValue(settings.timeLabel)
             }
@@ -148,7 +148,7 @@ struct LightingSimulationPanel: View {
             Text(title).font(.subheadline.bold())
             Toggle(title, isOn: isOn)
                 .labelsHidden()
-                .tint(.green)
+                .tint(LightingTheme.accent)
                 .frame(minHeight: 44)
         }
         .frame(maxWidth: .infinity)
@@ -158,6 +158,7 @@ struct LightingSimulationPanel: View {
 
 struct LightingEditPanel: View {
     @Bindable var editor: LightingSetupViewModel
+    var minimumHeight: Double = 0
     let onDelete: () -> Void
 
     var body: some View {
@@ -183,6 +184,7 @@ struct LightingEditPanel: View {
                     .padding(.bottom, 16)
             }
         }
+        .frame(minHeight: max(0, minimumHeight - 48), alignment: .top)
         .padding(24)
         .lightingPanel()
     }

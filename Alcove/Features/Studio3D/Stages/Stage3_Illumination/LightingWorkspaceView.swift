@@ -1,7 +1,7 @@
 import SwiftUI
 import SwiftData
 
-/// A bounded three-column workspace: light sources, room, then simulation and editing.
+/// Full-screen room canvas with independently collapsible floating inspectors.
 struct LightingWorkspaceView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -15,6 +15,10 @@ struct LightingWorkspaceView: View {
     @State private var cameraRequestID = 0
     @State private var placement = LightingPlacementState()
     @State private var showingDelete = false
+    @State private var headerOverlapped = false
+    @State private var sourcesExpanded = true
+    @State private var previewExpanded = true
+    @State private var editingExpanded = true
     @State private var saveError: String?
 
     init(room: Room, settings: Binding<LightingSimulationSettings>, isARPresented: Bool,
@@ -31,18 +35,40 @@ struct LightingWorkspaceView: View {
 
     var body: some View {
         GeometryReader { proxy in
-            let layout = LightingWorkspaceLayout(width: proxy.size.width,
-                                                  accessibilityText: dynamicTypeSize.isAccessibilitySize)
-            VStack(spacing: 16) {
-                header
-                stageProgress
-                if layout.usesColumns {
-                    columns(layout)
-                } else {
-                    compactWorkspace(width: proxy.size.width)
+            let panelWidth = min(288.0, max(240.0, proxy.size.width * 0.21))
+            ZStack {
+                if !isARPresented {
+                    lightingPreview
+                        .ignoresSafeArea()
+                        .accessibilityLabel("Room lighting layout")
+                        .accessibilityHint("Drag to turn the room. Pinch to zoom.")
+                        .accessibilityAction(named: "Add light at center") {
+                            if !placement.isActive { togglePlacement() }
+                            editor.place(unitX: 0.5, unitZ: 0.5)
+                        }
                 }
+                VStack(spacing: 10) {
+                    header
+                    stageProgress
+                        .opacity(headerOverlapped ? 0 : 1)
+                        .accessibilityHidden(headerOverlapped)
+                    Text(viewportPrompt)
+                        .font(.caption)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 60)
+                        .opacity(headerOverlapped ? 0 : 1)
+                    Spacer(minLength: 0)
+                    viewportControls
+                    Text(room.compassOrientation == nil ? "Sunlight preview · Sample direction" : "Sunlight preview · Aligned to magnetic north")
+                        .font(.caption2)
+                }
+                .padding(20)
+
+                floatingPanels(width: panelWidth, height: max(200, proxy.size.height - 230))
+                    .padding(.top, 160)
+                    .padding(.bottom, 70)
             }
-            .padding(layout.inset)
+
         }
         .background { LightingWorkspaceBackground() }
         .foregroundStyle(LightingTheme.ink)
@@ -72,10 +98,12 @@ struct LightingWorkspaceView: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Back")
-            Text("Stage 3: Light your room")
-                .font(.system(.title2, design: .rounded, weight: .heavy))
+            Text("Stage 3: Mark & Simulate Your Room Lighting")
+                .font(.system(.headline, design: .rounded, weight: .heavy))
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity)
+                .opacity(headerOverlapped ? 0 : 1)
+                .accessibilityHidden(headerOverlapped)
             Button(action: save) {
                 Label("Save", systemImage: "checkmark")
             }
@@ -131,61 +159,37 @@ struct LightingWorkspaceView: View {
         .frame(maxWidth: .infinity)
     }
 
-    private func columns(_ layout: LightingWorkspaceLayout) -> some View {
-        HStack(alignment: .top, spacing: layout.spacing) {
-            LightingSourcePanel(editor: editor, isAdding: placement.isActive, onAdd: togglePlacement)
-                .frame(width: layout.sourceWidth)
-                .frame(maxHeight: .infinity)
-            roomViewport()
-                .frame(width: layout.viewportWidth)
-                .frame(maxHeight: .infinity)
-            ScrollView {
-                inspectors
-            }
-            .scrollClipDisabled()
-            .frame(width: layout.inspectorWidth)
-        }
-    }
-
-    private func compactWorkspace(width: Double) -> some View {
-        ScrollView {
-            VStack(spacing: 24) {
-                roomViewport(previewHeight: min(480, max(280, width * 0.5)))
-                    .frame(maxWidth: 680)
-                    .frame(maxWidth: .infinity)
+    private func floatingPanels(width: Double, height: Double) -> some View {
+        HStack(alignment: .top, spacing: 0) {
+            LightingCollapsiblePanel(title: "Your lights", expanded: $sourcesExpanded, edge: .leading) {
                 LightingSourcePanel(editor: editor, isAdding: placement.isActive, onAdd: togglePlacement)
-                    .frame(height: dynamicTypeSize.isAccessibilitySize ? 480 : 320)
-                inspectors
+                    .frame(width: width, height: height)
             }
-        }
-    }
-
-    private func roomViewport(previewHeight: Double? = nil) -> some View {
-        VStack(spacing: 16) {
-            Text(viewportPrompt)
-                .font(.subheadline)
-                .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
-            Group {
-                if !isARPresented {
-                    lightingPreview
+            .frame(height: height)
+            Spacer(minLength: 0)
+            VStack(alignment: .trailing, spacing: 20) {
+                LightingCollapsiblePanel(title: "Lighting preview", expanded: $previewExpanded, edge: .trailing) {
+                    ScrollView {
+                        LightingSimulationPanel(settings: $settings,
+                            activeFixtureCount: editor.drafts.filter { settings.output(for: $0) > 0 }.count)
+                    }
+                    .scrollClipDisabled()
+                    .frame(width: width, height: min(245, height * 0.42))
                 }
+                .frame(height: min(245, height * 0.42))
+                LightingCollapsiblePanel(title: "Light settings", expanded: $editingExpanded, edge: .trailing) {
+                    ScrollView {
+                        LightingEditPanel(editor: editor, minimumHeight: max(160, height - min(245, height * 0.42) - 20),
+                                          onDelete: { showingDelete = true })
+                    }
+                    .scrollClipDisabled()
+                    .frame(width: width, height: max(160, height - min(245, height * 0.42) - 20))
+                }
+                .frame(height: max(160, height - min(245, height * 0.42) - 20))
             }
-            .frame(height: previewHeight.map { CGFloat($0) })
-            .clipShape(RoundedRectangle(cornerRadius: 20))
-            .padding(12)
-            .lightingPanel()
-            .accessibilityLabel("Room lighting layout")
-            .accessibilityHint(placement.isActive ? "Tap to place a light. The top view is locked." : "Drag to turn the room. Pinch to zoom.")
-            .accessibilityAction(named: "Add light at center") {
-                if !placement.isActive { togglePlacement() }
-                editor.place(unitX: 0.5, unitZ: 0.5)
-            }
-            viewportControls
-            Text(room.compassOrientation == nil ? "Sunlight preview · Sample direction" : "Sunlight preview · Aligned to magnetic north")
-                .font(.caption)
-                .foregroundStyle(LightingTheme.ink.opacity(0.85))
         }
+        .padding(.horizontal, 16)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
     private var lightingPreview: some View {
@@ -194,7 +198,8 @@ struct LightingWorkspaceView: View {
             settings: settings,
             preset: preset,
             cameraRequestID: cameraRequestID,
-            backgroundColor: UIColor(LightingTheme.canvas),
+            onHeaderOverlap: { headerOverlapped = $0 },
+            backgroundColor: .clear,
             onPlaceLight: { point in
                     guard !editor.isSelectingMultiple else { return }
                     editor.place(unitX: Double(point.x), unitZ: Double(point.y))
@@ -237,15 +242,6 @@ struct LightingWorkspaceView: View {
         if placement.isActive { return "Tap to add a light. Drag a selected light to move it." }
         if editor.drafts.isEmpty { return "Tap Add light to get started." }
         return "Tap a light to edit it. Drag the move icon to reposition it."
-    }
-
-    private var inspectors: some View {
-        VStack(spacing: 24) {
-            LightingSimulationPanel(settings: $settings,
-                                    activeFixtureCount: editor.drafts.filter { settings.output(for: $0) > 0 }.count)
-            LightingEditPanel(editor: editor, onDelete: { showingDelete = true })
-        }
-        .frame(maxWidth: .infinity)
     }
 
     private func progressTitle(_ stage: StageType) -> String {
