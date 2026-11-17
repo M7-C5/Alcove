@@ -663,8 +663,8 @@ public struct StageWalkthroughOverlay: View {
                         HStack {
                             Spacer()
                             AddButtonPointerCallout()
-                                .padding(.trailing, 152)
-                                .padding(.top, 56)
+                                .padding(.trailing, 8)
+                                .padding(.top, 58)
                                 .safeAreaPadding(.top)
                         }
                         Spacer()
