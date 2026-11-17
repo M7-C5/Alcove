@@ -135,6 +135,29 @@ public final class MockMascotAIService: MascotAIServiceProtocol {
                 }
             }
 
+            // Include exact AABB collisions, companion overlaps, and blocked doorway warnings from FastPathRulebook
+            let liveWarnings = FastPathRulebook().evaluateSpatialWarnings(
+                furnitures: furnitures,
+                roomDimensions: (width: room.dimensionsWidth, length: room.dimensionsLength)
+            )
+            for warning in liveWarnings where warning.severity == .collision {
+                let alreadyReported = bottlenecks.contains {
+                    $0.severity == .critical && $0.detail == warning.message
+                }
+                if !alreadyReported {
+                    let firstFurnitureName = warning.furnitureIDs.first.flatMap { id in
+                        furnitures.first(where: { $0.id == id })?.name
+                    }
+                    bottlenecks.append(SpatialBottleneck(
+                        title: warning.title,
+                        detail: warning.message,
+                        severity: .critical,
+                        affectedFurnitureName: firstFurnitureName
+                    ))
+                    score -= 15
+                }
+            }
+
             let canAdvance = bottlenecks.filter { $0.severity == .critical }.isEmpty
             let rearrangeRecs = generateContextualRecommendations(stage: .rearrangement, room: room, bottlenecks: bottlenecks)
             return StageEvaluationResult(

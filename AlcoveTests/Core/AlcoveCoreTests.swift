@@ -446,4 +446,20 @@ struct AlcoveCoreTests {
             $0.severity == .caution && $0.message.contains("front opening of Wardrobe")
         })
     }
+
+    @Test func stage2EvaluationBlocksAdvanceWhenLiveCollisionExists() async {
+        let room = SampleData.createStarterRoom()
+        let furnitures = room.workingLayout?.furnitures ?? []
+        if let desk = furnitures.first(where: { $0.name == "Work Desk" }),
+           let chair = furnitures.first(where: { $0.name == "Ergonomic Chair" }) {
+            // Overlap companion chair directly onto desk center
+            chair.positionX = desk.positionX
+            chair.positionZ = desk.positionZ
+        }
+
+        let mascot = MockMascotAIService()
+        let result = await mascot.evaluateStage(stage: .rearrangement, room: room)
+        #expect(result.canAdvance == false)
+        #expect(result.bottlenecks.contains { $0.severity == .critical && $0.title == "Collision" })
+    }
 }
