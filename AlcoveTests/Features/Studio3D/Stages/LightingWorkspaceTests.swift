@@ -261,6 +261,12 @@ struct LightingWorkspaceTests {
         #expect(pan.isEnabled && pinch.isEnabled && reset.isEnabled)
     }
 
+    @Test func lightTypeTitlesHaveNoLayoutWhitespace() {
+        for kind in LightKind.allCases {
+            #expect(kind.title == kind.title.trimmingCharacters(in: .whitespacesAndNewlines))
+        }
+    }
+
     @Test func lampTypesChooseMountingDetailsAndKeepColorAndBrightness() throws {
         let room = SampleData.createStarterRoom()
         let editor = LightingSetupViewModel(room: room)

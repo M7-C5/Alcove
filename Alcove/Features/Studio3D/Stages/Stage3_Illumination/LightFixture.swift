@@ -11,12 +11,12 @@ public enum LightKind: String, Codable, CaseIterable, Sendable, Identifiable {
 
     public var title: String {
         switch self {
-        case .ceilingLight: return " Ceiling Light"
-        case .pendantLight: return " Pendant Light"
-        case .deskLamp: return " Desk Lamp"
-        case .standingLamp: return " Standing Lamp"
-        case .tableLamp: return " Table Lamp"
-        case .wallLight: return " Wall Light"
+        case .ceilingLight: return "Ceiling Light"
+        case .pendantLight: return "Pendant Light"
+        case .deskLamp: return "Desk Lamp"
+        case .standingLamp: return "Standing Lamp"
+        case .tableLamp: return "Table Lamp"
+        case .wallLight: return "Wall Light"
         }
     }
 

@@ -12,6 +12,26 @@ public struct ProceduralRoomShellBuilder {
                    height: room.dimensionsHeight, includeCeiling: includeCeiling)
     }
 
+    /// Shared ceiling geometry; viewports may use it as a visually cutaway shadow occluder.
+    public static func buildCeiling(width: Double, length: Double, height: Double) -> ModelEntity {
+        let roomW = Float(width)
+        let roomL = Float(length)
+        let roomH = Float(height)
+        let ceilingMesh = MeshResource.generateBox(
+            size: SIMD3<Float>(roomW, 0.02, roomL),
+            cornerRadius: 0.005
+        )
+        let ceilingMaterial = SimpleMaterial(
+            color: UIColor(red: 0.96, green: 0.96, blue: 0.95, alpha: 1.0),
+            roughness: 0.90,
+            isMetallic: false
+        )
+        let ceilingEntity = ModelEntity(mesh: ceilingMesh, materials: [ceilingMaterial])
+        ceilingEntity.name = "Ceiling"
+        ceilingEntity.position = SIMD3<Float>(0, roomH + 0.01, 0)
+        return ceilingEntity
+    }
+
     /// Value-based entry point for immutable viewport snapshots.
     public static func buildShell(width: Double, length: Double, height: Double,
                                   includeCeiling: Bool = false) -> Entity {
@@ -72,19 +92,7 @@ public struct ProceduralRoomShellBuilder {
 
         // Optional Dynamic Ceiling Plane
         if includeCeiling {
-            let ceilingMesh = MeshResource.generateBox(
-                size: SIMD3<Float>(roomW, 0.02, roomL),
-                cornerRadius: 0.005
-            )
-            let ceilingMaterial = SimpleMaterial(
-                color: UIColor(red: 0.96, green: 0.96, blue: 0.95, alpha: 1.0),
-                roughness: 0.90,
-                isMetallic: false
-            )
-            let ceilingEntity = ModelEntity(mesh: ceilingMesh, materials: [ceilingMaterial])
-            ceilingEntity.name = "Ceiling"
-            ceilingEntity.position = SIMD3<Float>(0, roomH + 0.01, 0)
-            shell.addChild(ceilingEntity)
+            shell.addChild(buildCeiling(width: width, length: length, height: height))
         }
 
         // 1. Back Wall Group (Window Aperture + Baseboard)
