@@ -43,10 +43,10 @@ public struct StudioBottomHUD: View {
             } label: {
                 HStack(spacing: 6) {
                     Text("Next Stage")
+                        .font(.custom("Cleanow", size: 17, relativeTo: .subheadline))
                     Image(systemName: "chevron.right")
                         .font(.system(.subheadline, design: .rounded, weight: .heavy))
                 }
-                .font(.system(.subheadline, design: .rounded, weight: .bold))
                 .foregroundStyle(Color(red: 0x6D / 255.0, green: 0x45 / 255.0, blue: 0x31 / 255.0))
                 .padding(.horizontal, 20)
                 .frame(minWidth: 44, minHeight: 44)
