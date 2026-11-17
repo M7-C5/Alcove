@@ -128,20 +128,29 @@ public struct Studio3DView: View {
                     .zIndex(20)
                 }
 
-                // Bottom-Left Floating Otter Logo (kept visible behind scrim just like Figma)
+                // Bottom-Left Floating Otter Logo, Centered Collision/Warning Banner, & Bottom-Right Proceed Button
                 if !viewModel.isArchiveListPresented {
                     VStack {
                         Spacer()
-                        StudioBottomHUD(
-                            mascotEmotion: viewModel.mascotEmotion,
-                            mascotMessage: viewModel.mascotMessage,
-                            onTriggerEvaluation: { viewModel.triggerStageEvaluation() },
-                            onOpenChat: {
-                                withAnimation(.easeInOut(duration: 0.2)) {
-                                    viewModel.showingChatDrawer = true
+                        ZStack(alignment: .bottom) {
+                            StudioBottomHUD(
+                                mascotEmotion: viewModel.mascotEmotion,
+                                mascotMessage: viewModel.mascotMessage,
+                                onTriggerEvaluation: { viewModel.triggerStageEvaluation() },
+                                onOpenChat: {
+                                    withAnimation(.easeInOut(duration: 0.2)) {
+                                        viewModel.showingChatDrawer = true
+                                    }
                                 }
+                            )
+
+                            if !viewModel.isWalkthroughActive && !viewModel.showingChatDrawer {
+                                warningBanner
+                                    .padding(.horizontal, 180)
+                                    .padding(.bottom, 18)
+                                    .safeAreaPadding(.bottom)
                             }
-                        )
+                        }
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
                     .zIndex(15)
@@ -588,14 +597,6 @@ public struct Studio3DView: View {
                         .transition(.opacity)
                         .zIndex(14)
                     }
-
-                    // Top Warning Banner inside the framed room
-                    if !viewModel.isWalkthroughActive && !viewModel.showingChatDrawer {
-                        warningBanner
-                            .padding(.top, 10)
-                            .padding(.horizontal, 12)
-                            .zIndex(16)
-                    }
                 }
             }
         }
@@ -609,71 +610,51 @@ public struct Studio3DView: View {
     private var warningBanner: some View {
         if let warning = viewModel.activeTopWarning {
             let isCollision = warning.severity == .collision
-            let accentTint: Color = isCollision ? .red : .yellow
-            let badgeTint: Color = isCollision ? .red : Color(red: 0.78, green: 0.48, blue: 0.0)
+            let bannerFill = isCollision
+                ? Color(red: 0xD4 / 255.0, green: 0x63 / 255.0, blue: 0x63 / 255.0)
+                : Color(red: 0xFB / 255.0, green: 0xEA / 255.0, blue: 0xB6 / 255.0)
+            let foregroundInk: Color = isCollision ? .white : Color.alcoveText
 
             Button {
                 if let targetID = warning.furnitureIDs.first {
                     viewModel.selectFurniture(id: targetID)
                 }
             } label: {
-                HStack(spacing: 10) {
-                    Image(systemName: isCollision ? "exclamationmark.triangle.fill" : "exclamationmark.circle.fill")
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(badgeTint)
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 7) {
+                        Image(systemName: isCollision ? "exclamationmark.triangle.fill" : "exclamationmark.circle.fill")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(foregroundInk)
 
-                    VStack(alignment: .leading, spacing: 2) {
                         Text(warning.title.uppercased())
-                            .font(.system(.caption2, design: .rounded, weight: .bold))
-                            .foregroundStyle(badgeTint)
-                            .tracking(0.6)
-
-                        Text(warning.message)
-                            .font(.system(.caption, design: .rounded, weight: .medium))
-                            .foregroundStyle(Color.alcoveText)
-                            .lineLimit(2)
-                            .multilineTextAlignment(.leading)
-                            .fixedSize(horizontal: false, vertical: true)
+                            .font(.system(size: 13, weight: .heavy, design: .rounded))
+                            .foregroundStyle(foregroundInk)
+                            .tracking(0.5)
                     }
+
+                    Text(warning.message)
+                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                        .foregroundStyle(isCollision ? Color.white.opacity(0.95) : Color.alcoveText)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 12)
                 .frame(minHeight: 44)
                 .frame(maxWidth: 460, alignment: .leading)
-                .background {
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .fill(Color.alcoveBubbleFill)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                .fill(accentTint.opacity(isCollision ? 0.14 : 0.18))
-                        )
-                }
+                .background(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(bannerFill)
+                )
                 .overlay(
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .stroke(accentTint.opacity(isCollision ? 0.65 : 0.80), lineWidth: 1.5)
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .stroke(Color.alcoveBorder, lineWidth: 2)
                 )
             }
             .buttonStyle(.plain)
-            .transition(.move(edge: .top).combined(with: .opacity))
+            .transition(.move(edge: .bottom).combined(with: .opacity))
             .animation(.easeInOut(duration: 0.2), value: warning.id)
-        } else if viewModel.currentStage != .harmony {
-            HStack(spacing: 8) {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.subheadline)
-                    .foregroundStyle(.green)
-                Text("No collisions or tight walkways")
-                    .font(.system(.caption, design: .rounded, weight: .medium))
-                    .foregroundStyle(Color.alcoveText)
-                    .lineLimit(1)
-            }
-            .padding(.horizontal, 14)
-            .frame(minHeight: 44)
-            .background(Color.alcoveBubbleFill, in: Capsule())
-            .overlay(
-                Capsule()
-                    .stroke(Color.alcoveBorder.opacity(0.28), lineWidth: 1.2)
-            )
-            .transition(.move(edge: .top).combined(with: .opacity))
         }
     }
 
