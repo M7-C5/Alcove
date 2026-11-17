@@ -29,18 +29,13 @@ public struct Studio3DView: View {
     public var body: some View {
         Group {
             if viewModel.currentStage == .illumination {
-                LightingWorkspaceView(room: room, settings: $viewModel.lightingSettings,
-                                      isARPresented: isARWalkthroughPresented,
-                                      onOpenAR: { isARWalkthroughPresented = true }) {
+                LightingWorkspaceView(room: room, settings: $viewModel.lightingSettings) {
                     if let router, !router.isEmpty { router.pop() }
                     else { dismiss() }
                 }
             } else {
                 furnitureStudio
             }
-        }
-        .fullScreenCover(isPresented: $isARWalkthroughPresented) {
-            ARWalkthroughView(room: room)
         }
     }
 
@@ -272,6 +267,9 @@ public struct Studio3DView: View {
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
         }
+        .fullScreenCover(isPresented: $isARWalkthroughPresented) {
+            ARWalkthroughView(room: room)
+        }
         .alert("AR Room Walkthrough", isPresented: $viewModel.showingARPlaceholder) {
             Button("Got it!", role: .cancel) {}
         } message: {
@@ -340,21 +338,45 @@ public struct Studio3DView: View {
                 .frame(maxWidth: .infinity)
 
             HStack(spacing: 10) {
-                if viewModel.canManipulateFurniture {
-                    Button {
-                        playSnapFeedback()
-                        viewModel.openAddFurnitureCatalog()
-                    } label: {
-                        Image(systemName: "plus")
-                            .font(.headline.bold())
-                            .foregroundStyle(Color.alcoveText)
-                            .frame(width: 44, height: 44)
-                            .background(Color.alcoveBackground, in: Circle())
-                            .overlay(Circle().stroke(Color.alcoveBorder, lineWidth: 2))
+                Menu {
+                    ForEach(ViewportPreset.allCases) { preset in
+                        if preset == .dollhouse {
+                            Divider()
+                        }
+                        Button {
+                            viewModel.snapToViewport?(preset)
+                            viewModel.recordTutorialAction(.inspectCamera)
+                            playSnapFeedback()
+                        } label: {
+                            Label(preset.title, systemImage: preset.systemImage)
+                        }
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Add furniture")
+                } label: {
+                    Image(systemName: "cube")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(Color(red: 0x6D / 255.0, green: 0x45 / 255.0, blue: 0x31 / 255.0))
+                        .frame(width: 45, height: 45)
+                        .background {
+                            tactileCircleBackground(isCoralActive: false)
+                        }
                 }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Camera view")
+
+                Button {
+                    isARWalkthroughPresented = true
+                    playSnapFeedback()
+                } label: {
+                    Text("AR")
+                        .font(.system(.caption, design: .rounded, weight: .heavy))
+                        .foregroundStyle(Color(red: 0x6D / 255.0, green: 0x45 / 255.0, blue: 0x31 / 255.0))
+                        .frame(width: 45, height: 45)
+                        .background {
+                            tactileCircleBackground(isCoralActive: false)
+                        }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Launch 1:1 Life-Size AR Walkthrough")
 
                 if viewModel.currentStage.unlockedTools.contains(.inventoryArchive) && viewModel.currentStage != .harmony {
                     Button {
@@ -364,24 +386,22 @@ public struct Studio3DView: View {
                         playSnapFeedback()
                     } label: {
                         ZStack(alignment: .topTrailing) {
-                            Image(systemName: viewModel.isArchiveListPresented ? "archivebox.fill" : "archivebox")
-                                .font(.headline.bold())
-                                .foregroundStyle(Color.alcoveText)
-                                .frame(width: 44, height: 44)
-                                .background(
-                                    viewModel.isArchiveListPresented ? Color.alcovePrimaryFill : Color.alcoveBackground,
-                                    in: Circle()
-                                )
-                                .overlay(Circle().stroke(Color.alcoveBorder, lineWidth: 2))
+                            Image(systemName: "archivebox")
+                                .font(.system(size: 17, weight: .bold))
+                                .foregroundStyle(Color(red: 0x6D / 255.0, green: 0x45 / 255.0, blue: 0x31 / 255.0))
+                                .frame(width: 45, height: 45)
+                                .background {
+                                    tactileCircleBackground(isCoralActive: viewModel.isArchiveListPresented)
+                                }
 
                             if !viewModel.archivedFurnitures.isEmpty {
                                 Text("\(viewModel.archivedFurnitures.count)")
                                     .font(.system(.caption2, design: .rounded, weight: .bold))
-                                    .foregroundStyle(Color.alcoveText)
+                                    .foregroundStyle(Color(red: 0x6D / 255.0, green: 0x45 / 255.0, blue: 0x31 / 255.0))
                                     .padding(.horizontal, 5)
                                     .padding(.vertical, 2)
                                     .background(Color.alcovePrimaryFill, in: Capsule())
-                                    .overlay(Capsule().stroke(Color.alcoveBorder, lineWidth: 1.5))
+                                    .overlay(Capsule().stroke(Color(red: 0x6D / 255.0, green: 0x45 / 255.0, blue: 0x31 / 255.0), lineWidth: 1.5))
                                     .offset(x: 4, y: -4)
                             }
                         }
@@ -390,14 +410,56 @@ public struct Studio3DView: View {
                     .accessibilityLabel(viewModel.isArchiveListPresented ? "Close archive inventory" : "Open archive inventory, \(viewModel.archivedFurnitures.count) items archived")
                 }
 
-                StudioViewportActions(
-                    onSelectPreset: { preset in
-                        viewModel.snapToViewport?(preset)
-                        viewModel.recordTutorialAction(.inspectCamera)
-                    },
-                    onOpenAR: { isARWalkthroughPresented = true }
-                )
+                if viewModel.canManipulateFurniture {
+                    Button {
+                        playSnapFeedback()
+                        viewModel.openAddFurnitureCatalog()
+                    } label: {
+                        Image(systemName: "plus")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundStyle(Color(red: 0x6D / 255.0, green: 0x45 / 255.0, blue: 0x31 / 255.0))
+                            .frame(width: 45, height: 45)
+                            .background {
+                                tactileCircleBackground(isCoralActive: false)
+                            }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Add furniture")
+                }
             }
+        }
+    }
+
+    @ViewBuilder
+    private func tactileCircleBackground(isCoralActive: Bool) -> some View {
+        let border = Color(red: 0x6D / 255.0, green: 0x45 / 255.0, blue: 0x31 / 255.0)
+        let topHighlight = isCoralActive
+            ? Color(red: 0xFE / 255.0, green: 0xF6 / 255.0, blue: 0xED / 255.0)
+            : Color(red: 0xF9 / 255.0, green: 0xE4 / 255.0, blue: 0xC9 / 255.0)
+        let bottomLip = isCoralActive
+            ? Color(red: 0xD2 / 255.0, green: 0x7D / 255.0, blue: 0x5C / 255.0)
+            : Color(red: 0xE9 / 255.0, green: 0xC7 / 255.0, blue: 0x9D / 255.0)
+        let face = isCoralActive
+            ? Color(red: 0xFE / 255.0, green: 0xBC / 255.0, blue: 0xA3 / 255.0)
+            : Color(red: 0xFF / 255.0, green: 0xF7 / 255.0, blue: 0xE7 / 255.0)
+
+        ZStack {
+            Circle()
+                .fill(border)
+
+            ZStack {
+                VStack(spacing: 0) {
+                    topHighlight
+                    bottomLip
+                }
+
+                Circle()
+                    .fill(face)
+                    .padding(.top, 1.5)
+                    .padding(.bottom, 3)
+            }
+            .clipShape(Circle())
+            .padding(2)
         }
     }
 
@@ -797,7 +859,8 @@ public struct Studio3DView: View {
     }
 
     private func playSnapFeedback() {
-        StudioViewportFeedback.snap()
+        AudioServicesPlaySystemSound(1104)
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
     }
 }
 

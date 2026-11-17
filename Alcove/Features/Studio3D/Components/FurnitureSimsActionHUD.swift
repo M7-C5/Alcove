@@ -64,16 +64,16 @@ public struct FurnitureSimsActionHUD: View {
             // Hit-testing disabled so 3D furniture underneath remains directly selectable and draggable
             let effectiveSeverity = warningSeverity ?? (isColliding ? .collision : nil)
             let haloFill: Color = switch effectiveSeverity {
-            case .collision: Color.red.opacity(0.18)
-            case .caution: Color.yellow.opacity(0.18)
-            case nil: Color.white.opacity(0.48)
+            case .collision: Color(red: 0xD4 / 255.0, green: 0x63 / 255.0, blue: 0x63 / 255.0).opacity(0.24)
+            case .caution: Color(red: 0xFB / 255.0, green: 0xEA / 255.0, blue: 0xB6 / 255.0).opacity(0.45)
+            case nil: Color.white.opacity(0.64)
             }
             let haloStroke: Color = switch effectiveSeverity {
-            case .collision: Color.red.opacity(0.85)
-            case .caution: Color.yellow.opacity(0.95)
-            case nil: Color.white.opacity(0.55)
+            case .collision: Color(red: 0xD4 / 255.0, green: 0x63 / 255.0, blue: 0x63 / 255.0)
+            case .caution: Color(red: 0x7D / 255.0, green: 0x43 / 255.0, blue: 0x1D / 255.0)
+            case nil: Color.white
             }
-            let haloLineWidth: CGFloat = effectiveSeverity == nil ? 1.5 : 2.5
+            let haloLineWidth: CGFloat = effectiveSeverity == nil ? 2 : 2.5
 
             Circle()
                 .fill(haloFill)
@@ -81,7 +81,6 @@ public struct FurnitureSimsActionHUD: View {
                     Circle()
                         .stroke(haloStroke, lineWidth: haloLineWidth)
                 )
-                .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 2)
                 .frame(width: dialDiameter, height: dialDiameter)
                 .allowsHitTesting(false)
 
@@ -120,7 +119,10 @@ public struct FurnitureSimsActionHUD: View {
                 Button {
                     onRemove()
                 } label: {
-                    actionButtonContent(systemName: "trash.fill", tint: .red)
+                    actionButtonContent(
+                        systemName: "trash.fill",
+                        fill: Color(red: 0xD4 / 255.0, green: 0x63 / 255.0, blue: 0x63 / 255.0)
+                    )
                 }
                 .buttonStyle(.plain)
                 .frame(width: 48, height: 48)
@@ -156,16 +158,21 @@ public struct FurnitureSimsActionHUD: View {
         .coordinateSpace(name: "SimsHUDCoordinateSpace")
     }
 
-    private func actionButtonContent(systemName: String, tint: Color = Color(uiColor: .label)) -> some View {
+    private func actionButtonContent(
+        systemName: String,
+        fill: Color = Color(red: 0xAF / 255.0, green: 0x69 / 255.0, blue: 0x3F / 255.0)
+    ) -> some View {
         ZStack {
             Circle()
-                .fill(tint)
+                .fill(fill)
                 .frame(width: buttonRadius * 2, height: buttonRadius * 2)
-                .overlay(Circle().stroke(Color.white.opacity(0.35), lineWidth: 1))
-                .shadow(color: Color.black.opacity(0.22), radius: 5, x: 0, y: 2)
+                .overlay(
+                    Circle()
+                        .stroke(Color(red: 0x7D / 255.0, green: 0x43 / 255.0, blue: 0x1D / 255.0), lineWidth: 2)
+                )
 
             Image(systemName: systemName)
-                .font(.system(size: 18, weight: .semibold))
+                .font(.system(size: 17, weight: .semibold))
                 .foregroundStyle(Color.white)
         }
         .frame(width: 48, height: 48)
