@@ -427,7 +427,10 @@ struct Studio3DViewModelTests {
             )
         )
         #expect(vm.isCurrentStepActionCompleted == true)
-        try? await Task.sleep(nanoseconds: 750_000_000)
+        for _ in 0..<20 {
+            if vm.walkthroughStepIndex == 1 { break }
+            try? await Task.sleep(nanoseconds: 100_000_000)
+        }
         #expect(vm.walkthroughStepIndex == 1)
         #expect(vm.walkthroughSteps[1].requiredAction == .transformFurniture)
         #expect(vm.isCurrentStepActionCompleted == false)
@@ -442,7 +445,10 @@ struct Studio3DViewModelTests {
         // Opening add catalog completes step 2 and advances to dynamic mission step
         vm.openAddFurnitureCatalog()
         #expect(vm.isCurrentStepActionCompleted == true)
-        try? await Task.sleep(nanoseconds: 750_000_000)
+        for _ in 0..<20 {
+            if vm.walkthroughStepIndex == 3 { break }
+            try? await Task.sleep(nanoseconds: 100_000_000)
+        }
         #expect(vm.walkthroughStepIndex == 3)
         #expect(vm.walkthroughSteps[3].requiredAction == nil)
     }
