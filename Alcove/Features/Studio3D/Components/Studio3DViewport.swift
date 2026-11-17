@@ -26,6 +26,7 @@ public struct Studio3DViewport: UIViewRepresentable {
     public var onFloorRaycasterResolved: ((@escaping FloorRaycaster) -> Void)? = nil
     public var onSnapToViewportResolved: ((@escaping ViewportSnapper) -> Void)? = nil
     public var onTapBackground: (() -> Void)? = nil
+    public var onCameraInteracted: (() -> Void)? = nil
 
     public init(
         room: Room,
@@ -43,7 +44,8 @@ public struct Studio3DViewport: UIViewRepresentable {
         onComputeWarningSeverities: (() -> [UUID: SpatialWarningSeverity])? = nil,
         onFloorRaycasterResolved: ((@escaping FloorRaycaster) -> Void)? = nil,
         onSnapToViewportResolved: ((@escaping ViewportSnapper) -> Void)? = nil,
-        onTapBackground: (() -> Void)? = nil
+        onTapBackground: (() -> Void)? = nil,
+        onCameraInteracted: (() -> Void)? = nil
     ) {
         self.room = room
         self._selectedFurnitureID = selectedFurnitureID
@@ -61,6 +63,7 @@ public struct Studio3DViewport: UIViewRepresentable {
         self.onFloorRaycasterResolved = onFloorRaycasterResolved
         self.onSnapToViewportResolved = onSnapToViewportResolved
         self.onTapBackground = onTapBackground
+        self.onCameraInteracted = onCameraInteracted
     }
 
     public func makeCoordinator() -> Coordinator {
@@ -77,7 +80,8 @@ public struct Studio3DViewport: UIViewRepresentable {
             onFurnitureMoved: onFurnitureMoved,
             onFurnitureDragging: onFurnitureDragging,
             onComputeWarningSeverities: onComputeWarningSeverities,
-            onTapBackground: onTapBackground
+            onTapBackground: onTapBackground,
+            onCameraInteracted: onCameraInteracted
         )
     }
 
@@ -119,6 +123,7 @@ public struct Studio3DViewport: UIViewRepresentable {
         context.coordinator.updateSelectionHalos()
         context.coordinator.updateSelectedProjection()
         context.coordinator.onTapBackground = onTapBackground
+        context.coordinator.onCameraInteracted = onCameraInteracted
         if let selectedFurnitureID, selectedFurnitureID != previousSelection {
             context.coordinator.focusMascot(onFurnitureID: selectedFurnitureID)
         }
@@ -160,6 +165,7 @@ public struct Studio3DViewport: UIViewRepresentable {
         var onFurnitureDragging: (() -> Void)?
         var onComputeWarningSeverities: (() -> [UUID: SpatialWarningSeverity])?
         var onTapBackground: (() -> Void)?
+        var onCameraInteracted: (() -> Void)?
 
         private let blueHaloMaterial = SimpleMaterial(
             color: UIColor.systemBlue.withAlphaComponent(0.45),
@@ -224,7 +230,8 @@ public struct Studio3DViewport: UIViewRepresentable {
             onFurnitureMoved: ((FurnitureMoveEvent) -> Void)?,
             onFurnitureDragging: (() -> Void)? = nil,
             onComputeWarningSeverities: (() -> [UUID: SpatialWarningSeverity])? = nil,
-            onTapBackground: (() -> Void)? = nil
+            onTapBackground: (() -> Void)? = nil,
+            onCameraInteracted: (() -> Void)? = nil
         ) {
             self.room = room
             self.selectedFurnitureID = selectedFurnitureID
@@ -235,6 +242,7 @@ public struct Studio3DViewport: UIViewRepresentable {
             self.onFurnitureDragging = onFurnitureDragging
             self.onComputeWarningSeverities = onComputeWarningSeverities
             self.onTapBackground = onTapBackground
+            self.onCameraInteracted = onCameraInteracted
             cameraController = StudioOrbitCameraController(width: room.dimensionsWidth, length: room.dimensionsLength,
                                                            height: room.dimensionsHeight)
             super.init()
@@ -587,6 +595,9 @@ public struct Studio3DViewport: UIViewRepresentable {
                     updateCamera()
                     updateWallCutaways()
                     updateSelectedProjection()
+                    if hypot(translation.x, translation.y) > 12 {
+                        onCameraInteracted?()
+                    }
 
                 case .none:
                     break
@@ -615,6 +626,12 @@ public struct Studio3DViewport: UIViewRepresentable {
                         rotationYaw: item.rotationYaw
                     ))
 
+                case .orbiting:
+                    let translation = gesture.translation(in: arView)
+                    if hypot(translation.x, translation.y) > 12 {
+                        onCameraInteracted?()
+                    }
+
                 default:
                     break
                 }
@@ -638,6 +655,9 @@ public struct Studio3DViewport: UIViewRepresentable {
                     cameraController.magnify(from: pinchStartDistance, scale: scale)
                     updateCamera()
                     updateSelectedProjection()
+                    if abs(scale - 1.0) > 0.06 {
+                        onCameraInteracted?()
+                    }
                 }
             default:
                 break

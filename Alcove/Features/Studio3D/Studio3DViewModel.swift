@@ -49,6 +49,8 @@ public final class Studio3DViewModel {
     public var isWalkthroughActive: Bool = false
     public var walkthroughStepIndex: Int = 0
     public var walkthroughSteps: [WalkthroughStep] = []
+    public var isCurrentStepActionCompleted: Bool = false
+    private var tutorialAdvanceTask: Task<Void, Never>? = nil
 
     public init(
         room: Room,
@@ -168,6 +170,7 @@ public final class Studio3DViewModel {
         mascotMessage = "Archived \(item.name) into inventory!"
         feedbackService.playImpact(.heavy)
         feedbackService.speak(mascotMessage)
+        recordTutorialAction(.transformFurniture)
     }
 
     public func openAddFurnitureCatalog() {
@@ -175,6 +178,7 @@ public final class Studio3DViewModel {
         swapTargetFurnitureID = nil
         isArchiveListPresented = false
         isFurnitureCatalogPresented = true
+        recordTutorialAction(.addFurniture)
     }
 
     public func openSwapFurnitureCatalog(for item: Furniture) {
@@ -182,6 +186,7 @@ public final class Studio3DViewModel {
         swapTargetFurnitureID = item.id
         isArchiveListPresented = false
         isFurnitureCatalogPresented = true
+        recordTutorialAction(.transformFurniture)
     }
 
     @discardableResult
@@ -216,6 +221,7 @@ public final class Studio3DViewModel {
         mascotMessage = "Added \(newItem.name) to your room!"
         feedbackService.playImpact(.medium)
         feedbackService.speak(mascotMessage)
+        recordTutorialAction(.addFurniture)
 
         return newItem
     }
@@ -268,6 +274,7 @@ public final class Studio3DViewModel {
         swapTargetFurnitureID = nil
         selectedFurnitureID = item.id
         feedbackService.playImpact(.medium)
+        recordTutorialAction(.transformFurniture)
 
         handleFurnitureMoved(
             FurnitureMoveEvent(
@@ -332,6 +339,7 @@ public final class Studio3DViewModel {
         item.positionZ = Double(clamped.z)
 
         feedbackService.playImpact(.medium)
+        recordTutorialAction(.transformFurniture)
         handleFurnitureMoved(
             FurnitureMoveEvent(
                 furnitureName: item.name,
@@ -378,6 +386,7 @@ public final class Studio3DViewModel {
         mascotMessage = archived ? "Archived \(item.name) into inventory!" : "Restored \(item.name) to room!"
         feedbackService.playImpact(.heavy)
         feedbackService.speak(mascotMessage)
+        recordTutorialAction(.transformFurniture)
     }
 
     public func markLayoutDirty() {
@@ -387,6 +396,9 @@ public final class Studio3DViewModel {
     public func handleFurnitureMoved(_ event: FurnitureMoveEvent) {
         dragRevision &+= 1
         markLayoutDirty()
+        if hypot(event.newPosition.x - event.oldPosition.x, event.newPosition.z - event.oldPosition.z) > 0.01 {
+            recordTutorialAction(.dragFurniture)
+        }
         if let reaction = mascotService.microReact(
             event: event,
             roomDimensions: (width: room.dimensionsWidth, length: room.dimensionsLength),
@@ -459,6 +471,10 @@ public final class Studio3DViewModel {
     public func advanceToNextStage(result: StageEvaluationResult) {
         evaluationTask?.cancel()
         evaluationTask = nil
+        tutorialAdvanceTask?.cancel()
+        tutorialAdvanceTask = nil
+        isCurrentStepActionCompleted = false
+        isWalkthroughActive = false
         isEvaluating = false
         room.completeStage(currentStage, score: result.score, feedback: result.dialogue)
         if let next = currentStage.nextStage {
@@ -474,6 +490,10 @@ public final class Studio3DViewModel {
         guard room.isUnlocked(stage) else { return }
         evaluationTask?.cancel()
         evaluationTask = nil
+        tutorialAdvanceTask?.cancel()
+        tutorialAdvanceTask = nil
+        isCurrentStepActionCompleted = false
+        isWalkthroughActive = false
         isEvaluating = false
         currentStage = stage
         updateMascotGreeting()
@@ -668,34 +688,86 @@ public final class Studio3DViewModel {
 
     // MARK: - Interactive Walkthrough Orchestration (Figma Image 1 & 2)
     public func startWalkthrough() {
+        tutorialAdvanceTask?.cancel()
+        tutorialAdvanceTask = nil
+        isCurrentStepActionCompleted = false
         walkthroughSteps = buildWalkthroughSteps(for: currentStage)
         walkthroughStepIndex = 0
         isWalkthroughActive = !walkthroughSteps.isEmpty
-        if let first = walkthroughSteps.first {
-            mascotMessage = first.text
-            mascotEmotion = first.emotion
-            feedbackService.speak(first.text)
+        if !walkthroughSteps.isEmpty {
+            applyCurrentWalkthroughStepState()
         }
     }
 
     public func advanceWalkthrough() {
         guard isWalkthroughActive else { return }
+        tutorialAdvanceTask?.cancel()
+        tutorialAdvanceTask = nil
+        isCurrentStepActionCompleted = false
         if walkthroughStepIndex < walkthroughSteps.count - 1 {
             walkthroughStepIndex += 1
-            let current = walkthroughSteps[walkthroughStepIndex]
-            mascotMessage = current.text
-            mascotEmotion = current.emotion
             feedbackService.playImpact(.light)
-            feedbackService.speak(current.text)
+            applyCurrentWalkthroughStepState()
         } else {
             completeWalkthrough()
         }
     }
 
     public func completeWalkthrough() {
+        tutorialAdvanceTask?.cancel()
+        tutorialAdvanceTask = nil
+        isCurrentStepActionCompleted = false
         isWalkthroughActive = false
         feedbackService.playImpact(.medium)
         updateMascotGreeting()
+    }
+
+    /// Marks the active interactive tutorial step complete when the user performs its matching action,
+    /// then automatically advances to the next step after a brief celebratory cue.
+    public func recordTutorialAction(_ action: WalkthroughTutorialAction, immediateAdvance: Bool = false) {
+        guard isWalkthroughActive,
+              !isCurrentStepActionCompleted,
+              walkthroughStepIndex >= 0,
+              walkthroughStepIndex < walkthroughSteps.count else { return }
+
+        guard walkthroughSteps[walkthroughStepIndex].requiredAction == action else { return }
+
+        isCurrentStepActionCompleted = true
+        feedbackService.playNotification(.success)
+
+        tutorialAdvanceTask?.cancel()
+        if immediateAdvance {
+            tutorialAdvanceTask = nil
+            advanceWalkthrough()
+            return
+        }
+
+        let expectedIndex = walkthroughStepIndex
+        tutorialAdvanceTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 650_000_000)
+            guard let self,
+                  !Task.isCancelled,
+                  self.isWalkthroughActive,
+                  self.walkthroughStepIndex == expectedIndex else { return }
+            self.advanceWalkthrough()
+        }
+    }
+
+    private func applyCurrentWalkthroughStepState() {
+        guard walkthroughStepIndex >= 0 && walkthroughStepIndex < walkthroughSteps.count else { return }
+        let step = walkthroughSteps[walkthroughStepIndex]
+        mascotMessage = step.text
+        mascotEmotion = step.emotion
+        feedbackService.speak(step.text)
+
+        if step.requiredAction == .dragFurniture || step.requiredAction == .transformFurniture {
+            let hasActiveSelection = selectedFurnitureID.flatMap { id in
+                activeFurnitures.first { $0.id == id }
+            } != nil
+            if !hasActiveSelection {
+                selectedFurnitureID = activeFurnitures.first?.id
+            }
+        }
     }
 
     private let dialogueCurator = StageDialogueCurator()
