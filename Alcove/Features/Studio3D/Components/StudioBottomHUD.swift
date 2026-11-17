@@ -37,24 +37,42 @@ public struct StudioBottomHUD: View {
 
             Spacer()
 
-            // Temporary Proceed button for stage evaluation testing
+            // Next Stage button for stage evaluation
             Button {
                 onTriggerEvaluation()
             } label: {
                 HStack(spacing: 6) {
-                    Text("Proceed")
+                    Text("Next Stage")
                     Image(systemName: "chevron.right")
                         .font(.system(.subheadline, design: .rounded, weight: .heavy))
                 }
-                .font(.system(.headline, design: .rounded, weight: .bold))
-                .foregroundStyle(Color.alcoveText)
-                .padding(.horizontal, 22)
-                .frame(minWidth: 44, minHeight: 48)
-                .background(Color.alcovePrimaryFill, in: Capsule())
-                .overlay(Capsule().stroke(Color.alcoveBorder, lineWidth: 2.5))
+                .font(.system(.subheadline, design: .rounded, weight: .bold))
+                .foregroundStyle(Color(red: 0x6D / 255.0, green: 0x45 / 255.0, blue: 0x31 / 255.0))
+                .padding(.horizontal, 20)
+                .frame(minWidth: 44, minHeight: 44)
+                .background {
+                    ZStack {
+                        Capsule()
+                            .fill(Color(red: 0x6D / 255.0, green: 0x45 / 255.0, blue: 0x31 / 255.0))
+
+                        ZStack {
+                            VStack(spacing: 0) {
+                                Color(red: 0xFB / 255.0, green: 0xEA / 255.0, blue: 0xB6 / 255.0)
+                                Color(red: 0xFC / 255.0, green: 0xA6 / 255.0, blue: 0x0F / 255.0)
+                            }
+
+                            Capsule()
+                                .fill(Color(red: 0xFB / 255.0, green: 0xD4 / 255.0, blue: 0x60 / 255.0))
+                                .padding(.top, 2)
+                                .padding(.bottom, 3.5)
+                        }
+                        .clipShape(Capsule())
+                        .padding(2.5)
+                    }
+                }
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Proceed to evaluate stage")
+            .accessibilityLabel("Next Stage")
         }
         .padding(.horizontal, 24)
         .padding(.bottom, 20)

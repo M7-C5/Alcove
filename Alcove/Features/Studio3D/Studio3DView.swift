@@ -284,21 +284,53 @@ public struct Studio3DView: View {
     private var studioHeader: some View {
         HStack(spacing: 12) {
             Button {
-                if let router, !router.isEmpty {
-                    router.pop()
-                } else {
-                    dismiss()
+                switch viewModel.currentStage {
+                case .rearrangement:
+                    viewModel.switchToStage(.audit)
+                case .illumination:
+                    viewModel.switchToStage(.rearrangement)
+                case .harmony:
+                    viewModel.switchToStage(.illumination)
+                case .audit:
+                    if let router, !router.isEmpty {
+                        router.pop()
+                    } else {
+                        dismiss()
+                    }
                 }
             } label: {
-                Image(systemName: "chevron.left")
-                    .font(.headline.bold())
-                    .foregroundStyle(Color.alcoveText)
-                    .frame(width: 44, height: 44)
-                    .background(Color.alcoveBackground, in: Circle())
-                    .overlay(Circle().stroke(Color.alcoveBorder, lineWidth: 2))
+                HStack(spacing: 5) {
+                    Image(systemName: "chevron.left")
+                        .font(.system(.subheadline, design: .rounded, weight: .heavy))
+                    Text("Previous Stage")
+                }
+                .font(.system(.subheadline, design: .rounded, weight: .bold))
+                .foregroundStyle(Color(red: 0x6D / 255.0, green: 0x45 / 255.0, blue: 0x31 / 255.0))
+                .padding(.horizontal, 16)
+                .frame(minWidth: 44, minHeight: 44)
+                .background {
+                    ZStack {
+                        Capsule()
+                            .fill(Color(red: 0x6D / 255.0, green: 0x45 / 255.0, blue: 0x31 / 255.0))
+
+                        ZStack {
+                            VStack(spacing: 0) {
+                                Color(red: 0xF9 / 255.0, green: 0xE4 / 255.0, blue: 0xC9 / 255.0)
+                                Color(red: 0xE9 / 255.0, green: 0xC7 / 255.0, blue: 0x9D / 255.0)
+                            }
+
+                            Capsule()
+                                .fill(Color(red: 0xFF / 255.0, green: 0xF7 / 255.0, blue: 0xE7 / 255.0))
+                                .padding(.top, 2)
+                                .padding(.bottom, 3.5)
+                        }
+                        .clipShape(Capsule())
+                        .padding(2)
+                    }
+                }
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Back to Stages")
+            .accessibilityLabel("Previous Stage")
 
             Text(stageHeaderTitle)
                 .font(.custom("Cleanow", size: 32, relativeTo: .title))
