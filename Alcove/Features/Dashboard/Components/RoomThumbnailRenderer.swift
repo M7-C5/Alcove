@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 import UIKit
 import simd
 
@@ -16,7 +17,7 @@ public enum RoomThumbnailRenderer {
         let renderer = UIGraphicsImageRenderer(size: size)
         let image = renderer.image { ctx in
             let cg = ctx.cgContext
-            let bg = UIColor(named: "AlcoveSurfaceElevated") ?? UIColor(red: 0.996, green: 0.965, blue: 0.929, alpha: 1.0)
+            let bg = UIColor(Color.alcoveSurfaceElevated)
             bg.setFill()
             cg.fill(CGRect(origin: .zero, size: size))
 

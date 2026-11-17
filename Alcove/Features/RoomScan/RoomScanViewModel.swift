@@ -134,6 +134,25 @@ public final class RoomScanViewModel {
         modelContext: ModelContext,
         roomName: String = "Scanned Room"
     ) -> Room? {
+        guard let room = prepareValidatedRoom(from: payload, roomName: roomName) else { return nil }
+        return persistScannedRoom(room, in: modelContext)
+    }
+
+    private func processPayloadAndRenderThumbnail(
+        _ payload: CapturedRoomPayload,
+        modelContext: ModelContext,
+        roomName: String
+    ) async {
+        guard let room = prepareValidatedRoom(from: payload, roomName: roomName) else { return }
+        room.thumbnailData = await RoomThumbnailRenderer.renderThumbnailData(for: room)
+        guard !isCancelled else { return }
+        persistScannedRoom(room, in: modelContext)
+    }
+
+    private func prepareValidatedRoom(
+        from payload: CapturedRoomPayload,
+        roomName: String
+    ) -> Room? {
         guard !isCancelled else { return nil }
         state = .processing
 
@@ -144,8 +163,12 @@ public final class RoomScanViewModel {
 
         let room = mapper.mapToRoom(payload: payload, roomName: roomName)
         room.compassOrientation = compassCapture.orientation
-        modelContext.insert(room)
+        return room
+    }
 
+    @discardableResult
+    private func persistScannedRoom(_ room: Room, in modelContext: ModelContext) -> Room? {
+        modelContext.insert(room)
         do {
             try modelContext.save()
             state = .completed(roomId: room.id)
@@ -153,32 +176,6 @@ public final class RoomScanViewModel {
         } catch {
             state = .error("Failed to save scanned room: \(error.localizedDescription)")
             return nil
-        }
-    }
-
-    private func processPayloadAndRenderThumbnail(
-        _ payload: CapturedRoomPayload,
-        modelContext: ModelContext,
-        roomName: String
-    ) async {
-        guard !isCancelled else { return }
-        state = .processing
-
-        guard isValidScan(payload: payload) else {
-            state = .error("Invalid scan: A complete room requires scanning at least 2 corner walls to establish depth. Please scan around a corner before finishing.")
-            return
-        }
-
-        let room = mapper.mapToRoom(payload: payload, roomName: roomName)
-        room.compassOrientation = compassCapture.orientation
-        room.thumbnailData = await RoomThumbnailRenderer.renderThumbnailData(for: room)
-        modelContext.insert(room)
-
-        do {
-            try modelContext.save()
-            state = .completed(roomId: room.id)
-        } catch {
-            state = .error("Failed to save scanned room: \(error.localizedDescription)")
         }
     }
 
