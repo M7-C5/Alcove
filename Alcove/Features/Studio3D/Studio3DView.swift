@@ -67,21 +67,19 @@ public struct Studio3DView: View {
             ZStack(alignment: .bottomLeading) {
                 LightingWorkspaceBackground()
 
+                // Full-bleed 3D Room Viewport (unboxed so users can freely zoom & orbit edge-to-edge)
+                framedRoomViewport(
+                    outerSize: outerGeometry.size,
+                    selectedFurnitureID: $bindableVM.selectedFurnitureID,
+                    beforeAfterSplit: $bindableVM.beforeAfterSplit,
+                    warningSeverities: warningSeverities
+                )
+                .ignoresSafeArea()
+
                 VStack(spacing: 12) {
                     studioHeader
                     stageProgressBar
-
-                    Spacer(minLength: 4)
-
-                    // Centered Framed 3D Room Viewport matching Light Stage UI
-                    framedRoomViewport(
-                        outerSize: outerGeometry.size,
-                        selectedFurnitureID: $bindableVM.selectedFurnitureID,
-                        beforeAfterSplit: $bindableVM.beforeAfterSplit,
-                        warningSeverities: warningSeverities
-                    )
-
-                    Spacer(minLength: 8)
+                    Spacer()
                 }
                 .padding(.horizontal, 28)
                 .padding(.top, 16)
@@ -344,8 +342,8 @@ public struct Studio3DView: View {
                     Image(systemName: "chevron.left")
                         .font(.system(.subheadline, design: .rounded, weight: .heavy))
                     Text("Previous Stage")
+                        .font(.custom("Cleanow", size: 16, relativeTo: .subheadline))
                 }
-                .font(.system(.subheadline, design: .rounded, weight: .bold))
                 .foregroundStyle(Color(red: 0x6D / 255.0, green: 0x45 / 255.0, blue: 0x31 / 255.0))
                 .padding(.horizontal, 16)
                 .frame(minWidth: 44, minHeight: 44)
@@ -389,7 +387,7 @@ public struct Studio3DView: View {
                     }
                     playSnapFeedback()
                 } label: {
-                    Image(systemName: "cube")
+                    Image(systemName: "rotate.3d")
                         .font(.system(size: 18, weight: .semibold))
                         .foregroundStyle(Color(red: 0x6D / 255.0, green: 0x45 / 255.0, blue: 0x31 / 255.0))
                         .frame(width: 45, height: 45)
@@ -710,8 +708,6 @@ public struct Studio3DView: View {
         beforeAfterSplit: Binding<Double>,
         warningSeverities: [UUID: SpatialWarningSeverity]
     ) -> some View {
-        let panelWidth = min(760, max(320, outerSize.width - 140))
-
         ZStack {
             GeometryReader { viewportGeometry in
                 ZStack(alignment: .top) {
@@ -803,7 +799,7 @@ public struct Studio3DView: View {
                         .zIndex(10)
                     }
 
-                    // Stage 4 Harmony: Split Curtain Divider inside framed viewport
+                    // Stage 4 Harmony: Split Curtain Divider inside viewport
                     if viewModel.currentStage == .harmony && !viewModel.isArchiveListPresented {
                         SplitCurtainDividerView(
                             splitFraction: beforeAfterSplit,
@@ -816,10 +812,7 @@ public struct Studio3DView: View {
                 }
             }
         }
-        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .padding(10)
-        .lightingPanel()
-        .frame(maxWidth: panelWidth, maxHeight: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     @ViewBuilder

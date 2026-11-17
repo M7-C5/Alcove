@@ -64,22 +64,8 @@ public struct StageEvaluationSheet: View {
 
     public var body: some View {
         VStack(spacing: 0) {
-            // Header bar with circular 'X' close button, centered title, and optional refresh
+            // Centered header title
             HStack {
-                Button {
-                    dismiss()
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 16, weight: .bold, design: .rounded))
-                        .foregroundStyle(EvaluationReviewPalette.borderBrown)
-                        .frame(width: 44, height: 44)
-                        .background(EvaluationReviewPalette.innerCream, in: Circle())
-                        .overlay(Circle().stroke(EvaluationReviewPalette.borderBrown, lineWidth: 2.5))
-                        .contentShape(Circle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Close Layout Review")
-
                 Spacer()
 
                 Text(stage == .audit ? "Room Audit Review" : "Layout Review")
@@ -87,29 +73,10 @@ public struct StageEvaluationSheet: View {
                     .foregroundStyle(EvaluationReviewPalette.borderBrown)
 
                 Spacer()
-
-                if let onReevaluate {
-                    Button {
-                        onReevaluate()
-                    } label: {
-                        Image(systemName: "arrow.clockwise")
-                            .font(.system(size: 16, weight: .bold, design: .rounded))
-                            .foregroundStyle(EvaluationReviewPalette.borderBrown)
-                            .frame(width: 44, height: 44)
-                            .background(EvaluationReviewPalette.innerCream, in: Circle())
-                            .overlay(Circle().stroke(EvaluationReviewPalette.borderBrown, lineWidth: 2.5))
-                            .contentShape(Circle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Re-evaluate")
-                } else {
-                    Color.clear
-                        .frame(width: 44, height: 44)
-                }
             }
             .padding(.horizontal, 24)
-            .padding(.top, 20)
-            .padding(.bottom, 8)
+            .padding(.top, 22)
+            .padding(.bottom, 10)
 
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 18) {
@@ -280,10 +247,10 @@ public struct StageEvaluationSheet: View {
                         } label: {
                             HStack(spacing: 6) {
                                 Text(primaryActionTitle)
+                                    .font(.custom("Cleanow", size: 17, relativeTo: .subheadline))
                                 Image(systemName: stage == .harmony ? "arkit" : "chevron.right")
                                     .font(.system(size: 14, weight: .heavy, design: .rounded))
                             }
-                            .font(.system(.subheadline, design: .rounded, weight: .bold))
                             .foregroundStyle(result.canAdvance ? EvaluationReviewPalette.borderBrown : EvaluationReviewPalette.greyBorder)
                             .padding(.horizontal, 26)
                             .frame(minHeight: 46)
@@ -298,7 +265,7 @@ public struct StageEvaluationSheet: View {
                             dismiss()
                         } label: {
                             Text(secondaryActionTitle)
-                                .font(.system(.subheadline, design: .rounded, weight: .bold))
+                                .font(.custom("Cleanow", size: 16, relativeTo: .subheadline))
                                 .foregroundStyle(EvaluationReviewPalette.greyBorder)
                                 .frame(minHeight: 44)
                                 .padding(.horizontal, 16)

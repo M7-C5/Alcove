@@ -83,7 +83,9 @@ public struct Studio3DViewport: UIViewRepresentable {
 
     public func makeUIView(context: Context) -> ARView {
         let view = RoomPreviewARView(frame: .zero, cameraMode: .nonAR, automaticallyConfigureSession: false)
-        view.environment.background = .color(UIColor(Color.alcoveSurface))
+        view.isOpaque = false
+        view.backgroundColor = .clear
+        view.environment.background = .color(.clear)
         view.renderOptions.insert([.disableMotionBlur, .disableDepthOfField])
 
         context.coordinator.install(in: view)
