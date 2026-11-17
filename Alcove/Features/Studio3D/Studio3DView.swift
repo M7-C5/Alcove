@@ -152,6 +152,7 @@ public struct Studio3DView: View {
                     StageWalkthroughOverlay(
                         steps: viewModel.walkthroughSteps,
                         currentStepIndex: viewModel.walkthroughStepIndex,
+                        isActionCompleted: viewModel.isCurrentStepActionCompleted,
                         onAdvance: { viewModel.advanceWalkthrough() },
                         onSkip: { viewModel.completeWalkthrough() }
                     )
@@ -348,7 +349,10 @@ public struct Studio3DView: View {
                 }
 
                 StudioViewportActions(
-                    onSelectPreset: { viewModel.snapToViewport?($0) },
+                    onSelectPreset: { preset in
+                        viewModel.snapToViewport?(preset)
+                        viewModel.recordTutorialAction(.inspectCamera)
+                    },
                     onOpenAR: { isARWalkthroughPresented = true }
                 )
             }
@@ -516,6 +520,9 @@ public struct Studio3DView: View {
                                     }
                                     playSnapFeedback()
                                 }
+                            },
+                            onCameraInteracted: {
+                                viewModel.recordTutorialAction(.inspectCamera)
                             }
                         )
                         .background {
@@ -702,6 +709,7 @@ public struct Studio3DView: View {
         rotateDragStartYaw = nil
         wasSnapped = false
         playSnapFeedback()
+        viewModel.recordTutorialAction(.transformFurniture)
         viewModel.handleFurnitureMoved(
             FurnitureMoveEvent(
                 furnitureName: furniture.name,
