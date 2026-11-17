@@ -75,6 +75,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Remove interactive game-style tutorial overlay.
 - Remove numerical scores and grades from evaluations.
 - Share room validation/persistence and use alcoveSurfaceElevated token.
 - Share Audit viewport controls and camera.
@@ -88,6 +89,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Pass isARPresented and onOpenAR to LightingWorkspaceView.
 - Block advance on live collisions and restyle bottom warning banner.
 - Preserve 44pt minimum hit targets on scaled scan buttons.
 - Use symmetric fade-out animation when dismissing done alert.
