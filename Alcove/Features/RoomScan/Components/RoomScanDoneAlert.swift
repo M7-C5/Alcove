@@ -20,55 +20,55 @@ struct RoomScanDoneAlert: View {
     var body: some View {
         VStack(spacing: 0) {
             Text("Are you done scanning?")
-                .font(.custom("Cleanow", size: 28, relativeTo: .title))
+                .font(.custom("Cleanow", size: 18, relativeTo: .headline))
                 .foregroundStyle(brown)
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
-                .minimumScaleFactor(0.8)
+                .minimumScaleFactor(0.85)
                 .fixedSize(horizontal: false, vertical: true)
 
             Text("Make sure you have fully scanned the whole room to receive maximum results.")
-                .font(.system(.title3, design: .rounded, weight: .semibold))
+                .font(.system(.subheadline, design: .rounded, weight: .semibold))
                 .foregroundStyle(brown)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 14)
+                .padding(.top, 8)
 
-            HStack(spacing: 22) {
+            HStack(spacing: 14) {
                 alertButton(title: "No", isPrimary: false, action: onNo)
                 alertButton(title: "Yes", isPrimary: true, action: onYes)
             }
-            .padding(.top, 26)
+            .padding(.top, 16)
         }
-        .padding(.horizontal, 36)
-        .padding(.top, 42)
-        .padding(.bottom, 34)
-        .frame(width: 440)
+        .padding(.horizontal, 22)
+        .padding(.top, 26)
+        .padding(.bottom, 22)
+        .frame(width: 296)
         .background {
-            RoundedRectangle(cornerRadius: 50)
+            RoundedRectangle(cornerRadius: 30)
                 .fill(cream)
                 .background(alignment: .top) {
                     Image("EditOtterHead")
                         .resizable()
                         .scaledToFit()
-                        .frame(width: 190)
-                        .offset(y: -116)
+                        .frame(width: 118)
+                        .offset(y: -72)
                         .allowsHitTesting(false)
                 }
         }
         .overlay {
-            RoundedRectangle(cornerRadius: 50)
-                .strokeBorder(brown, lineWidth: 5)
+            RoundedRectangle(cornerRadius: 30)
+                .strokeBorder(brown, lineWidth: 3)
         }
         .overlay(alignment: .top) {
             Image("OtterPaws")
                 .resizable()
                 .scaledToFit()
-                .frame(width: 140)
-                .offset(x: 7, y: -15)
+                .frame(width: 90)
+                .offset(x: 4, y: -10)
                 .allowsHitTesting(false)
         }
-        .padding(.top, 130)
+        .padding(.top, 80)
     }
 
     private func alertButton(
@@ -82,14 +82,14 @@ struct RoomScanDoneAlert: View {
 
         return Button(action: action) {
             Text(title)
-                .font(.custom("Cleanow", size: 24, relativeTo: .title3))
+                .font(.custom("Cleanow", size: 16, relativeTo: .callout))
                 .foregroundStyle(brown)
                 .frame(maxWidth: .infinity)
-                .frame(height: 58)
+                .frame(height: 40)
                 .background {
                     GeometryReader { geometry in
-                        let border: CGFloat = 4
-                        let band: CGFloat = 6
+                        let border: CGFloat = 2.5
+                        let band: CGFloat = 3.5
 
                         ZStack {
                             Capsule()
