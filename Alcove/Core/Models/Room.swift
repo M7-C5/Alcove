@@ -11,6 +11,9 @@ public final class Room {
     public var dimensionsHeight: Double
     /// Optional payload lets existing rooms migrate without inventing a north reference.
     public var compassOrientationData: Data? = nil
+    /// Rendered 3D dollhouse preview PNG for the Dashboard room card.
+    @Attribute(.externalStorage)
+    public var thumbnailData: Data? = nil
 
     public var compassOrientation: RoomCompassOrientation? {
         get {
