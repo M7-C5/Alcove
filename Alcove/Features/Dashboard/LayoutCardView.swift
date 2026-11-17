@@ -3,6 +3,7 @@ import UIKit
 
 struct LayoutCardView: View {
 
+    let layoutID: UUID
     let layoutName: String
     let cardWidth: CGFloat
     let cardHeight: CGFloat
@@ -11,19 +12,19 @@ struct LayoutCardView: View {
     let onEdit: () -> Void
     let onDelete: () -> Void
 
-    @Binding var openMenuLayout: String?
+    @Binding var openMenuLayoutID: UUID?
 
     private var isMenuOpen: Bool {
-        openMenuLayout == layoutName
+        openMenuLayoutID == layoutID
     }
 
     // Design system colors
-    private let brown = Color("AlcoveInk")
-    private let orange = Color("AlcovePrimaryShadow")
-    private let cream = Color("AlcoveCardBackground")
+    private let brown = Color.alcoveInk
+    private let orange = Color.alcovePrimaryShadow
+    private let cream = Color.alcoveCardBackground
 
-    private let badgeGold = Color("AlcoveBadgeGold")
-    private let thumbnailSurface = Color("AlcoveSurfaceElevated")
+    private let badgeGold = Color.alcoveBadgeGold
+    private let thumbnailSurface = Color.alcoveSurfaceElevated
 
     private var badgeWidth: CGFloat {
         cardWidth * 0.22
@@ -101,7 +102,7 @@ struct LayoutCardView: View {
                         dampingFraction: 0.82
                     )
                 ) {
-                    openMenuLayout = isMenuOpen ? nil : layoutName
+                    openMenuLayoutID = isMenuOpen ? nil : layoutID
                 }
             } label: {
                 Image(systemName: "ellipsis")
@@ -122,7 +123,7 @@ struct LayoutCardView: View {
 
                     Button {
                         withAnimation(.easeInOut(duration: 0.18)) {
-                            openMenuLayout = nil
+                            openMenuLayoutID = nil
                         }
                         onEdit()
                     } label: {
@@ -136,7 +137,7 @@ struct LayoutCardView: View {
 
                     Button {
                         withAnimation(.easeInOut(duration: 0.18)) {
-                            openMenuLayout = nil
+                            openMenuLayoutID = nil
                         }
                         onDelete()
                     } label: {
@@ -160,7 +161,7 @@ struct LayoutCardView: View {
                 .padding(.vertical, 4)
                 .frame(width: 230)
                 .background(
-                    Color("AlcoveSurface"),
+                    Color.alcoveSurface,
                     in: RoundedRectangle(cornerRadius: 28)
                 )
                 .overlay {
@@ -236,20 +237,21 @@ struct LayoutCardView: View {
 
 #Preview("Alcove Room Card") {
 
-    @Previewable @State var openMenu: String? = nil
+    @Previewable @State var openMenu: UUID? = nil
 
     ZStack {
-        Color(red: 1, green: 0.97, blue: 0.94)
+        Color.alcoveBackground
             .ignoresSafeArea()
 
         LayoutCardView(
+            layoutID: UUID(),
             layoutName: "M's Bedroom",
             cardWidth: 570,
             cardHeight: 530,
             onTap: {},
             onEdit: {},
             onDelete: {},
-            openMenuLayout: $openMenu
+            openMenuLayoutID: $openMenu
         )
     }
 }

@@ -16,21 +16,21 @@ struct LayoutAlert: View {
     @State private var hasTypedName = false
 
     // Design system colors
-    private let brown = Color("AlcoveInk")
-    private let cream = Color("AlcoveSurface")
+    private let brown = Color.alcoveInk
+    private let cream = Color.alcoveSurface
 
     // Save/Yes button
-    private let yellow = Color("AlcovePrimaryFill")
-    private let yellowHighlight = Color("AlcovePrimaryHighlight")
-    private let orange = Color("AlcovePrimaryShadow")
+    private let yellow = Color.alcovePrimaryFill
+    private let yellowHighlight = Color.alcovePrimaryHighlight
+    private let orange = Color.alcovePrimaryShadow
 
     // Cancel/No button
-    private let cancelFill = Color("AlcoveSurfaceElevated")
-    private let cancelHighlight = Color("AlcoveSecondaryHighlight")
-    private let cancelShadow = Color("AlcoveSecondaryShadow")
+    private let cancelFill = Color.alcoveSurfaceElevated
+    private let cancelHighlight = Color.alcoveSecondaryHighlight
+    private let cancelShadow = Color.alcoveSecondaryShadow
 
     // Text field
-    private let placeholderColor = Color("AlcovePlaceholderText")
+    private let placeholderColor = Color.alcovePlaceholderText
 
     private var isEditing: Bool {
         type == .edit
