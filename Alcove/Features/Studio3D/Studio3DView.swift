@@ -216,6 +216,7 @@ public struct Studio3DView: View {
                         viewModel.triggerStageEvaluation(forceReprompt: true)
                     }
                 )
+                .presentationBackground(.clear)
             }
         }
         .sheet(isPresented: $viewModel.showingScorecardSheet) {

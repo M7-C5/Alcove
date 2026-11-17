@@ -1,6 +1,24 @@
 import SwiftUI
 
-/// Advisory stage evaluation dialog presenting Mascot's critique with override option
+private enum EvaluationReviewPalette {
+    static let borderBrown = Color(red: 0x6D / 255.0, green: 0x45 / 255.0, blue: 0x31 / 255.0)
+    static let cardPeach = Color(red: 0xFE / 255.0, green: 0xEE / 255.0, blue: 0xDE / 255.0)
+    static let innerCream = Color(red: 0xFF / 255.0, green: 0xFB / 255.0, blue: 0xF5 / 255.0)
+    static let subtitleTerracotta = Color(red: 0xC4 / 255.0, green: 0x7A / 255.0, blue: 0x5A / 255.0)
+    static let improveRed = Color(red: 0xD4 / 255.0, green: 0x63 / 255.0, blue: 0x63 / 255.0)
+    static let worksWellSage = Color(red: 0xDD / 255.0, green: 0xDD / 255.0, blue: 0xB1 / 255.0)
+
+    static let goldHighlight = Color(red: 0xFB / 255.0, green: 0xEA / 255.0, blue: 0xB6 / 255.0)
+    static let goldFace = Color(red: 0xFB / 255.0, green: 0xD4 / 255.0, blue: 0x60 / 255.0)
+    static let goldLip = Color(red: 0xFC / 255.0, green: 0xA6 / 255.0, blue: 0x0F / 255.0)
+
+    static let greyBorder = Color(red: 0xB7 / 255.0, green: 0xB7 / 255.0, blue: 0xB7 / 255.0)
+    static let greyHighlight = Color(red: 0xF7 / 255.0, green: 0xF7 / 255.0, blue: 0xF7 / 255.0)
+    static let greyFace = Color(red: 0xEA / 255.0, green: 0xE8 / 255.0, blue: 0xE6 / 255.0)
+    static let greyLip = Color(red: 0xC7 / 255.0, green: 0xC7 / 255.0, blue: 0xC7 / 255.0)
+}
+
+/// Advisory stage evaluation dialog presenting Otter's review styled to match Alcove's Figma card system.
 public struct StageEvaluationSheet: View {
     @Environment(\.dismiss) private var dismiss
     let result: StageEvaluationResult
@@ -23,187 +41,313 @@ public struct StageEvaluationSheet: View {
         self.onReevaluate = onReevaluate
     }
 
+    private var statusSubtitle: String {
+        if stage == .audit {
+            return "Baseline Room Audit Captured"
+        }
+        return result.canAdvance ? "Ready for Next Stage" : "A Few Things Need Your Attention"
+    }
+
+    private var primaryActionTitle: String {
+        if stage == .harmony {
+            return "View in AR Walkthrough"
+        } else if stage == .audit {
+            return "Proceed to Rearrangement"
+        } else {
+            return result.canAdvance ? "Advance to Next Stage" : "Proceed Anyway (Advisory Override)"
+        }
+    }
+
+    private var secondaryActionTitle: String {
+        stage == .audit ? "Keep Inspecting Baseline" : "Keep Refining Layout"
+    }
+
     public var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    // Evaluation Status & Mascot Verdict
-                    HStack(spacing: 16) {
-                        Text(result.canAdvance ? "🎉" : "🤔")
-                            .font(.system(size: 48))
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(result.title)
-                                .font(.title2.bold())
-                            if stage == .audit {
-                                Text("Current Situation: Baseline Intake Captured")
-                                    .font(.subheadline.bold())
-                                    .foregroundStyle(.indigo)
-                            } else {
-                                Text(result.canAdvance ? "Ready for Next Stage" : "Suggested Refinements")
-                                    .font(.subheadline.bold())
-                                    .foregroundStyle(result.canAdvance ? .green : .orange)
-                            }
-                        }
-                    }
-                    .padding(20)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .fill(Color(uiColor: .secondarySystemGroupedBackground))
-                    )
+        VStack(spacing: 0) {
+            // Header bar with circular 'X' close button, centered title, and optional refresh
+            HStack {
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                        .foregroundStyle(EvaluationReviewPalette.borderBrown)
+                        .frame(width: 44, height: 44)
+                        .background(EvaluationReviewPalette.innerCream, in: Circle())
+                        .overlay(Circle().stroke(EvaluationReviewPalette.borderBrown, lineWidth: 2.5))
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Close Layout Review")
 
-                    // Mascot Dialogue
+                Spacer()
+
+                Text(stage == .audit ? "Room Audit Review" : "Layout Review")
+                    .font(.custom("Cleanow", size: 22, relativeTo: .title3))
+                    .foregroundStyle(EvaluationReviewPalette.borderBrown)
+
+                Spacer()
+
+                if let onReevaluate {
+                    Button {
+                        onReevaluate()
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 16, weight: .bold, design: .rounded))
+                            .foregroundStyle(EvaluationReviewPalette.borderBrown)
+                            .frame(width: 44, height: 44)
+                            .background(EvaluationReviewPalette.innerCream, in: Circle())
+                            .overlay(Circle().stroke(EvaluationReviewPalette.borderBrown, lineWidth: 2.5))
+                            .contentShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Re-evaluate")
+                } else {
+                    Color.clear
+                        .frame(width: 44, height: 44)
+                }
+            }
+            .padding(.horizontal, 24)
+            .padding(.top, 20)
+            .padding(.bottom, 8)
+
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 18) {
+                    // Main Evaluation Header
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(result.title.isEmpty ? "Layout Evaluation Complete!" : result.title)
+                            .font(.custom("Cleanow", size: 24, relativeTo: .title2))
+                            .foregroundStyle(EvaluationReviewPalette.borderBrown)
+
+                        Text(statusSubtitle)
+                            .font(.system(.subheadline, design: .rounded, weight: .semibold))
+                            .foregroundStyle(EvaluationReviewPalette.subtitleTerracotta)
+                    }
+
+                    // Otter's Note
                     VStack(alignment: .leading, spacing: 8) {
-                        Label(stage == .audit ? "Mascot Room Diagnosis" : "Mascot Critique", systemImage: "quote.bubble.fill")
-                            .font(.caption.bold())
-                            .foregroundStyle(.indigo)
-                            .textCase(.uppercase)
+                        Text("Otter's Note")
+                            .font(.custom("Cleanow", size: 17, relativeTo: .headline))
+                            .foregroundStyle(EvaluationReviewPalette.borderBrown)
 
-                        if let attributed = try? AttributedString(markdown: result.dialogue, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)) {
-                            Text(attributed)
-                                .font(.body)
-                                .lineSpacing(4)
-                        } else {
-                            Text(result.dialogue)
-                                .font(.body)
-                                .lineSpacing(4)
+                        Group {
+                            if let attributed = try? AttributedString(
+                                markdown: result.dialogue,
+                                options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)
+                            ) {
+                                Text(attributed)
+                            } else {
+                                Text(result.dialogue)
+                            }
                         }
+                        .font(.system(.subheadline, design: .rounded, weight: .medium))
+                        .foregroundStyle(EvaluationReviewPalette.borderBrown)
+                        .lineSpacing(3)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(16)
+                        .background(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .fill(EvaluationReviewPalette.innerCream)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .stroke(EvaluationReviewPalette.borderBrown, lineWidth: 2)
+                        )
                     }
-                    .padding(20)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .fill(Color.indigo.opacity(0.08))
-                    )
 
-                    // Bottlenecks section (if any)
+                    // Areas to Improve (if any bottlenecks detected)
                     if !result.bottlenecks.isEmpty {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Identified Bottlenecks")
-                                .font(.headline)
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Areas to Improve")
+                                .font(.custom("Cleanow", size: 17, relativeTo: .headline))
+                                .foregroundStyle(EvaluationReviewPalette.borderBrown)
 
-                            ForEach(result.bottlenecks) { bottleneck in
-                                HStack(alignment: .top, spacing: 12) {
-                                    Image(systemName: "exclamationmark.triangle.fill")
-                                        .foregroundStyle(.orange)
-                                        .font(.title3)
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        Text(bottleneck.title)
-                                            .font(.subheadline.bold())
-                                        Text(bottleneck.detail)
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
+                            VStack(alignment: .leading, spacing: 10) {
+                                ForEach(result.bottlenecks) { bottleneck in
+                                    HStack(alignment: .top, spacing: 10) {
+                                        Image(systemName: "exclamationmark.triangle.fill")
+                                            .font(.system(size: 16, weight: .bold))
+                                            .foregroundStyle(.white)
+                                            .padding(.top, 2)
+
+                                        VStack(alignment: .leading, spacing: 3) {
+                                            Text(bottleneck.title)
+                                                .font(.system(.subheadline, design: .rounded, weight: .bold))
+                                                .foregroundStyle(.white)
+                                            Text(bottleneck.detail)
+                                                .font(.system(.caption, design: .rounded, weight: .medium))
+                                                .foregroundStyle(.white.opacity(0.95))
+                                        }
                                     }
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(14)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                            .fill(EvaluationReviewPalette.improveRed)
+                                    )
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                            .stroke(EvaluationReviewPalette.borderBrown, lineWidth: 2)
+                                    )
                                 }
-                                .padding(14)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                        .fill(Color.orange.opacity(0.1))
-                                )
                             }
                         }
                     }
 
-                    // Recommendations section (grounded design improvements)
+                    // Design Tips
                     if !result.recommendations.isEmpty {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Design Tips")
-                                .font(.headline)
+                                .font(.custom("Cleanow", size: 17, relativeTo: .headline))
+                                .foregroundStyle(EvaluationReviewPalette.borderBrown)
 
-                            ForEach(result.recommendations, id: \.self) { rec in
-                                HStack(alignment: .top, spacing: 10) {
-                                    Image(systemName: "lightbulb.fill")
-                                        .foregroundStyle(.yellow)
-                                        .font(.subheadline)
-                                        .padding(.top, 2)
-                                    if let attributed = try? AttributedString(markdown: rec, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)) {
-                                        Text(attributed)
-                                            .font(.subheadline)
-                                            .foregroundStyle(.primary)
-                                    } else {
-                                        Text(rec)
-                                            .font(.subheadline)
-                                            .foregroundStyle(.primary)
+                            VStack(alignment: .leading, spacing: 12) {
+                                ForEach(result.recommendations, id: \.self) { rec in
+                                    HStack(alignment: .top, spacing: 10) {
+                                        Image(systemName: "lightbulb.fill")
+                                            .font(.system(size: 15, weight: .bold))
+                                            .foregroundStyle(EvaluationReviewPalette.borderBrown)
+                                            .padding(.top, 2)
+
+                                        Group {
+                                            if let attributed = try? AttributedString(
+                                                markdown: rec,
+                                                options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)
+                                            ) {
+                                                Text(attributed)
+                                            } else {
+                                                Text(rec)
+                                            }
+                                        }
+                                        .font(.system(.subheadline, design: .rounded, weight: .medium))
+                                        .foregroundStyle(EvaluationReviewPalette.borderBrown)
+                                        .lineSpacing(2)
                                     }
+                                    .frame(maxWidth: .infinity, alignment: .leading)
                                 }
-                                .padding(12)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                        .fill(Color(uiColor: .tertiarySystemGroupedBackground))
-                                )
                             }
+                            .padding(16)
+                            .background(
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .fill(EvaluationReviewPalette.innerCream)
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .stroke(EvaluationReviewPalette.borderBrown, lineWidth: 2)
+                            )
                         }
                     }
 
-                    // Praise
+                    // What Works Well
                     if !result.praise.isEmpty {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("What Works Well")
-                                .font(.headline)
+                                .font(.custom("Cleanow", size: 17, relativeTo: .headline))
+                                .foregroundStyle(EvaluationReviewPalette.borderBrown)
 
-                            ForEach(result.praise, id: \.self) { point in
-                                Label(point, systemImage: "checkmark.circle.fill")
-                                    .font(.subheadline)
-                                    .foregroundStyle(.green)
+                            VStack(alignment: .leading, spacing: 10) {
+                                ForEach(result.praise, id: \.self) { point in
+                                    HStack(alignment: .top, spacing: 10) {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .font(.system(size: 16, weight: .bold))
+                                            .foregroundStyle(EvaluationReviewPalette.borderBrown)
+                                            .padding(.top, 1)
+
+                                        Text(point)
+                                            .font(.system(.subheadline, design: .rounded, weight: .medium))
+                                            .foregroundStyle(EvaluationReviewPalette.borderBrown)
+                                    }
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                }
                             }
+                            .padding(16)
+                            .background(
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .fill(EvaluationReviewPalette.worksWellSage)
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .stroke(EvaluationReviewPalette.borderBrown, lineWidth: 2)
+                            )
                         }
                     }
 
-                    // Action buttons
-                    VStack(spacing: 12) {
+                    // Bottom Tactile Action Buttons
+                    VStack(spacing: 8) {
                         Button {
                             onProceedAnyway()
                             dismiss()
                         } label: {
-                            HStack {
-                                if stage == .harmony {
-                                    Text("View in AR Walkthrough")
-                                    Image(systemName: "arkit")
-                                } else if stage == .audit {
-                                    Text("Proceed to Rearrangement")
-                                    Image(systemName: "arrow.right")
-                                } else {
-                                    Text(result.canAdvance ? "Advance to Next Stage" : "Proceed Anyway (Advisory Override)")
-                                    Image(systemName: "arrow.right")
-                                }
+                            HStack(spacing: 6) {
+                                Text(primaryActionTitle)
+                                Image(systemName: stage == .harmony ? "arkit" : "chevron.right")
+                                    .font(.system(size: 14, weight: .heavy, design: .rounded))
                             }
-                            .font(.headline)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
+                            .font(.system(.subheadline, design: .rounded, weight: .bold))
+                            .foregroundStyle(result.canAdvance ? EvaluationReviewPalette.borderBrown : EvaluationReviewPalette.greyBorder)
+                            .padding(.horizontal, 26)
+                            .frame(minHeight: 46)
+                            .background {
+                                tactilePillBackground(isEnabledStyle: result.canAdvance)
+                            }
                         }
-                        .buttonStyle(.borderedProminent)
-                        .tint(result.canAdvance ? .indigo : .secondary)
+                        .buttonStyle(.plain)
 
-                        Button(stage == .audit ? "Keep Inspecting Baseline" : "Keep Refining Layout") {
+                        Button {
                             onKeepRefining()
                             dismiss()
-                        }
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                    }
-                    .padding(.top, 16)
-                }
-                .padding(28)
-            }
-            .background(Color(uiColor: .systemGroupedBackground))
-            .navigationTitle(stage == .audit ? "Room Audit Diagnosis" : "Stage Evaluation")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") { dismiss() }
-                }
-                if let onReevaluate {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button {
-                            onReevaluate()
                         } label: {
-                            Label("Re-evaluate", systemImage: "arrow.clockwise")
+                            Text(secondaryActionTitle)
+                                .font(.system(.subheadline, design: .rounded, weight: .bold))
+                                .foregroundStyle(EvaluationReviewPalette.greyBorder)
+                                .frame(minHeight: 44)
+                                .padding(.horizontal, 16)
                         }
+                        .buttonStyle(.plain)
                     }
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 8)
                 }
+                .padding(.horizontal, 28)
+                .padding(.top, 8)
+                .padding(.bottom, 24)
             }
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .fill(EvaluationReviewPalette.cardPeach)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .stroke(EvaluationReviewPalette.borderBrown, lineWidth: 3)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+    }
+
+    @ViewBuilder
+    private func tactilePillBackground(isEnabledStyle: Bool) -> some View {
+        let border = isEnabledStyle ? EvaluationReviewPalette.borderBrown : EvaluationReviewPalette.greyBorder
+        let topHighlight = isEnabledStyle ? EvaluationReviewPalette.goldHighlight : EvaluationReviewPalette.greyHighlight
+        let face = isEnabledStyle ? EvaluationReviewPalette.goldFace : EvaluationReviewPalette.greyFace
+        let bottomLip = isEnabledStyle ? EvaluationReviewPalette.goldLip : EvaluationReviewPalette.greyLip
+
+        ZStack {
+            Capsule()
+                .fill(border)
+
+            ZStack {
+                VStack(spacing: 0) {
+                    topHighlight
+                    bottomLip
+                }
+
+                Capsule()
+                    .fill(face)
+                    .padding(.top, 2)
+                    .padding(.bottom, 4)
+            }
+            .clipShape(Capsule())
+            .padding(2.5)
         }
     }
 }
