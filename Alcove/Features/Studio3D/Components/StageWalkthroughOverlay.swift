@@ -1,60 +1,23 @@
 import SwiftUI
 import UIKit
 
-/// Interactive action the user can perform directly in the 3D studio to complete a tutorial step.
-public enum WalkthroughTutorialAction: String, Sendable, Equatable {
-    case inspectCamera
-    case dragFurniture
-    case transformFurniture
-    case addFurniture
-
-    public var badgeTitle: String {
-        switch self {
-        case .inspectCamera:
-            return "TRY IT: SWIPE TO ORBIT OR PINCH TO ZOOM"
-        case .dragFurniture:
-            return "TRY IT: TAP & DRAG ANY FURNITURE"
-        case .transformFurniture:
-            return "TRY IT: TAP A PIECE TO ROTATE, SWAP, OR ARCHIVE"
-        case .addFurniture:
-            return "TRY IT: TAP THE '+' BUTTON AT TOP RIGHT"
-        }
-    }
-
-    public var systemImage: String {
-        switch self {
-        case .inspectCamera:
-            return "hand.draw.fill"
-        case .dragFurniture:
-            return "arrow.up.and.down.and.arrow.left.and.right"
-        case .transformFurniture:
-            return "arrow.triangle.2.circlepath"
-        case .addFurniture:
-            return "plus.circle.fill"
-        }
-    }
-}
-
 /// Represents a single dialogue step during an interactive stage walkthrough.
 public struct WalkthroughStep: Identifiable, Sendable, Equatable {
     public let id: UUID
     public let text: String
     public let emotion: MascotEmotion
     public let highlightedFurnitureName: String?
-    public let requiredAction: WalkthroughTutorialAction?
 
     public init(
         id: UUID = UUID(),
         text: String,
         emotion: MascotEmotion = .neutral,
-        highlightedFurnitureName: String? = nil,
-        requiredAction: WalkthroughTutorialAction? = nil
+        highlightedFurnitureName: String? = nil
     ) {
         self.id = id
         self.text = text
         self.emotion = emotion
         self.highlightedFurnitureName = highlightedFurnitureName
-        self.requiredAction = requiredAction
     }
 }
 
@@ -447,129 +410,21 @@ public struct OtterNamePill: View {
     }
 }
 
-/// Game-style tutorial objective coach banner shown during interactive walkthrough steps.
-private struct TutorialCoachBanner: View {
-    let stepNumber: Int
-    let totalSteps: Int
-    let action: WalkthroughTutorialAction
-    let isCompleted: Bool
-    let onSkip: () -> Void
-
-    @State private var isPulsing = false
-
-    var body: some View {
-        HStack(spacing: 12) {
-            ZStack {
-                Circle()
-                    .fill(isCompleted ? Color.alcoveProgressDone : Color.alcoveBadgeGold)
-                Circle()
-                    .stroke(Color.alcoveBorder, lineWidth: 2)
-                Image(systemName: isCompleted ? "checkmark" : action.systemImage)
-                    .font(.system(size: 16, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color.alcoveText)
-            }
-            .frame(width: 36, height: 36)
-            .scaleEffect(isPulsing && !isCompleted ? 1.08 : 0.98)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text("STEP \(stepNumber) OF \(totalSteps)")
-                    .font(.system(size: 11, weight: .heavy, design: .rounded))
-                    .foregroundStyle(Color.alcoveMutedInk)
-                    .tracking(0.8)
-
-                Text(isCompleted ? "GREAT JOB! STEP COMPLETE" : action.badgeTitle)
-                    .font(.system(size: 14, weight: .heavy, design: .rounded))
-                    .foregroundStyle(isCompleted ? Color.green : Color.alcoveText)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            Spacer(minLength: 8)
-
-            Button(action: onSkip) {
-                Text("Skip")
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color.alcoveText)
-                    .padding(.horizontal, 14)
-                    .frame(minWidth: 44, minHeight: 36)
-                    .background(Color.alcoveBackground, in: Capsule())
-                    .overlay(Capsule().stroke(Color.alcoveBorder, lineWidth: 1.5))
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .frame(minHeight: 44)
-            .accessibilityLabel("Skip tutorial")
-        }
-        .padding(.leading, 12)
-        .padding(.trailing, 10)
-        .padding(.vertical, 6)
-        .frame(maxWidth: 640)
-        .background {
-            AlcoveTactileCardBackground(
-                cornerRadius: 22,
-                borderWidth: 2.5,
-                topHighlightColor: .alcovePrimaryHighlight,
-                bottomLipColor: .alcoveSecondaryShadow,
-                faceColor: .alcoveSurfaceElevated,
-                topBevel: 0,
-                bottomBevel: 3
-            )
-        }
-        .onAppear {
-            withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) {
-                isPulsing = true
-            }
-        }
-    }
-}
-
-/// Animated top-right pointer callout pointing toward the '+' Add Furniture button during the tutorial.
-private struct AddButtonPointerCallout: View {
-    @State private var bobUp = false
-
-    var body: some View {
-        VStack(spacing: 4) {
-            Image(systemName: "arrow.up.circle.fill")
-                .font(.system(size: 26, weight: .bold))
-                .foregroundStyle(Color.alcovePrimaryFill)
-                .background(Color.alcoveBorder, in: Circle())
-
-            Text("Tap '+' here!")
-                .font(.system(size: 13, weight: .heavy, design: .rounded))
-                .foregroundStyle(Color.alcoveText)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(Color.alcoveBadgeGold, in: Capsule())
-                .overlay(Capsule().stroke(Color.alcoveBorder, lineWidth: 2))
-        }
-        .offset(y: bobUp ? -6 : 4)
-        .allowsHitTesting(false)
-        .onAppear {
-            withAnimation(.easeInOut(duration: 0.7).repeatForever(autoreverses: true)) {
-                bobUp = true
-            }
-        }
-    }
-}
-
 /// Fullscreen interactive walkthrough overlay styled cleanly to match Alcove Figma designs.
 public struct StageWalkthroughOverlay: View {
     let steps: [WalkthroughStep]
     let currentStepIndex: Int
-    let isActionCompleted: Bool
     let onAdvance: () -> Void
     let onSkip: () -> Void
 
     public init(
         steps: [WalkthroughStep],
         currentStepIndex: Int,
-        isActionCompleted: Bool = false,
         onAdvance: @escaping () -> Void,
         onSkip: @escaping () -> Void
     ) {
         self.steps = steps
         self.currentStepIndex = currentStepIndex
-        self.isActionCompleted = isActionCompleted
         self.onAdvance = onAdvance
         self.onSkip = onSkip
     }
@@ -580,104 +435,20 @@ public struct StageWalkthroughOverlay: View {
     }
 
     public var body: some View {
-        let isInteractive = currentStep?.requiredAction != nil
-
         ZStack {
-            // Reading steps use a full-screen tap-to-advance scrim;
-            // interactive tutorial steps use a soft pass-through vignette so users can touch the 3D room directly.
-            if isInteractive {
-                LinearGradient(
-                    colors: [
-                        Color.black.opacity(0.14),
-                        Color.clear,
-                        Color.clear,
-                        Color.black.opacity(0.24)
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
+            // Dimmed semi-transparent backdrop over the live room
+            Color.black.opacity(0.38)
                 .ignoresSafeArea()
-                .allowsHitTesting(false)
-            } else {
-                Color.black.opacity(0.38)
-                    .ignoresSafeArea()
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        onAdvance()
-                    }
-            }
-
-            if let step = currentStep {
-                // Top Game Coach HUD / Skip Control
-                VStack {
-                    if let action = step.requiredAction {
-                        TutorialCoachBanner(
-                            stepNumber: currentStepIndex + 1,
-                            totalSteps: steps.count,
-                            action: action,
-                            isCompleted: isActionCompleted,
-                            onSkip: onSkip
-                        )
-                        .padding(.horizontal, 28)
-                        .padding(.top, 128)
-                        .safeAreaPadding(.top)
-                        .transition(.move(edge: .top).combined(with: .opacity))
-                    } else {
-                        HStack {
-                            Text("STEP \(currentStepIndex + 1) OF \(steps.count)")
-                                .font(.system(size: 12, weight: .heavy, design: .rounded))
-                                .foregroundStyle(Color.alcoveText)
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 7)
-                                .background(Color.alcoveSurfaceElevated, in: Capsule())
-                                .overlay(Capsule().stroke(Color.alcoveBorder, lineWidth: 2))
-
-                            Spacer()
-
-                            Button(action: onSkip) {
-                                Text("Skip")
-                                    .font(.system(size: 13, weight: .bold, design: .rounded))
-                                    .foregroundStyle(Color.alcoveText)
-                                    .padding(.horizontal, 16)
-                                    .frame(minWidth: 44, minHeight: 36)
-                                    .background(Color.alcoveSurfaceElevated, in: Capsule())
-                                    .overlay(Capsule().stroke(Color.alcoveBorder, lineWidth: 2))
-                                    .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.plain)
-                            .frame(minHeight: 44)
-                            .accessibilityLabel("Skip tutorial")
-                        }
-                        .padding(.horizontal, 28)
-                        .padding(.top, 128)
-                        .safeAreaPadding(.top)
-                    }
-
-                    Spacer()
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-
-                // Top-Right Animated Pointer Callout toward '+' Add Furniture button
-                if step.requiredAction == .addFurniture {
-                    VStack {
-                        HStack {
-                            Spacer()
-                            AddButtonPointerCallout()
-                                .padding(.trailing, 8)
-                                .padding(.top, 58)
-                                .safeAreaPadding(.top)
-                        }
-                        Spacer()
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-                    .allowsHitTesting(false)
-                    .transition(.opacity)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    onAdvance()
                 }
 
-                // Bottom Otter Mascot (behind card & pill) + Cream Dialogue Card
-                VStack {
-                    Spacer()
+            // Bottom Otter Mascot (behind card & pill) + Cream Dialogue Card
+            VStack {
+                Spacer()
 
+                if let step = currentStep {
                     HStack(alignment: .center, spacing: 16) {
                         Text(step.text)
                             .font(.system(size: 24, weight: .heavy, design: .rounded))
@@ -723,12 +494,6 @@ public struct StageWalkthroughOverlay: View {
                             .offset(x: 44, y: -22)
                             .allowsHitTesting(false)
                     }
-                    .contentShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-                    .onTapGesture {
-                        if !isInteractive {
-                            onAdvance()
-                        }
-                    }
                     .padding(.horizontal, 40)
                     .padding(.bottom, 24)
                     .safeAreaPadding(.bottom)
@@ -740,6 +505,5 @@ public struct StageWalkthroughOverlay: View {
             }
         }
         .animation(.easeInOut(duration: 0.25), value: currentStepIndex)
-        .animation(.easeInOut(duration: 0.2), value: isActionCompleted)
     }
 }

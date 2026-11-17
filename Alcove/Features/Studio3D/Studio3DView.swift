@@ -224,7 +224,6 @@ public struct Studio3DView: View {
                     StageWalkthroughOverlay(
                         steps: viewModel.walkthroughSteps,
                         currentStepIndex: viewModel.walkthroughStepIndex,
-                        isActionCompleted: viewModel.isCurrentStepActionCompleted,
                         onAdvance: { viewModel.advanceWalkthrough() },
                         onSkip: { viewModel.completeWalkthrough() }
                     )
@@ -479,7 +478,6 @@ public struct Studio3DView: View {
                 Button {
                     selectedCameraPreset = preset
                     viewModel.snapToViewport?(preset)
-                    viewModel.recordTutorialAction(.inspectCamera)
                     playSnapFeedback()
                     withAnimation(.easeInOut(duration: 0.16)) {
                         isCameraMenuPresented = false
@@ -519,7 +517,6 @@ public struct Studio3DView: View {
             Button {
                 selectedCameraPreset = .dollhouse
                 viewModel.snapToViewport?(.dollhouse)
-                viewModel.recordTutorialAction(.inspectCamera)
                 playSnapFeedback()
                 withAnimation(.easeInOut(duration: 0.16)) {
                     isCameraMenuPresented = false
@@ -752,9 +749,6 @@ public struct Studio3DView: View {
                                     }
                                     playSnapFeedback()
                                 }
-                            },
-                            onCameraInteracted: {
-                                viewModel.recordTutorialAction(.inspectCamera)
                             }
                         )
                         .background {
@@ -913,7 +907,6 @@ public struct Studio3DView: View {
         rotateDragStartYaw = nil
         wasSnapped = false
         playSnapFeedback()
-        viewModel.recordTutorialAction(.transformFurniture)
         viewModel.handleFurnitureMoved(
             FurnitureMoveEvent(
                 furnitureName: furniture.name,

@@ -32,26 +32,22 @@ public struct StageDialogueCurator: Sendable {
                 ),
                 WalkthroughStep(
                     text: "Then, try to rotate, zoom in, or zoom out to get a better room view!",
-                    emotion: .curious,
-                    requiredAction: .inspectCamera
+                    emotion: .curious
                 )
             ]
         case .rearrangement:
             return [
                 WalkthroughStep(
                     text: "Drag a furniture to move it around!",
-                    emotion: .happy,
-                    requiredAction: .dragFurniture
+                    emotion: .happy
                 ),
                 WalkthroughStep(
                     text: "Now, tap a furniture to rotate, archive, or change it into another piece — like swapping a lamp for a bed!",
-                    emotion: .curious,
-                    requiredAction: .transformFurniture
+                    emotion: .curious
                 ),
                 WalkthroughStep(
                     text: "Want more pieces? Tap the '+' button at the top right to add new furniture to your room!",
-                    emotion: .happy,
-                    requiredAction: .addFurniture
+                    emotion: .happy
                 )
             ]
         case .illumination:
