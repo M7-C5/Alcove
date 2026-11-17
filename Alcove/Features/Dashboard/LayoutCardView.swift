@@ -5,6 +5,7 @@ struct LayoutCardView: View {
 
     let layoutID: UUID
     let layoutName: String
+    let thumbnailData: Data?
     let cardWidth: CGFloat
     let cardHeight: CGFloat
 
@@ -13,6 +14,28 @@ struct LayoutCardView: View {
     let onDelete: () -> Void
 
     @Binding var openMenuLayoutID: UUID?
+
+    init(
+        layoutID: UUID,
+        layoutName: String,
+        thumbnailData: Data? = nil,
+        cardWidth: CGFloat,
+        cardHeight: CGFloat,
+        onTap: @escaping () -> Void,
+        onEdit: @escaping () -> Void,
+        onDelete: @escaping () -> Void,
+        openMenuLayoutID: Binding<UUID?>
+    ) {
+        self.layoutID = layoutID
+        self.layoutName = layoutName
+        self.thumbnailData = thumbnailData
+        self.cardWidth = cardWidth
+        self.cardHeight = cardHeight
+        self.onTap = onTap
+        self.onEdit = onEdit
+        self.onDelete = onDelete
+        self._openMenuLayoutID = openMenuLayoutID
+    }
 
     private var isMenuOpen: Bool {
         openMenuLayoutID == layoutID
@@ -214,7 +237,16 @@ struct LayoutCardView: View {
     // Room thumbnail
     @ViewBuilder
     private var roomThumbnail: some View {
-        if UIImage(named: "RoomThumbnail") != nil {
+        if let thumbnailData, let renderedImage = UIImage(data: thumbnailData) {
+            Image(uiImage: renderedImage)
+                .resizable()
+                .scaledToFill()
+                .frame(
+                    width: cardWidth * 0.90,
+                    height: cardHeight * 0.70
+                )
+                .clipped()
+        } else if UIImage(named: "RoomThumbnail") != nil {
             Image("RoomThumbnail")
                 .resizable()
                 .scaledToFill()

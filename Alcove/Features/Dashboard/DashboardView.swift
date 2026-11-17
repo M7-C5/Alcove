@@ -72,11 +72,16 @@ public struct DashboardView: View {
                     centeredRoomID = rooms.first?.id
                 }
             }
-            .sheet(isPresented: $viewModel.showingScanSheet) {
-                RoomScanSheet { scannedRoom in
-                    viewModel.addScannedRoom(scannedRoom, modelContext: modelContext)
-                    centeredRoomID = scannedRoom.id
-                }
+            .fullScreenCover(isPresented: $viewModel.showingScanSheet) {
+                RoomScanView(
+                    onScanComplete: { scannedRoomID in
+                        viewModel.showingScanSheet = false
+                        centeredRoomID = scannedRoomID
+                    },
+                    onCancel: {
+                        viewModel.showingScanSheet = false
+                    }
+                )
             }
             .fullScreenCover(item: $viewModel.lightingTestSession) { session in
                 NavigationStack {
@@ -285,6 +290,7 @@ public struct DashboardView: View {
         LayoutCardView(
             layoutID: room.id,
             layoutName: room.name,
+            thumbnailData: room.thumbnailData,
             cardWidth: cardWidth,
             cardHeight: cardHeight,
             onTap: {
