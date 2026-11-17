@@ -9,9 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Add a full-screen lighting workspace with independently collapsing panels and captured magnetic north indicators.
-- Share orbit camera presets and AR presentation between Audit and Lighting.
-
+- Add interactive game-style step-by-step tutorial.
+- Render scanned 3D room thumbnails and wire full-screen scanner.
+- Add RoomPlan scanning view, overlay pills, and confirmation alert.
+- Add RoomPlan capture payload, dimension extractor, sanitizer, and mapper.
+- Implement dashboard iterated UI, interactions, & accessibility.
+- Refine fullscreen workspace and shared controls.
+- Add floating panels north indicators and viewport framing.
 - Update Otter walkthrough and chat UI and side-by-side clearance rules.
 - Align mascot prompt and dialogues with seven AI vibes.
 - Integrate roaming Otter mascot across 3D studio stages.
@@ -71,9 +75,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Align lighting controls with the shared tactile buttons, MainBackground artwork, and five-step progress header.
-- Keep lighting placement framed between inspectors and allow scrolling only within the light-source list.
-
+- Remove numerical scores and grades from evaluations.
+- Share room validation/persistence and use alcoveSurfaceElevated token.
+- Share Audit viewport controls and camera.
 - Use SwiftUI openURL environment action.
 - Share view model warning severities with 3D viewport.
 - Adopt global alcove color tokens in home and tactile pill.
@@ -84,9 +88,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Remove layout whitespace from fixture names and restore Dynamic Type and semantic tokens in tactile lighting buttons.
-- Add a permanent cutaway ceiling shadow occluder to prevent direct sunlight entering through the open mockup roof.
-
+- Block advance on live collisions and restyle bottom warning banner.
+- Preserve 44pt minimum hit targets on scaled scan buttons.
+- Use symmetric fade-out animation when dismissing done alert.
+- Scale down scan overlay pills and done alert.
+- Render room thumbnails with CoreGraphics isometric dollhouse.
+- Disable Metal GPU validation to prevent RoomPlan debug hang.
+- Wire SwiftData persistence, NavigationRouter, and Light-only tokens.
+- Address review feedback and block overhead sunlight.
 - Update Otter 3D model face details and remove duplicate asset.
 - Store API key in Keychain, use header auth, and decouple chat badge.
 - Compute wall proximity from boundary extents and sanitize flowery placement wording.
