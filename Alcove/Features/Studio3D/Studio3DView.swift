@@ -19,6 +19,8 @@ public struct Studio3DView: View {
     @State private var ghostFloorPosition: SIMD3<Float>? = nil
     @State private var isARWalkthroughPresented: Bool = false
     @State private var viewportFrame: CGRect = .zero
+    @State private var isCameraMenuPresented: Bool = false
+    @State private var selectedCameraPreset: ViewportPreset = .dollhouse
 
     public init(room: Room, stage: StageType = .rearrangement) {
         self.room = room
@@ -87,7 +89,7 @@ public struct Studio3DView: View {
                         Spacer()
                         FurnitureInventoryDock(
                             archivedFurnitures: viewModel.archivedFurnitures,
-                            dockWidth: outerGeometry.size.width * 0.60,
+                            dockWidth: min(540, max(280, outerGeometry.size.width - 360)),
                             onRestoreItem: { item, screenPoint in
                                 restoreFurnitureItem(item, at: screenPoint)
                             },
@@ -123,32 +125,93 @@ public struct Studio3DView: View {
                     .zIndex(20)
                 }
 
-                // Bottom-Left Floating Otter Logo, Centered Collision/Warning Banner, & Bottom-Right Proceed Button
-                if !viewModel.isArchiveListPresented {
-                    VStack {
-                        Spacer()
-                        ZStack(alignment: .bottom) {
-                            StudioBottomHUD(
-                                mascotEmotion: viewModel.mascotEmotion,
-                                mascotMessage: viewModel.mascotMessage,
-                                onTriggerEvaluation: { viewModel.triggerStageEvaluation() },
-                                onOpenChat: {
-                                    withAnimation(.easeInOut(duration: 0.2)) {
-                                        viewModel.showingChatDrawer = true
-                                    }
+                // Bottom-Left Floating Otter Logo, Centered Collision/Warning Banner, & Bottom-Right Next Stage Button
+                VStack {
+                    Spacer()
+                    ZStack(alignment: .bottom) {
+                        StudioBottomHUD(
+                            mascotEmotion: viewModel.mascotEmotion,
+                            mascotMessage: viewModel.mascotMessage,
+                            onTriggerEvaluation: { viewModel.triggerStageEvaluation() },
+                            onOpenChat: {
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    viewModel.showingChatDrawer = true
                                 }
-                            )
-
-                            if !viewModel.isWalkthroughActive && !viewModel.showingChatDrawer {
-                                warningBanner
-                                    .padding(.horizontal, 180)
-                                    .padding(.bottom, 18)
-                                    .safeAreaPadding(.bottom)
                             }
+                        )
+
+                        if !viewModel.isArchiveListPresented && !viewModel.isWalkthroughActive && !viewModel.showingChatDrawer {
+                            warningBanner
+                                .padding(.horizontal, 180)
+                                .padding(.bottom, 18)
+                                .safeAreaPadding(.bottom)
                         }
                     }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
-                    .zIndex(15)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+                .zIndex(15)
+
+                // Floating Camera View & Add Furniture Popovers
+                if isCameraMenuPresented || viewModel.isFurnitureCatalogPresented {
+                    Color.black.opacity(0.001)
+                        .ignoresSafeArea()
+                        .onTapGesture {
+                            withAnimation(.easeInOut(duration: 0.16)) {
+                                isCameraMenuPresented = false
+                                viewModel.isFurnitureCatalogPresented = false
+                                viewModel.swapTargetFurnitureID = nil
+                            }
+                        }
+                        .zIndex(27)
+                }
+
+                if isCameraMenuPresented {
+                    VStack {
+                        HStack {
+                            Spacer()
+                            cameraMenuPopover
+                                .padding(.trailing, 28)
+                                .padding(.top, 70)
+                                .safeAreaPadding(.top)
+                        }
+                        Spacer()
+                    }
+                    .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .topTrailing)))
+                    .zIndex(28)
+                }
+
+                if viewModel.isFurnitureCatalogPresented {
+                    let swapTarget = viewModel.swapTargetFurnitureID.flatMap { id in
+                        room.workingLayout?.furnitures.first(where: { $0.id == id })
+                    }
+                    VStack {
+                        HStack {
+                            Spacer()
+                            FurnitureCatalogSheet(
+                                swapTarget: swapTarget,
+                                onSelectItem: { item in
+                                    playSnapFeedback()
+                                    withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                                        if let target = swapTarget {
+                                            viewModel.swapFurniture(target, with: item)
+                                        } else {
+                                            viewModel.addFurniture(from: item)
+                                        }
+                                    }
+                                },
+                                onDismiss: {
+                                    viewModel.isFurnitureCatalogPresented = false
+                                    viewModel.swapTargetFurnitureID = nil
+                                }
+                            )
+                            .padding(.trailing, 28)
+                            .padding(.top, 70)
+                            .safeAreaPadding(.top)
+                        }
+                        Spacer()
+                    }
+                    .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .topTrailing)))
+                    .zIndex(28)
                 }
 
                 // Stage Walkthrough Dialogue Overlay
@@ -243,30 +306,6 @@ public struct Studio3DView: View {
             .presentationDetents([.fraction(0.85), .large])
             .presentationDragIndicator(.visible)
         }
-        .sheet(isPresented: $bindableVM.isFurnitureCatalogPresented) {
-            let swapTarget = viewModel.swapTargetFurnitureID.flatMap { id in
-                room.workingLayout?.furnitures.first(where: { $0.id == id })
-            }
-            FurnitureCatalogSheet(
-                swapTarget: swapTarget,
-                onSelectItem: { item in
-                    playSnapFeedback()
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
-                        if let target = swapTarget {
-                            viewModel.swapFurniture(target, with: item)
-                        } else {
-                            viewModel.addFurniture(from: item)
-                        }
-                    }
-                },
-                onDismiss: {
-                    viewModel.isFurnitureCatalogPresented = false
-                    viewModel.swapTargetFurnitureID = nil
-                }
-            )
-            .presentationDetents([.medium, .large])
-            .presentationDragIndicator(.visible)
-        }
         .fullScreenCover(isPresented: $isARWalkthroughPresented) {
             ARWalkthroughView(room: room)
         }
@@ -338,26 +377,20 @@ public struct Studio3DView: View {
                 .frame(maxWidth: .infinity)
 
             HStack(spacing: 10) {
-                Menu {
-                    ForEach(ViewportPreset.allCases) { preset in
-                        if preset == .dollhouse {
-                            Divider()
-                        }
-                        Button {
-                            viewModel.snapToViewport?(preset)
-                            viewModel.recordTutorialAction(.inspectCamera)
-                            playSnapFeedback()
-                        } label: {
-                            Label(preset.title, systemImage: preset.systemImage)
-                        }
+                Button {
+                    withAnimation(.easeInOut(duration: 0.16)) {
+                        viewModel.isFurnitureCatalogPresented = false
+                        viewModel.swapTargetFurnitureID = nil
+                        isCameraMenuPresented.toggle()
                     }
+                    playSnapFeedback()
                 } label: {
                     Image(systemName: "cube")
                         .font(.system(size: 18, weight: .semibold))
                         .foregroundStyle(Color(red: 0x6D / 255.0, green: 0x45 / 255.0, blue: 0x31 / 255.0))
                         .frame(width: 45, height: 45)
                         .background {
-                            tactileCircleBackground(isCoralActive: false)
+                            tactileCircleBackground(isCoralActive: isCameraMenuPresented)
                         }
                 }
                 .buttonStyle(.plain)
@@ -413,6 +446,7 @@ public struct Studio3DView: View {
                 if viewModel.canManipulateFurniture {
                     Button {
                         playSnapFeedback()
+                        isCameraMenuPresented = false
                         viewModel.openAddFurnitureCatalog()
                     } label: {
                         Image(systemName: "plus")
@@ -420,7 +454,7 @@ public struct Studio3DView: View {
                             .foregroundStyle(Color(red: 0x6D / 255.0, green: 0x45 / 255.0, blue: 0x31 / 255.0))
                             .frame(width: 45, height: 45)
                             .background {
-                                tactileCircleBackground(isCoralActive: false)
+                                tactileCircleBackground(isCoralActive: viewModel.isFurnitureCatalogPresented && viewModel.swapTargetFurnitureID == nil)
                             }
                     }
                     .buttonStyle(.plain)
@@ -428,6 +462,95 @@ public struct Studio3DView: View {
                 }
             }
         }
+    }
+
+    private var cameraMenuPopover: some View {
+        let brown = Color(red: 0x6D / 255.0, green: 0x45 / 255.0, blue: 0x31 / 255.0)
+        let peach = Color(red: 0xFE / 255.0, green: 0xEE / 255.0, blue: 0xDE / 255.0)
+        let anglePresets = ViewportPreset.allCases.filter { $0 != .dollhouse }
+
+        return VStack(alignment: .leading, spacing: 2) {
+            ForEach(anglePresets) { preset in
+                Button {
+                    selectedCameraPreset = preset
+                    viewModel.snapToViewport?(preset)
+                    viewModel.recordTutorialAction(.inspectCamera)
+                    playSnapFeedback()
+                    withAnimation(.easeInOut(duration: 0.16)) {
+                        isCameraMenuPresented = false
+                    }
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(brown)
+                            .opacity(selectedCameraPreset == preset ? 1 : 0)
+                            .frame(width: 16)
+
+                        Image(systemName: preset.systemImage)
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(brown)
+                            .frame(width: 22)
+
+                        Text(preset.title)
+                            .font(.system(.subheadline, design: .rounded, weight: .bold))
+                            .foregroundStyle(brown)
+
+                        Spacer()
+                    }
+                    .padding(.horizontal, 16)
+                    .frame(minHeight: 40)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+
+            Rectangle()
+                .fill(brown)
+                .frame(height: 1.5)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 6)
+
+            Button {
+                selectedCameraPreset = .dollhouse
+                viewModel.snapToViewport?(.dollhouse)
+                viewModel.recordTutorialAction(.inspectCamera)
+                playSnapFeedback()
+                withAnimation(.easeInOut(duration: 0.16)) {
+                    isCameraMenuPresented = false
+                }
+            } label: {
+                HStack(spacing: 12) {
+                    Color.clear
+                        .frame(width: 16)
+
+                    Image(systemName: "arrow.counterclockwise")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(brown)
+                        .frame(width: 22)
+
+                    Text("Reset Angle")
+                        .font(.system(.subheadline, design: .rounded, weight: .bold))
+                        .foregroundStyle(brown)
+
+                    Spacer()
+                }
+                .padding(.horizontal, 16)
+                .frame(minHeight: 40)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.vertical, 12)
+        .frame(width: 230)
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(peach)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(brown, lineWidth: 2.5)
+        )
     }
 
     @ViewBuilder

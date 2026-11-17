@@ -65,12 +65,14 @@ public struct FurnitureInventoryDock: View {
             }
         }
         .frame(width: dockWidth)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .stroke(Color.primary.opacity(0.10), lineWidth: 1)
+        .background(
+            Color(red: 0xFE / 255.0, green: 0xEE / 255.0, blue: 0xDE / 255.0),
+            in: RoundedRectangle(cornerRadius: 24, style: .continuous)
         )
-        .shadow(color: Color.black.opacity(0.12), radius: 16, x: 0, y: 6)
+        .overlay(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .stroke(Color(red: 0x6D / 255.0, green: 0x45 / 255.0, blue: 0x31 / 255.0), lineWidth: 2.5)
+        )
     }
 }
 
@@ -102,23 +104,25 @@ public struct ArchivedFurnitureCard: View {
         VStack(spacing: 4) {
             Image(systemName: furniture.category.icon)
                 .font(.title2)
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color(red: 0x6D / 255.0, green: 0x45 / 255.0, blue: 0x31 / 255.0))
                 .frame(height: 28)
 
             Text(furniture.name)
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(.primary)
+                .font(.system(.caption2, design: .rounded, weight: .semibold))
+                .foregroundStyle(Color(red: 0x6D / 255.0, green: 0x45 / 255.0, blue: 0x31 / 255.0))
                 .lineLimit(1)
                 .truncationMode(.tail)
                 .multilineTextAlignment(.center)
         }
         .frame(width: 76, height: 72)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(
+            Color(red: 0xF9 / 255.0, green: 0xE4 / 255.0, blue: 0xC9 / 255.0),
+            in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+        )
         .overlay(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+                .stroke(Color(red: 0x6D / 255.0, green: 0x45 / 255.0, blue: 0x31 / 255.0), lineWidth: 2)
         )
-        .shadow(color: Color.black.opacity(0.06), radius: 4, y: 2)
         .opacity(isDragging ? 0.35 : 1.0)
         .gesture(
             DragGesture(minimumDistance: 8, coordinateSpace: .named("Studio3DViewportSpace"))
