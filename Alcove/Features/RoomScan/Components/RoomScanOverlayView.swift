@@ -119,7 +119,8 @@ public struct RoomScanOverlayView: View {
                     }
                 }
             }
-            .contentShape(Capsule())
+            .frame(minWidth: 44, minHeight: 44)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
