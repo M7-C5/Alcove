@@ -40,8 +40,8 @@ public struct RoomScanOverlayView: View {
                     .accessibilityLabel("Finish room scan")
                 }
             }
-            .padding(.horizontal, 24)
-            .padding(.top, 20)
+            .padding(.horizontal, 20)
+            .padding(.top, 10)
 
             Spacer()
 
@@ -78,19 +78,19 @@ public struct RoomScanOverlayView: View {
         let shadowColor = isPrimary ? Color.alcovePrimaryShadow : Color.alcoveSecondaryShadow
 
         return Button(action: action) {
-            HStack(spacing: 8) {
+            HStack(spacing: 6) {
                 Text(title)
-                    .font(.custom("Cleanow", size: 22, relativeTo: .title3))
+                    .font(.custom("Cleanow", size: 17, relativeTo: .callout))
                 Image(systemName: systemImage)
-                    .font(.system(size: 16, weight: .heavy))
+                    .font(.system(size: 13, weight: .heavy))
             }
             .foregroundStyle(Color.alcoveInk)
-            .padding(.horizontal, 22)
-            .frame(minWidth: 112, minHeight: 50)
+            .padding(.horizontal, 16)
+            .frame(height: 38)
             .background {
                 GeometryReader { geometry in
-                    let border: CGFloat = 3.5
-                    let band: CGFloat = 5
+                    let border: CGFloat = 2.5
+                    let band: CGFloat = 3.5
                     ZStack {
                         Capsule()
                             .fill(Color.alcoveInk)
