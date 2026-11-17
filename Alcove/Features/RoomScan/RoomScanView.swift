@@ -103,7 +103,7 @@ public struct RoomScanView: View {
             RoomScanOverlayView(
                 state: viewModel.state,
                 onDone: {
-                    withAnimation(.spring(response: 0.34, dampingFraction: 0.86)) {
+                    withAnimation(.easeInOut(duration: 0.24)) {
                         viewModel.requestFinishScanning()
                     }
                 },
@@ -116,31 +116,28 @@ public struct RoomScanView: View {
                 Color.black.opacity(0.32)
                     .ignoresSafeArea()
                     .onTapGesture {
-                        withAnimation(.easeInOut(duration: 0.2)) {
+                        withAnimation(.easeInOut(duration: 0.24)) {
                             viewModel.dismissConfirmationAlert()
                         }
                     }
                     .transition(.opacity)
+                    .zIndex(1)
 
                 RoomScanDoneAlert(
                     onNo: {
-                        withAnimation(.easeInOut(duration: 0.2)) {
+                        withAnimation(.easeInOut(duration: 0.24)) {
                             viewModel.dismissConfirmationAlert()
                         }
                     },
                     onYes: {
-                        withAnimation(.easeInOut(duration: 0.2)) {
+                        withAnimation(.easeInOut(duration: 0.24)) {
                             viewModel.confirmFinishScanning()
                         }
                     }
                 )
-                .offset(y: -45)
-                .transition(
-                    .asymmetric(
-                        insertion: .opacity.combined(with: .scale(scale: 0.92)),
-                        removal: .opacity.combined(with: .scale(scale: 0.97))
-                    )
-                )
+                .offset(y: -36)
+                .transition(.opacity.combined(with: .scale(scale: 0.92)))
+                .zIndex(2)
             }
         }
     }
