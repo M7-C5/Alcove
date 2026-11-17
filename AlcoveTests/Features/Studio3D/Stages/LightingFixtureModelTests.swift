@@ -26,6 +26,35 @@ struct LightingFixtureModelTests {
         #expect(scene.root.findEntity(named: model.name) === model)
     }
 
+    @Test func roofBlocksOverheadSunWithoutClosingTheVisibleDollhouse() throws {
+        let room = MockRoomGenerator.generateBedroomOfficeCombo()
+        let scene = LightingRoomScene(snapshot: LightingRoomSnapshot(room: room))
+        let roof = try #require(scene.root.findEntity(named: "SunlightRoofOccluder") as? ModelEntity)
+        let shell = try #require(scene.root.findEntity(named: "RoomShell"))
+        #expect(shell.findEntity(named: "Ceiling") == nil)
+        #expect(shell.findEntity(named: "WindowFrameCasing") != nil)
+        #expect(roof.components[DynamicLightShadowComponent.self]?.castsShadow == true)
+        #expect(roof.components[OpacityComponent.self]?.opacity == 0.001)
+        let original = roof.transform
+        let bounds = roof.visualBounds(relativeTo: scene.root)
+        #expect(bounds.min.x < -Float(room.dimensionsWidth / 2))
+        #expect(bounds.max.x > Float(room.dimensionsWidth / 2))
+        #expect(bounds.min.z < -Float(room.dimensionsLength / 2))
+        #expect(bounds.max.z > Float(room.dimensionsLength / 2))
+        #expect(bounds.min.y >= Float(room.dimensionsHeight) - 0.001)
+        let view = ARView(frame: .zero, cameraMode: .nonAR, automaticallyConfigureSession: false)
+        for preset in ViewportPreset.allCases {
+            for hour in [9, 14, 19] {
+                var settings = LightingSimulationSettings()
+                settings.minuteOfDay = hour * 60
+                scene.apply(settings, preset: preset, in: view)
+                #expect(roof.isEnabled)
+                #expect(roof.transform == original)
+                #expect(roof.components[DynamicLightShadowComponent.self]?.castsShadow == true)
+            }
+        }
+    }
+
     @Test func cutawayWallsStayEnabledAndRestoreOpacityWhenCameraChanges() throws {
         guard #available(iOS 18.0, *) else { return }
         let scene = LightingRoomScene(snapshot: LightingRoomSnapshot(room: MockRoomGenerator.generateBedroomOfficeCombo()))

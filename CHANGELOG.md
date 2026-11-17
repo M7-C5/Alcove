@@ -84,6 +84,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Remove layout whitespace from fixture names and restore Dynamic Type and semantic tokens in tactile lighting buttons.
+- Add a permanent cutaway ceiling shadow occluder to prevent direct sunlight entering through the open mockup roof.
+
 - Update Otter 3D model face details and remove duplicate asset.
 - Store API key in Keychain, use header auth, and decouple chat badge.
 - Compute wall proximity from boundary extents and sanitize flowery placement wording.

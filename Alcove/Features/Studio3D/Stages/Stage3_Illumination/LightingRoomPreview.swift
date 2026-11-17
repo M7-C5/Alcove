@@ -348,6 +348,16 @@ final class LightingRoomScene: NSObject {
         let shell = ProceduralRoomShellBuilder.buildShell(width: geometry.width, length: geometry.length,
                                                         height: geometry.height, includeCeiling: false)
         root.addChild(shell)
+        // The dollhouse is visually open, but sunlight must see a closed roof.
+        // Reuse the architectural ceiling mesh and the same shadow-preserving cutaway
+        // opacity as the walls. Keep it outside wall groups so camera cutaways never disable it.
+        let roof = ProceduralRoomShellBuilder.buildCeiling(width: geometry.width + 0.24,
+                                                         length: geometry.length + 0.24, height: geometry.height)
+        roof.name = "SunlightRoofOccluder"
+        roof.components.set(OpacityComponent(opacity: 0.001))
+        roof.components.set(DynamicLightShadowComponent(castsShadow: true))
+        roof.components.set(GroundingShadowComponent(castsShadow: false))
+        root.addChild(roof)
         if let orientation = snapshot.compassOrientation {
             root.addChild(RoomNorthMarker.build(orientation: orientation, width: geometry.width, length: geometry.length))
         }

@@ -39,3 +39,9 @@ RealityKit's dynamic-light budget reserves one light for the sun and renders the
 `AlcoveTests/Features/Studio3D/Stages/LightingFixtureModelTests.swift` covers distinct lamp geometry, collision selection, emitter alignment, mounting, placement restoration, focused/diffuse light selection, material glow, color and brightness changes, and fixture replacement and removal.
 
 The workspace suite also covers additive selection and deselection, mixed settings, independent batch property edits, unique names when changing kinds, batch save/deletion with baseline preservation, placement isolation, and viewport selection outlines.
+
+### Lighting review follow-up
+
+The compact tactile button retains Dynamic Type for its label and scales its geometry using the title text style. Both appearances use generated Alcove semantic color tokens; the cream surface uses `alcoveSurfaceElevated`. The regular button preserves the existing Home label, capsule layers, sizing and press feedback. Extending this shared component and adding MainBackground are required by the Lighting design; Home continues using its existing background and regular button.
+
+The visually open lighting mockup also contains a permanent, nearly transparent ceiling shadow occluder built from the shared ceiling geometry. It extends to the exterior wall edges, stays active through camera cutaways and blocks direct overhead sunlight while leaving the window aperture open. Its opacity follows the existing wall-cutaway convention. Device rendering must confirm the shadow result; simulator geometry tests verify coverage and persistence, not GPU shadow output.
