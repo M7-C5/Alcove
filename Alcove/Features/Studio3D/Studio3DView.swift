@@ -31,7 +31,12 @@ public struct Studio3DView: View {
     public var body: some View {
         Group {
             if viewModel.currentStage == .illumination {
-                LightingWorkspaceView(room: room, settings: $viewModel.lightingSettings) {
+                LightingWorkspaceView(
+                    room: room,
+                    settings: $viewModel.lightingSettings,
+                    isARPresented: isARWalkthroughPresented,
+                    onOpenAR: { isARWalkthroughPresented = true }
+                ) {
                     if let router, !router.isEmpty { router.pop() }
                     else { dismiss() }
                 }
