@@ -10,6 +10,7 @@ struct LightingWorkspaceView: View {
     let onBack: () -> Void
     let isARPresented: Bool
     let onOpenAR: () -> Void
+    let onSelectStage: ((StageType) -> Void)?
     @State private var editor: LightingSetupViewModel
     @State private var preset: ViewportPreset = .top
     @State private var cameraRequestID = 0
@@ -23,12 +24,15 @@ struct LightingWorkspaceView: View {
     @State private var saveError: String?
 
     init(room: Room, settings: Binding<LightingSimulationSettings>, isARPresented: Bool,
-         onOpenAR: @escaping () -> Void, onBack: @escaping () -> Void) {
+         onOpenAR: @escaping () -> Void,
+         onSelectStage: ((StageType) -> Void)? = nil,
+         onBack: @escaping () -> Void) {
         self.room = room
         self._settings = settings
         self.onBack = onBack
         self.isARPresented = isARPresented
         self.onOpenAR = onOpenAR
+        self.onSelectStage = onSelectStage
         let editor = LightingSetupViewModel(room: room)
         editor.selectedID = editor.drafts.first?.id
         _editor = State(initialValue: editor)
@@ -173,6 +177,12 @@ struct LightingWorkspaceView: View {
         return HStack(alignment: .top, spacing: 8) {
             ForEach(titles.indices, id: \.self) { index in
                 let active = index == 3
+                let stageType: StageType? = switch index {
+                case 1: .audit
+                case 2: .rearrangement
+                case 4: .harmony
+                default: nil
+                }
                 let completed: Bool = switch index {
                 case 0: true
                 case 1: room.isCompleted(.audit)
@@ -180,7 +190,7 @@ struct LightingWorkspaceView: View {
                 case 4: room.isCompleted(.harmony)
                 default: false
                 }
-                VStack(spacing: 8) {
+                let badgeContent = VStack(spacing: 8) {
                     ZStack {
                         Circle().fill(completed ? completedColor : active ? Color.alcovePrimaryFill : upcomingColor)
                         Circle().stroke(active || completed ? LightingTheme.ink : upcomingInk, lineWidth: 2)
@@ -193,6 +203,20 @@ struct LightingWorkspaceView: View {
                         .font(.system(size: 14, weight: .semibold))
                 }
                 .frame(width: 76)
+                .contentShape(Rectangle())
+
+                Group {
+                    if completed, let stageType, let onSelectStage {
+                        Button {
+                            onSelectStage(stageType)
+                        } label: {
+                            badgeContent
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        badgeContent
+                    }
+                }
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel("Step \(index + 1), \(titles[index]), \(completed ? "completed" : active ? "current" : "upcoming")")
                 .accessibilityAddTraits(active ? .isSelected : [])
