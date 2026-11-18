@@ -37,8 +37,7 @@ public struct Studio3DView: View {
                     isARPresented: isARWalkthroughPresented,
                     onOpenAR: { isARWalkthroughPresented = true }
                 ) {
-                    if let router, !router.isEmpty { router.pop() }
-                    else { dismiss() }
+                    viewModel.switchToStage(.rearrangement)
                 }
             } else {
                 furnitureStudio
@@ -258,12 +257,12 @@ public struct Studio3DView: View {
         .onAppear {
             viewModel.updateMascotGreeting()
             if viewModel.currentStage == .audit || viewModel.currentStage == .rearrangement {
-                viewModel.startWalkthrough()
+                viewModel.startWalkthroughIfNeeded()
             }
         }
         .onChange(of: viewModel.currentStage) { _, newStage in
             if newStage == .rearrangement {
-                viewModel.startWalkthrough()
+                viewModel.startWalkthroughIfNeeded()
             }
         }
         .sheet(isPresented: $viewModel.showingEvaluationSheet) {
@@ -588,46 +587,29 @@ public struct Studio3DView: View {
     }
 
     private enum StepStatus {
-        case done
+        case done(Int)
         case active(Int)
         case upcoming(Int)
     }
 
-    private var progressSteps: [(title: String, status: StepStatus)] {
-        switch viewModel.currentStage {
-        case .audit:
-            return [
-                ("Scan", .done),
-                ("Check", .active(2)),
-                ("Rearrange", .upcoming(3)),
-                ("Lighting", .upcoming(4)),
-                ("AR", .upcoming(5))
-            ]
-        case .rearrangement:
-            return [
-                ("Scan", .done),
-                ("Check", .done),
-                ("Rearrange", .active(3)),
-                ("Lighting", .upcoming(4)),
-                ("AR", .upcoming(5))
-            ]
-        case .illumination:
-            return [
-                ("Scan", .done),
-                ("Check", .done),
-                ("Rearrange", .done),
-                ("Lighting", .active(4)),
-                ("AR", .upcoming(5))
-            ]
-        case .harmony:
-            return [
-                ("Scan", .done),
-                ("Check", .done),
-                ("Rearrange", .done),
-                ("Lighting", .done),
-                ("AR", .active(5))
-            ]
+    private func status(for stage: StageType, number: Int) -> StepStatus {
+        if viewModel.currentStage == stage {
+            return .active(number)
+        } else if room.isCompleted(stage) {
+            return .done(number)
+        } else {
+            return .upcoming(number)
         }
+    }
+
+    private var progressSteps: [(title: String, status: StepStatus)] {
+        [
+            ("Scan", .done(1)),
+            ("Check", status(for: .audit, number: 2)),
+            ("Rearrange", status(for: .rearrangement, number: 3)),
+            ("Lighting", status(for: .illumination, number: 4)),
+            ("AR", status(for: .harmony, number: 5))
+        ]
     }
 
     @ViewBuilder
@@ -643,13 +625,13 @@ public struct Studio3DView: View {
                     VStack(spacing: 6) {
                         ZStack {
                             switch step.status {
-                            case .done:
+                            case .done(let number):
                                 Circle()
                                     .fill(Color.alcoveProgressDone)
                                 Circle()
                                     .stroke(Color.alcoveBorder, lineWidth: 2)
-                                Image(systemName: "checkmark")
-                                    .font(.system(.subheadline, design: .rounded, weight: .heavy))
+                                Text("\(number)")
+                                    .font(.system(.headline, design: .rounded, weight: .bold))
                                     .foregroundStyle(Color.alcoveText)
                             case .active(let number):
                                 Circle()

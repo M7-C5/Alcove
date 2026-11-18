@@ -49,6 +49,7 @@ public final class Studio3DViewModel {
     public var isWalkthroughActive: Bool = false
     public var walkthroughStepIndex: Int = 0
     public var walkthroughSteps: [WalkthroughStep] = []
+    public private(set) var seenWalkthroughStages: Set<StageType> = []
 
     public init(
         room: Room,
@@ -667,7 +668,14 @@ public final class Studio3DViewModel {
     }
 
     // MARK: - Interactive Walkthrough Orchestration (Figma Image 1 & 2)
+    public func startWalkthroughIfNeeded() {
+        guard !seenWalkthroughStages.contains(currentStage),
+              !room.isCompleted(currentStage) else { return }
+        startWalkthrough()
+    }
+
     public func startWalkthrough() {
+        seenWalkthroughStages.insert(currentStage)
         walkthroughSteps = buildWalkthroughSteps(for: currentStage)
         walkthroughStepIndex = 0
         isWalkthroughActive = !walkthroughSteps.isEmpty
