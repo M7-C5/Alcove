@@ -170,7 +170,7 @@ struct LightingWorkspaceView: View {
     }
 
     private var stageBadges: some View {
-        let titles = ["Scan", "Check", "Rearrange", "Lighting", "AR"]
+        let titles = ["Scan", "Check", "Rearrange", "Lighting", "Result"]
         let completedColor = Color(red: 0.87, green: 0.87, blue: 0.69)
         let upcomingColor = Color(red: 0.91, green: 0.91, blue: 0.91)
         let upcomingInk = Color(red: 0.71, green: 0.71, blue: 0.71)
