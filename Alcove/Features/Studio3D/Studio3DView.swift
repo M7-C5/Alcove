@@ -35,7 +35,11 @@ public struct Studio3DView: View {
                     room: room,
                     settings: $viewModel.lightingSettings,
                     isARPresented: isARWalkthroughPresented,
-                    onOpenAR: { isARWalkthroughPresented = true }
+                    onOpenAR: { isARWalkthroughPresented = true },
+                    onSelectStage: { targetStage in
+                        viewModel.switchToStage(targetStage)
+                        playSnapFeedback()
+                    }
                 ) {
                     viewModel.switchToStage(.rearrangement)
                 }
@@ -602,13 +606,13 @@ public struct Studio3DView: View {
         }
     }
 
-    private var progressSteps: [(title: String, status: StepStatus)] {
+    private var progressSteps: [(title: String, status: StepStatus, stage: StageType?)] {
         [
-            ("Scan", .done(1)),
-            ("Check", status(for: .audit, number: 2)),
-            ("Rearrange", status(for: .rearrangement, number: 3)),
-            ("Lighting", status(for: .illumination, number: 4)),
-            ("AR", status(for: .harmony, number: 5))
+            ("Scan", .done(1), nil),
+            ("Check", status(for: .audit, number: 2), .audit),
+            ("Rearrange", status(for: .rearrangement, number: 3), .rearrangement),
+            ("Lighting", status(for: .illumination, number: 4), .illumination),
+            ("AR", status(for: .harmony, number: 5), .harmony)
         ]
     }
 
@@ -622,7 +626,7 @@ public struct Studio3DView: View {
             let steps = progressSteps
             HStack(alignment: .top, spacing: 6) {
                 ForEach(Array(steps.enumerated()), id: \.offset) { index, step in
-                    VStack(spacing: 6) {
+                    let stepLabel = VStack(spacing: 6) {
                         ZStack {
                             switch step.status {
                             case .done(let number):
@@ -663,6 +667,20 @@ public struct Studio3DView: View {
                             }())
                     }
                     .frame(width: 66)
+                    .contentShape(Rectangle())
+
+                    if case .done = step.status, let targetStage = step.stage {
+                        Button {
+                            viewModel.switchToStage(targetStage)
+                            playSnapFeedback()
+                        } label: {
+                            stepLabel
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Go to \(step.title) stage")
+                    } else {
+                        stepLabel
+                    }
 
                     if index < steps.count - 1 {
                         let lineDone: Bool = {
