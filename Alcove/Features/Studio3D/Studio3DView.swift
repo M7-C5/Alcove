@@ -151,74 +151,12 @@ public struct Studio3DView: View {
                                 .padding(.horizontal, 180)
                                 .padding(.bottom, 18)
                                 .safeAreaPadding(.bottom)
+                                .animation(.spring(response: 0.28, dampingFraction: 0.82), value: viewModel.activeTopWarning?.id)
                         }
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
                 .zIndex(15)
-
-                // Floating Camera View & Add Furniture Popovers
-                if isCameraMenuPresented || viewModel.isFurnitureCatalogPresented {
-                    Color.black.opacity(0.001)
-                        .ignoresSafeArea()
-                        .onTapGesture {
-                            if isCameraMenuPresented {
-                                withAnimation(.easeInOut(duration: 0.16)) {
-                                    isCameraMenuPresented = false
-                                }
-                            }
-                            viewModel.isFurnitureCatalogPresented = false
-                            viewModel.swapTargetFurnitureID = nil
-                        }
-                        .zIndex(27)
-                }
-
-                if isCameraMenuPresented {
-                    VStack {
-                        HStack {
-                            Spacer()
-                            cameraMenuPopover
-                                .padding(.trailing, 72)
-                                .padding(.top, 70)
-                                .safeAreaPadding(.top)
-                        }
-                        Spacer()
-                    }
-                    .transition(.identity)
-                    .zIndex(28)
-                }
-
-                if viewModel.isFurnitureCatalogPresented {
-                    let swapTarget = viewModel.swapTargetFurnitureID.flatMap { id in
-                        room.workingLayout?.furnitures.first(where: { $0.id == id })
-                    }
-                    VStack {
-                        HStack {
-                            Spacer()
-                            FurnitureCatalogSheet(
-                                swapTarget: swapTarget,
-                                onSelectItem: { item in
-                                    playSnapFeedback()
-                                    if let target = swapTarget {
-                                        viewModel.swapFurniture(target, with: item)
-                                    } else {
-                                        viewModel.addFurniture(from: item)
-                                    }
-                                },
-                                onDismiss: {
-                                    viewModel.isFurnitureCatalogPresented = false
-                                    viewModel.swapTargetFurnitureID = nil
-                                }
-                            )
-                            .padding(.trailing, 28)
-                            .padding(.top, 70)
-                            .safeAreaPadding(.top)
-                        }
-                        Spacer()
-                    }
-                    .transition(.identity)
-                    .zIndex(28)
-                }
 
                 // Stage Walkthrough Dialogue Overlay
                 if viewModel.isWalkthroughActive {
@@ -254,6 +192,8 @@ public struct Studio3DView: View {
                 }
             }
             .coordinateSpace(name: "Studio3DViewportSpace")
+            .animation(.spring(response: 0.32, dampingFraction: 0.84), value: viewModel.isWalkthroughActive)
+            .animation(.spring(response: 0.34, dampingFraction: 0.84), value: viewModel.currentStage)
         }
         .ignoresSafeArea()
         .navigationBarBackButtonHidden(true)
@@ -324,7 +264,8 @@ public struct Studio3DView: View {
     // MARK: - Top Header & 5-Step Stage Stepper (Figma / Light Stage Style)
 
     private var studioHeader: some View {
-        HStack(spacing: 12) {
+        @Bindable var bindableVM = viewModel
+        return HStack(spacing: 12) {
             if viewModel.currentStage != .audit {
                 Button {
                     switch viewModel.currentStage {
@@ -384,11 +325,9 @@ public struct Studio3DView: View {
 
             HStack(spacing: 10) {
                 Button {
-                    withAnimation(.easeInOut(duration: 0.16)) {
-                        viewModel.isFurnitureCatalogPresented = false
-                        viewModel.swapTargetFurnitureID = nil
-                        isCameraMenuPresented.toggle()
-                    }
+                    viewModel.isFurnitureCatalogPresented = false
+                    viewModel.swapTargetFurnitureID = nil
+                    isCameraMenuPresented.toggle()
                     playSnapFeedback()
                 } label: {
                     Image(systemName: "rotate.3d")
@@ -401,6 +340,11 @@ public struct Studio3DView: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Camera view")
+                .popover(isPresented: $isCameraMenuPresented, attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
+                    cameraMenuPopover
+                        .presentationCompactAdaptation(.popover)
+                        .presentationBackground(Color(red: 0xFE / 255.0, green: 0xEE / 255.0, blue: 0xDE / 255.0))
+                }
 
                 Button {
                     isARWalkthroughPresented = true
@@ -465,6 +409,30 @@ public struct Studio3DView: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Add furniture")
+                    .popover(isPresented: $bindableVM.isFurnitureCatalogPresented, attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
+                        let swapTarget = viewModel.swapTargetFurnitureID.flatMap { id in
+                            room.workingLayout?.furnitures.first(where: { $0.id == id })
+                        }
+                        FurnitureCatalogSheet(
+                            swapTarget: swapTarget,
+                            onSelectItem: { item in
+                                playSnapFeedback()
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.78)) {
+                                    if let target = swapTarget {
+                                        viewModel.swapFurniture(target, with: item)
+                                    } else {
+                                        viewModel.addFurniture(from: item)
+                                    }
+                                }
+                            },
+                            onDismiss: {
+                                viewModel.isFurnitureCatalogPresented = false
+                                viewModel.swapTargetFurnitureID = nil
+                            }
+                        )
+                        .presentationCompactAdaptation(.popover)
+                        .presentationBackground(Color(red: 0xFE / 255.0, green: 0xEE / 255.0, blue: 0xDE / 255.0))
+                    }
                 }
             }
         }
@@ -481,9 +449,7 @@ public struct Studio3DView: View {
                     selectedCameraPreset = preset
                     viewModel.snapToViewport?(preset)
                     playSnapFeedback()
-                    withAnimation(.easeInOut(duration: 0.16)) {
-                        isCameraMenuPresented = false
-                    }
+                    isCameraMenuPresented = false
                 } label: {
                     HStack(spacing: 12) {
                         Image(systemName: "checkmark")
@@ -520,9 +486,7 @@ public struct Studio3DView: View {
                 selectedCameraPreset = .dollhouse
                 viewModel.snapToViewport?(.dollhouse)
                 playSnapFeedback()
-                withAnimation(.easeInOut(duration: 0.16)) {
-                    isCameraMenuPresented = false
-                }
+                isCameraMenuPresented = false
             } label: {
                 HStack(spacing: 12) {
                     Color.clear
@@ -547,14 +511,7 @@ public struct Studio3DView: View {
         }
         .padding(.vertical, 12)
         .frame(width: 230)
-        .background(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(peach)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .stroke(brown, lineWidth: 2.5)
-        )
+        .background(peach)
     }
 
     @ViewBuilder
@@ -588,6 +545,7 @@ public struct Studio3DView: View {
             .clipShape(Circle())
             .padding(2)
         }
+        .animation(.easeInOut(duration: 0.16), value: isCoralActive)
     }
 
     private enum StepStatus {
