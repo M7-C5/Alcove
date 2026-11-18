@@ -413,6 +413,12 @@ public final class Studio3DViewModel {
         mascotMessage = "Restored your room to the original baseline scan!"
         feedbackService.playNotification(.warning)
         feedbackService.speak(mascotMessage)
+        refreshRoomThumbnail()
+    }
+
+    /// Persists layout changes; `LayoutCardView` renders the live 3D thumbnail directly from `room`.
+    public func refreshRoomThumbnail(modelContext: ModelContext? = nil) {
+        try? modelContext?.save()
     }
 
     @discardableResult

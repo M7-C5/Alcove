@@ -100,4 +100,37 @@ struct RoomScanTests {
         #expect(vm.isCancelled == true)
         #expect(vm.state == .cancelled)
     }
+
+    @Test func mapperAlignsLongestWallWithWidthAndClampsFurnitureInsideBounds() {
+        let walls = [
+            ScannedWallPayload(position: [0, 1.3, -1.75], dimensions: [5.5, 2.6, 0.1], rotationYaw: 0),
+            ScannedWallPayload(position: [0, 1.3, 1.75], dimensions: [5.5, 2.6, 0.1], rotationYaw: .pi),
+            ScannedWallPayload(position: [2.75, 1.3, 0], dimensions: [3.5, 2.6, 0.1], rotationYaw: .pi / 2),
+            ScannedWallPayload(position: [-2.75, 1.3, 0], dimensions: [3.5, 2.6, 0.1], rotationYaw: -.pi / 2)
+        ]
+        // Sofa pushed right up to / slightly past the +X wall edge should be clamped cleanly inside room bounds.
+        let objects = [
+            ScannedObjectPayload(rawCategory: "sofa", position: [2.5, 0.4, 1.5], dimensions: [2.0, 0.8, 0.9], rotationYaw: 0)
+        ]
+        let payload = CapturedRoomPayload(
+            roomLength: 3.5,
+            roomWidth: 5.5,
+            roomHeight: 2.6,
+            floorLevel: 0.0,
+            walls: walls,
+            openings: [],
+            objects: objects
+        )
+
+        let room = RoomCaptureMapper().mapToRoom(payload: payload, roomName: "Clamped Scan")
+        #expect(room.dimensionsWidth == 5.5)
+        #expect(room.dimensionsLength == 3.5)
+
+        let sofa = room.workingLayout?.furnitures.first
+        #expect(sofa != nil)
+        if let sofa {
+            #expect(abs(sofa.positionX) + sofa.width / 2.0 <= room.dimensionsWidth / 2.0 + 0.001)
+            #expect(abs(sofa.positionZ) + sofa.length / 2.0 <= room.dimensionsLength / 2.0 + 0.001)
+        }
+    }
 }

@@ -3,34 +3,36 @@ import SwiftUI
 /// Live scan HUD overlay featuring Alcove's cream `Cancel ✕` and yellow `Done ✓` tactile pill buttons.
 public struct RoomScanOverlayView: View {
     public let state: RoomScanViewModel.ScanState
+    public let isHidingControls: Bool
     public let onDone: () -> Void
     public let onCancel: () -> Void
 
     public init(
         state: RoomScanViewModel.ScanState,
+        isHidingControls: Bool = false,
         onDone: @escaping () -> Void,
         onCancel: @escaping () -> Void
     ) {
         self.state = state
+        self.isHidingControls = isHidingControls
         self.onDone = onDone
         self.onCancel = onCancel
     }
 
     public var body: some View {
         VStack(spacing: 0) {
-            HStack {
-                scanPillButton(
-                    title: "Cancel",
-                    systemImage: "xmark",
-                    isPrimary: false,
-                    action: onCancel
-                )
-                .disabled(state == .processing)
-                .accessibilityLabel("Cancel room scan")
+            if state == .scanning && !isHidingControls {
+                HStack {
+                    scanPillButton(
+                        title: "Cancel",
+                        systemImage: "xmark",
+                        isPrimary: false,
+                        action: onCancel
+                    )
+                    .accessibilityLabel("Cancel room scan")
 
-                Spacer()
+                    Spacer()
 
-                if state == .scanning {
                     scanPillButton(
                         title: "Done",
                         systemImage: "checkmark",
@@ -39,9 +41,10 @@ public struct RoomScanOverlayView: View {
                     )
                     .accessibilityLabel("Finish room scan")
                 }
+                .padding(.horizontal, 20)
+                .padding(.top, 10)
+                .transition(.opacity)
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 10)
 
             Spacer()
 

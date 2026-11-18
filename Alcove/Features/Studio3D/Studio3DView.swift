@@ -6,6 +6,7 @@ import AudioToolbox
 /// circular Sims Action HUD, Otter walkthrough & chat overlays, and bottom-left Otter trigger.
 public struct Studio3DView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(NavigationRouter.self) private var router: NavigationRouter?
     public let room: Room
@@ -307,6 +308,9 @@ public struct Studio3DView: View {
             if viewModel.currentStage == .audit || viewModel.currentStage == .rearrangement {
                 viewModel.startWalkthroughIfNeeded()
             }
+        }
+        .onDisappear {
+            viewModel.refreshRoomThumbnail(modelContext: modelContext)
         }
         .onChange(of: viewModel.currentStage) { _, newStage in
             if newStage == .audit || newStage == .rearrangement {

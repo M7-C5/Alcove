@@ -1,10 +1,13 @@
 import SwiftUI
 
-/// Custom Alcove confirmation alert shown when tapping Done during room scanning,
-/// featuring the peeking Otter mascot and cream/yellow tactile buttons.
-struct RoomScanDoneAlert: View {
-    let onNo: () -> Void
-    let onYes: () -> Void
+/// Custom Alcove alert card featuring the peeking Otter mascot and cream/yellow tactile buttons.
+struct RoomScanMascotAlert: View {
+    let title: String
+    let message: String
+    let secondaryTitle: String
+    let onSecondary: () -> Void
+    let primaryTitle: String
+    let onPrimary: () -> Void
 
     private let brown = Color.alcoveInk
     private let cream = Color.alcoveSurface
@@ -19,7 +22,7 @@ struct RoomScanDoneAlert: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Text("Are you done scanning?")
+            Text(title)
                 .font(.custom("Cleanow", size: 18, relativeTo: .headline))
                 .foregroundStyle(brown)
                 .multilineTextAlignment(.center)
@@ -27,7 +30,7 @@ struct RoomScanDoneAlert: View {
                 .minimumScaleFactor(0.85)
                 .fixedSize(horizontal: false, vertical: true)
 
-            Text("Make sure you have fully scanned the whole room to receive maximum results.")
+            Text(message)
                 .font(.system(.subheadline, design: .rounded, weight: .semibold))
                 .foregroundStyle(brown)
                 .multilineTextAlignment(.center)
@@ -35,8 +38,8 @@ struct RoomScanDoneAlert: View {
                 .padding(.top, 8)
 
             HStack(spacing: 14) {
-                alertButton(title: "No", isPrimary: false, action: onNo)
-                alertButton(title: "Yes", isPrimary: true, action: onYes)
+                alertButton(title: secondaryTitle, isPrimary: false, action: onSecondary)
+                alertButton(title: primaryTitle, isPrimary: true, action: onPrimary)
             }
             .padding(.top, 16)
         }
@@ -124,5 +127,22 @@ struct RoomScanDoneAlert: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+}
+
+/// Custom Alcove confirmation alert shown when tapping Done during room scanning.
+struct RoomScanDoneAlert: View {
+    let onNo: () -> Void
+    let onYes: () -> Void
+
+    var body: some View {
+        RoomScanMascotAlert(
+            title: "Are you done scanning?",
+            message: "Make sure you have fully scanned the whole room to receive maximum results.",
+            secondaryTitle: "No",
+            onSecondary: onNo,
+            primaryTitle: "Yes",
+            onPrimary: onYes
+        )
     }
 }
