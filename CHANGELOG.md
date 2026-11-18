@@ -77,10 +77,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Unify Lighting and studio header, progress, navigation, camera menus and quick-action styling; present north as a shadow-free floor decal.
+
 - Remove interactive game-style tutorial overlay.
 - Remove numerical scores and grades from evaluations.
 - Share room validation/persistence and use alcoveSurfaceElevated token.
 - Share Audit viewport controls and camera.
+- Share north-aligned daylight, fixed shadows, roof occlusion and saved fixture rendering between earlier studio stages and Lighting.
+
+- Align lighting controls with the shared tactile buttons, MainBackground artwork, and five-step progress header.
+- Keep lighting placement framed between inspectors and allow scrolling only within the light-source list.
+
 - Use SwiftUI openURL environment action.
 - Share view model warning severities with 3D viewport.
 - Adopt global alcove color tokens in home and tactile pill.
@@ -91,6 +98,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Return Lighting directly to Rearrange, suppress repeated Otter introductions on previous-stage navigation, and remove the viewport top inset.
+- Unify Lighting button fades, camera menus, lamp-type selection and Otter delete confirmation.
 - Remove close chevron and lift Otter chat above software keyboard.
 - Prevent Color.clear from expanding camera angle popover full height.
 - Pass isARPresented and onOpenAR to LightingWorkspaceView.
@@ -102,6 +111,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Disable Metal GPU validation to prevent RoomPlan debug hang.
 - Wire SwiftData persistence, NavigationRouter, and Light-only tokens.
 - Address review feedback and block overhead sunlight.
+- Remove the seven-fixture cap on GPUs supporting extended dynamic lighting and make the legacy fallback account for active sunlight.
+
+- Remove layout whitespace from fixture names and restore Dynamic Type and semantic tokens in tactile lighting buttons.
+- Add a permanent cutaway ceiling shadow occluder to prevent direct sunlight entering through the open mockup roof.
+
 - Update Otter 3D model face details and remove duplicate asset.
 - Store API key in Keychain, use header auth, and decouple chat badge.
 - Compute wall proximity from boundary extents and sanitize flowery placement wording.

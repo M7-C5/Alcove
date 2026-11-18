@@ -10,6 +10,9 @@ struct LayoutAlert: View {
     let type: AlertType
     @Binding var layoutName: String
 
+    var customTitle: String? = nil
+    var compact = false
+
     let onCancel: () -> Void
     let onConfirm: () -> Void
 
@@ -41,6 +44,7 @@ struct LayoutAlert: View {
     }
 
     private var alertTitle: String {
+        if let customTitle { return customTitle }
         if isEditing {
             return "Edit name"
         } else {
@@ -57,7 +61,7 @@ struct LayoutAlert: View {
                 .font(
                     .custom(
                         "Cleanow",
-                        size: isEditing ? 30 : 27,
+                        size: compact ? 20 : isEditing ? 30 : 27,
                         relativeTo: .title
                     )
                 )
@@ -75,14 +79,14 @@ struct LayoutAlert: View {
             )
             .font(
                 .system(
-                    .title2,
+                    compact ? .subheadline : .title2,
                     design: .rounded,
                     weight: .semibold
                 )
             )
             .foregroundStyle(brown)
             .multilineTextAlignment(.center)
-            .padding(.top, 16)
+            .padding(.top, compact ? 12 : 16)
 
             // Text field for Edit only
             if isEditing {
@@ -94,7 +98,7 @@ struct LayoutAlert: View {
                 )
                 .font(
                     .system(
-                        .title2,
+                        compact ? .subheadline : .title2,
                         design: .rounded,
                         weight: .semibold
 
@@ -117,7 +121,7 @@ struct LayoutAlert: View {
             }
 
             // Action buttons
-            HStack(spacing: 22) {
+            HStack(spacing: compact ? 16 : 22) {
 
                 alertButton(
                     title: isEditing ? "Cancel" : "No",
@@ -131,16 +135,16 @@ struct LayoutAlert: View {
                     action: onConfirm
                 )
             }
-            .padding(.top, 28)
+            .padding(.top, compact ? 16 : 28)
         }
-        .padding(.horizontal, 36)
-        .padding(.top, 42)
-        .padding(.bottom, 36)
-        .frame(width: isEditing ? 450 : 431)
+        .padding(.horizontal, compact ? 24 : 36)
+        .padding(.top, compact ? 28 : 42)
+        .padding(.bottom, compact ? 24 : 36)
+        .frame(width: compact ? 320 : isEditing ? 450 : 431)
 
         // Alert background & otter
         .background {
-            RoundedRectangle(cornerRadius: 50)
+            RoundedRectangle(cornerRadius: compact ? 36 : 50)
                 .fill(cream)
                 .background(alignment: .top) {
 
@@ -148,16 +152,16 @@ struct LayoutAlert: View {
                     Image(otterHeadAsset)
                         .resizable()
                         .scaledToFit()
-                        .frame(width: 190)
-                        .offset(y: -116)
+                        .frame(width: compact ? 140 : 190)
+                        .offset(y: compact ? -85 : -116)
                         .allowsHitTesting(false)
                 }
         }
 
         // Brown border IN FRONT of the head
         .overlay {
-            RoundedRectangle(cornerRadius: 50)
-                .strokeBorder(brown, lineWidth: 5)
+            RoundedRectangle(cornerRadius: compact ? 36 : 50)
+                .strokeBorder(brown, lineWidth: compact ? 3 : 5)
         }
 
         // Otter paws IN FRONT of the border
@@ -165,12 +169,12 @@ struct LayoutAlert: View {
             Image("OtterPaws")
                 .resizable()
                 .scaledToFit()
-                .frame(width: 140)
-                .offset(x: 7, y: -15)
+                .frame(width: compact ? 100 : 140)
+                .offset(x: compact ? 5 : 7, y: compact ? -11 : -15)
                 .allowsHitTesting(false)
         }
 
-        .padding(.top, 145)
+        .padding(.top, compact ? 100 : 145)
 
     }  // Closes var body
 
@@ -187,14 +191,14 @@ struct LayoutAlert: View {
 
         return Button(action: action) {
             Text(title)
-                .font(.custom("Cleanow", size: 24, relativeTo: .title3))
+                .font(.custom("Cleanow", size: compact ? 18 : 24, relativeTo: .title3))
                 .foregroundStyle(brown)
                 .frame(maxWidth: .infinity)
-                .frame(height: 58)
+                .frame(height: compact ? 44 : 58)
                 .background {
                     GeometryReader { geometry in
-                        let border: CGFloat = 4
-                        let band: CGFloat = 6
+                        let border: CGFloat = compact ? 2.5 : 4
+                        let band: CGFloat = compact ? 3.5 : 6
 
                         ZStack {
                             // Brown outer base

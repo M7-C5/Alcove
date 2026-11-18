@@ -8,10 +8,11 @@ struct LightingSourcePanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             sourceHeader
-            TactilePillButton(title: isAdding ? "Done adding" : "Add light", size: .compact,
-                              appearance: .cream, systemImage: isAdding ? "checkmark" : "plus.circle",
-                              fillsWidth: true, action: onAdd)
-            if editor.isSelectingMultiple { selectionControls }
+            StudioStageButton(title: isAdding ? "Save Lights" : "Add light", role: .add,
+                              systemImage: isAdding ? "checkmark" : "plus.circle", fillsWidth: true, action: onAdd)
+            if editor.isSelectingMultiple {
+                selectionControls.transition(.opacity)
+            }
             ScrollView {
                 LazyVStack(spacing: 12) {
                     if editor.drafts.isEmpty {
@@ -33,13 +34,15 @@ struct LightingSourcePanel: View {
             }
         }
         .padding(20)
+        .animation(.easeInOut(duration: 0.16), value: editor.isSelectingMultiple)
+        .animation(.easeInOut(duration: 0.16), value: isAdding)
         .lightingPanel()
     }
 
     private var sourceHeader: some View {
         HStack(spacing: 8) {
             Label("Your lights", systemImage: "lightbulb")
-                .font(.system(.headline, design: .rounded, weight: .heavy))
+                .font(.custom("Cleanow", size: 20, relativeTo: .headline))
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
             Button { editor.toggleMultipleSelection() } label: {
@@ -82,7 +85,7 @@ struct LightingSourcePanel: View {
                     .frame(width: 24)
                     .opacity(fixture.isOn ? 1 : 0.5)
                 Text(fixture.name)
-                    .font(.system(.subheadline, design: .rounded, weight: .bold))
+                    .font(.custom("Cleanow", size: 16, relativeTo: .subheadline))
                     .multilineTextAlignment(.leading)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 if editor.isSelectingMultiple {
@@ -94,12 +97,13 @@ struct LightingSourcePanel: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
             .frame(minHeight: 48)
-            .background(selected ? LightingTheme.accent.opacity(0.25) : LightingTheme.row,
+            .background(selected ? Color.alcoveItemSurface : LightingTheme.row,
                         in: RoundedRectangle(cornerRadius: 16))
-            .overlay(RoundedRectangle(cornerRadius: 16).stroke(selected ? LightingTheme.ink.opacity(0.5) : .clear))
+            .overlay(RoundedRectangle(cornerRadius: 16).stroke(LightingTheme.ink.opacity(selected ? 1 : 0.3), lineWidth: 2))
             .contentShape(RoundedRectangle(cornerRadius: 16))
         }
         .buttonStyle(.plain)
+        .animation(.easeInOut(duration: 0.16), value: selected)
         .accessibilityAddTraits(selected ? .isSelected : [])
         .accessibilityHint(editor.isSelectingMultiple ? (selected ? "Tap to deselect this light." : "Tap to add this light to your selection.") : "Tap to edit this light.")
     }
@@ -112,7 +116,7 @@ struct LightingSimulationPanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Label("Lighting preview", systemImage: "sun.max")
-                .font(.system(.headline, design: .rounded, weight: .heavy))
+                .font(.custom("Cleanow", size: 20, relativeTo: .headline))
                 .fixedSize(horizontal: false, vertical: true)
             HStack(alignment: .top, spacing: 16) {
                 lightToggle("Lights", isOn: $settings.artificialLightsOn)
@@ -136,8 +140,10 @@ struct LightingSimulationPanel: View {
                     .accessibilityValue(settings.timeLabel)
             }
             .disabled(settings.layoutOnly || !settings.sunlightOn)
-            if activeFixtureCount > 7 {
-                Text("Showing your seven brightest lights.").font(.caption)
+            let sunlightActive = settings.sunlightOn && !settings.layoutOnly &&
+                IlluminationSimulationEngine().calculateDaylight(hourOfDay: settings.hourOfDay).intensityLux > 0
+            if let limit = StudioLightBudget.maximumFixtures(sunlightActive: sunlightActive), activeFixtureCount > limit {
+                Text("Showing the \(limit) brightest lights on this device.").font(.caption)
             }
         }
         .padding(20)
@@ -157,6 +163,7 @@ struct LightingSimulationPanel: View {
 }
 
 struct LightingEditPanel: View {
+    @State private var typePickerPresented = false
     @Bindable var editor: LightingSetupViewModel
     var minimumHeight: Double = 0
     let onDelete: () -> Void
@@ -165,7 +172,7 @@ struct LightingEditPanel: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Label("Light settings", systemImage: "lamp.desk.fill")
-                    .font(.system(.headline, design: .rounded, weight: .heavy))
+                    .font(.custom("Cleanow", size: 20, relativeTo: .headline))
                 Spacer(minLength: 0)
                 Button(role: .destructive, action: onDelete) {
                     Image(systemName: "trash").foregroundStyle(.red).frame(width: 44, height: 44)
@@ -176,7 +183,7 @@ struct LightingEditPanel: View {
             selectionSummary
             lampTypePicker
             if let fixture = editor.selected {
-                fixtureControls(fixture)
+                fixtureControls(fixture).transition(.opacity)
             } else {
                 Text(editor.isSelectingMultiple ? "Select lights from the list or the room to edit them together." : "Choose a lamp type, then tap the room to place it.")
                     .font(.subheadline)
@@ -184,6 +191,7 @@ struct LightingEditPanel: View {
                     .padding(.bottom, 16)
             }
         }
+        .animation(.easeInOut(duration: 0.16), value: editor.selected?.id)
         .frame(minHeight: max(0, minimumHeight - 40), alignment: .top)
         .padding(20)
         .lightingPanel()
@@ -200,29 +208,55 @@ struct LightingEditPanel: View {
     }
 
     private var lampTypePicker: some View {
-        Picker("Lamp type", selection: Binding<LightKind?>(
-            get: { editor.selected == nil ? editor.placementKind : editor.commonKind },
-            set: { if let kind = $0 { editor.chooseKind(kind) } }
-        )) {
-            if editor.selected != nil && editor.commonKind == nil {
-                Text("Mixed types").tag(nil as LightKind?)
+        let current = editor.selected == nil ? editor.placementKind : editor.commonKind
+        return Button { typePickerPresented.toggle() } label: {
+            HStack(spacing: 8) {
+                if let current { Image(systemName: current.icon).frame(width: 24) }
+                Text(current?.title ?? "Mixed types")
+                Image(systemName: "chevron.up.chevron.down").font(.caption.bold())
+                Spacer(minLength: 0)
             }
-            if let current = editor.commonKind, !LightKind.lightingKinds.contains(current) {
-                Label(current.title, systemImage: current.icon)
-                    .tag(Optional(current))
-                    .disabled(true)
-            }
-            ForEach(LightKind.lightingKinds) { kind in
-                Label(kind.title, systemImage: kind.icon).tag(Optional(kind))
-            }
+            .font(.custom("Cleanow", size: 17, relativeTo: .subheadline))
+            .foregroundStyle(LightingTheme.ink)
+            .padding(.horizontal, 14)
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .background(LightingTheme.row, in: RoundedRectangle(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(LightingTheme.ink, lineWidth: 2))
         }
-        .font(.subheadline)
-        .pickerStyle(.menu)
-        .labelsHidden()
+        .buttonStyle(.plain)
         .accessibilityLabel("Lamp type")
-        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-        .background(LightingTheme.row, in: RoundedRectangle(cornerRadius: 12))
         .disabled(editor.isSelectingMultiple && editor.selected == nil)
+        .popover(isPresented: $typePickerPresented, arrowEdge: .top) {
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(LightKind.lightingKinds) { kind in
+                    Button {
+                        editor.chooseKind(kind)
+                        typePickerPresented = false
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "checkmark").frame(width: 18)
+                                .opacity(current == kind ? 1 : 0)
+                            Image(systemName: kind.icon).frame(width: 24)
+                            Text(kind.title)
+                            Spacer(minLength: 0)
+                        }
+                        .font(.custom("Cleanow", size: 17, relativeTo: .subheadline))
+                        .foregroundStyle(LightingTheme.ink)
+                        .padding(.horizontal, 18)
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.vertical, 12)
+            .frame(width: 270)
+            .background(LightingTheme.row, in: RoundedRectangle(cornerRadius: 32))
+            .overlay(RoundedRectangle(cornerRadius: 32).strokeBorder(LightingTheme.ink, lineWidth: 3))
+            .padding(4)
+            .presentationBackground(.clear)
+            .presentationCompactAdaptation(.popover)
+        }
     }
 
     private func fixtureControls(_ fixture: LightFixture) -> some View {

@@ -86,6 +86,8 @@ public struct Studio3DViewport: UIViewRepresentable {
         view.isOpaque = false
         view.backgroundColor = .clear
         view.environment.background = .color(.clear)
+        let daylight = IlluminationSimulationEngine().calculateDaylight(hourOfDay: 12)
+        view.environment.lighting.intensityExponent = -5 + Float(daylight.intensityLux / 10000) * 2
         view.renderOptions.insert([.disableMotionBlur, .disableDepthOfField])
 
         context.coordinator.install(in: view)
@@ -117,6 +119,7 @@ public struct Studio3DViewport: UIViewRepresentable {
         context.coordinator.furnitureWarningSeverities = furnitureWarningSeverities
         context.coordinator.onFurnitureDragging = onFurnitureDragging
         context.coordinator.onComputeWarningSeverities = onComputeWarningSeverities
+        context.coordinator.updateRoomLighting()
         context.coordinator.updateFurnitureEntities(from: room)
         context.coordinator.updateSelectionHalos()
         context.coordinator.updateSelectedProjection()
@@ -136,7 +139,6 @@ public struct Studio3DViewport: UIViewRepresentable {
     }
 
     public static func dismantleUIView(_ view: ARView, coordinator: Coordinator) {
-        coordinator.northIndicator.removeFromSuperview()
         coordinator.animationTask?.cancel()
         coordinator.updateSubscription?.cancel()
         view.scene.anchors.removeAll()
@@ -182,9 +184,9 @@ public struct Studio3DViewport: UIViewRepresentable {
         let root = Entity()
         let camera = PerspectiveCamera()
         let sun = DirectionalLight()
-        let fill = DirectionalLight()
+        private var lightingDefinitions: [LightFixture] = []
+        private var fixtureLights: [(light: LightingFixtureLight, model: LightingFixtureModel)] = []
 
-        let northIndicator = RoomNorthIndicator()
         var updateSubscription: (any Cancellable)?
         private var entitySignatures: [UUID: String] = [:]
         let cameraController: StudioOrbitCameraController
@@ -247,46 +249,23 @@ public struct Studio3DViewport: UIViewRepresentable {
         private func setupScene() {
             root.name = "DollhouseRoot"
 
-            // Non-AR lighting configuration
-            root.components.set(EnvironmentLightingConfigurationComponent(environmentLightingWeight: 0))
-            root.components.set(ImageBasedLightComponent(source: .none))
-            root.components.set(ImageBasedLightReceiverComponent(imageBasedLight: root))
-
             // Realistic Perspective Camera
             camera.name = "OrbitCamera"
             cameraController.configure(camera)
             root.addChild(camera)
 
-            // Directional Sunlight pouring in fixed projection through the window opening
-            let halfL = Float(room.dimensionsLength) / 2.0
-            let windowCenterY: Float = 0.85 + (1.30 / 2.0) // 1.50m
-            let windowZ: Float = -halfL
-
+            let geometry = LightingRoomGeometry(width: room.dimensionsWidth, length: room.dimensionsLength,
+                                                height: room.dimensionsHeight)
             sun.name = "SunLight"
-            sun.light.intensity = 2800
-            sun.light.color = .init(red: 1.0, green: 0.96, blue: 0.90, alpha: 1.0)
-            sun.shadow = DirectionalLightComponent.Shadow(maximumDistance: 14.0, depthBias: 0.8)
-
-            // Fixed position directly outside the window aperture, aimed across the room floor
-            let sunPos = SIMD3<Float>(0.4, windowCenterY + 0.9, windowZ - 2.5)
-            let sunTarget = SIMD3<Float>(-0.2, 0.0, windowZ + halfL * 0.9)
-            sun.look(at: sunTarget, from: sunPos, relativeTo: root)
+            StudioDaylightRig.configure(sun, geometry: geometry)
             root.addChild(sun)
-
-            // Ambient Fill Light (soft bounce light without shadows)
-            fill.name = "FillLight"
-            fill.light.intensity = 1100
-            fill.light.color = .init(red: 0.92, green: 0.95, blue: 1.0, alpha: 1.0)
-            fill.look(at: .zero, from: [-2.0, 3.5, 2.5], relativeTo: root)
-            root.addChild(fill)
+            root.addChild(StudioDaylightRig.roofOccluder(geometry: geometry))
+            updateRoomLighting()
 
             // Procedural Room Shell: Floor and 4 Cardinal Walls
             let shell = ProceduralRoomShellBuilder.buildShell(for: room, includeCeiling: false)
             root.addChild(shell)
-            if let orientation = room.compassOrientation {
-                root.addChild(RoomNorthMarker.build(orientation: orientation, width: room.dimensionsWidth,
-                                                   length: room.dimensionsLength))
-            }
+            root.addChild(RoomNorthMarker.build(snapshot: LightingRoomSnapshot(room: room)))
 
             // Procedural Low-Poly Furniture Entities
             let furnitureGroup = Entity()
@@ -312,9 +291,38 @@ public struct Studio3DViewport: UIViewRepresentable {
             updateWallCutaways()
         }
 
+        /// Stage previews use the same default noon sun and saved fixture optics as Lighting.
+        func updateRoomLighting() {
+            let snapshot = LightingRoomSnapshot(room: room)
+            let settings = LightingSimulationSettings()
+            let daylight = IlluminationSimulationEngine().calculateDaylight(hourOfDay: settings.hourOfDay)
+            StudioDaylightRig.update(sun, in: root, geometry: snapshot.geometry,
+                                     orientation: snapshot.compassOrientation, daylight: daylight, enabled: true)
+            guard lightingDefinitions != snapshot.fixtures else { return }
+            for fixture in fixtureLights {
+                fixture.light.entity.removeFromParent()
+                fixture.model.root.removeFromParent()
+            }
+            let activeIDs = settings.renderedFixtureIDs(in: snapshot.fixtures,
+                maximumCount: StudioLightBudget.maximumFixtures(sunlightActive: sun.isEnabled))
+            fixtureLights = snapshot.fixtures.map { fixture in
+                let model = LightingFixtureModel(fixture: fixture, room: snapshot)
+                let light = LightingFixtureLight(optics: model.optics)
+                light.entity.name = "LightingFixture-\(fixture.id)"
+                light.position(at: model.emitterPosition, direction: model.emissionDirection)
+                let enabled = activeIDs.contains(fixture.id)
+                light.apply(output: settings.output(for: fixture), kelvin: fixture.colorTemperatureKelvin, enabled: enabled)
+                model.applyAppearance(output: settings.output(for: fixture),
+                                      kelvin: fixture.colorTemperatureKelvin)
+                root.addChild(light.entity)
+                root.addChild(model.root)
+                return (light, model)
+            }
+            lightingDefinitions = snapshot.fixtures
+        }
+
         func install(in view: ARView) {
             self.arView = view
-            view.addSubview(northIndicator)
             let anchor = AnchorEntity(world: .zero)
             anchor.addChild(root)
             view.scene.addAnchor(anchor)
@@ -393,15 +401,7 @@ public struct Studio3DViewport: UIViewRepresentable {
                         orientation: orientation,
                         pitch: pitch
                     )
-                    if #available(iOS 18.0, *) {
-                        if isHidden {
-                            entity.components.set(OpacityComponent(opacity: 0.0))
-                        } else {
-                            entity.components.remove(OpacityComponent.self)
-                        }
-                    } else {
-                        entity.isEnabled = !isHidden
-                    }
+                    StudioDaylightRig.setCutaway(entity, hidden: isHidden)
                 }
             }
         }
@@ -420,10 +420,6 @@ public struct Studio3DViewport: UIViewRepresentable {
         // MARK: - 3D to 2D Screen Projection (Native RealityKit Hardware Matrix)
 
         func updateSelectedProjection() {
-            if let arView {
-                northIndicator.update(in: arView, orientation: room.compassOrientation,
-                                      cameraOrientation: camera.orientation(relativeTo: nil))
-            }
             guard let arView = arView,
                   let id = selectedFurnitureID,
                   let container = arView.scene.findEntity(named: "Furniture_\(id.uuidString)") else {

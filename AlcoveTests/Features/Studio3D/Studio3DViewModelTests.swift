@@ -63,6 +63,70 @@ struct Studio3DViewModelTests {
         #expect(vm.mascotMessage.contains("Stage 2 unlocked"))
     }
 
+    @Test func previousFromLightingReturnsToRearrangementInSameRoom() {
+        let room = SampleData.createStarterRoom()
+        room.completeStage(.audit, score: 90, feedback: "Passed")
+        room.completeStage(.rearrangement, score: 90, feedback: "Passed")
+        let vm = Studio3DViewModel(room: room, stage: .illumination)
+        let layoutID = room.workingLayout?.id
+
+        vm.switchToStage(.rearrangement)
+
+        #expect(vm.currentStage == .rearrangement)
+        #expect(vm.room.id == room.id)
+        #expect(room.workingLayout?.id == layoutID)
+        #expect(vm.evaluationResult == nil)
+    }
+
+    @Test func previousStageDoesNotReplayOtterIntroduction() {
+        let room = SampleData.createStarterRoom()
+        room.completeStage(.audit, score: 90, feedback: "Passed")
+        room.completeStage(.rearrangement, score: 90, feedback: "Passed")
+        let vm = Studio3DViewModel(room: room, stage: .illumination)
+
+        vm.switchToStage(.rearrangement)
+        vm.startWalkthrough()
+        #expect(!vm.isWalkthroughActive)
+        #expect(vm.walkthroughSteps.isEmpty)
+
+        vm.switchToStage(.audit)
+        vm.startWalkthrough()
+        #expect(!vm.isWalkthroughActive)
+        #expect(vm.walkthroughSteps.isEmpty)
+    }
+
+    @Test func completedStageDoesNotIntroduceItselfInNewSession() {
+        let room = SampleData.createStarterRoom()
+        room.completeStage(.audit, score: 90, feedback: "Passed")
+        let vm = Studio3DViewModel(room: room, stage: .audit)
+        vm.startWalkthrough()
+        #expect(!vm.isWalkthroughActive)
+    }
+
+    @Test func freshStageIntroductionOnlyStartsOnceAndClosesOnNavigation() {
+        let room = SampleData.createStarterRoom()
+        let vm = Studio3DViewModel(room: room, stage: .audit)
+        vm.startWalkthrough()
+        #expect(vm.isWalkthroughActive)
+        vm.advanceWalkthrough()
+        let index = vm.walkthroughStepIndex
+        vm.startWalkthrough()
+        #expect(vm.walkthroughStepIndex == index)
+        vm.completeWalkthrough()
+        vm.startWalkthrough()
+        #expect(!vm.isWalkthroughActive)
+
+        room.completeStage(.audit, score: 90, feedback: "Passed")
+        vm.switchToStage(.rearrangement)
+        vm.startWalkthrough()
+        #expect(vm.isWalkthroughActive)
+        vm.switchToStage(.audit)
+        #expect(!vm.isWalkthroughActive)
+        #expect(vm.walkthroughSteps.isEmpty)
+        vm.startWalkthrough()
+        #expect(!vm.isWalkthroughActive)
+    }
+
     @Test func stageEvaluationAndAdvancement() async {
         let room = SampleData.createStarterRoom()
         let vm = Studio3DViewModel(room: room, stage: .audit)

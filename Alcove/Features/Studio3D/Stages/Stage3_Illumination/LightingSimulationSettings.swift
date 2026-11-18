@@ -18,13 +18,17 @@ struct LightingSimulationSettings: Equatable, Sendable {
         return max(0, fixture.lumens)
     }
 
-    /// RealityKit supports eight dynamic lights; reserve one for the illustrative sun.
-    func renderedFixtureIDs(in fixtures: [LightFixture]) -> Set<UUID> {
-        Set(fixtures.filter { output(for: $0) > 0 }.sorted {
+    /// An explicit limit is only needed for GPUs with the legacy dynamic-light budget.
+    func renderedFixtureIDs(in fixtures: [LightFixture], maximumCount: Int? = nil) -> Set<UUID> {
+        let active = fixtures.filter { output(for: $0) > 0 }
+        guard let maximumCount else { return Set(active.map(\.id)) }
+        let ordered = active.sorted {
             if $0.lumens == $1.lumens { return $0.id.uuidString < $1.id.uuidString }
             return $0.lumens > $1.lumens
-        }.prefix(7).map(\.id))
+        }
+        return Set(ordered.prefix(max(0, maximumCount)).map(\.id))
     }
+
 }
 
 /// The same meter-based bounds drive the plan editor and the rendered room.

@@ -30,7 +30,7 @@ The viewport has no visible grid points. In placement mode, tapping inside the w
 
 Alcove does not currently persist Resign's captured wall outlines, window apertures, geographic site, or north calibration. The room is a rectangular dollhouse and daylight follows an explicitly illustrative 08:00–20:00 arc, with darkness at night. The preview does not claim geographic accuracy or calibrated illuminance.
 
-RealityKit's dynamic-light budget reserves one light for the sun and renders the seven brightest enabled fixtures. All saved fixtures retain visible models and remain available to the illumination evaluation. The simulation inspector explains the limit when exceeded. Device previews enable spot-light shadows; simulator previews omit those shadows for predictable rendering. Diffuse sources approximate shade transmission; the preview does not simulate material scattering or indirect light transport.
+The dynamic-light budget follows the device GPU. Devices supporting Metal Apple GPU family 6 or later render all enabled fixtures instead of globally truncating the list to seven. Older devices render the brightest seven fixtures while sunlight is active, or eight when it is not; the simulation inspector explains this fallback when exceeded. Models reflect their saved on/off/brightness state independently of the fallback render selection. All saved fixtures remain available to the illumination evaluation. Device previews enable spot-light shadows; simulator previews omit those shadows for predictable rendering. Diffuse sources approximate shade transmission; the preview does not simulate material scattering or indirect light transport.
 
 ## Verification
 
@@ -45,3 +45,10 @@ The workspace suite also covers additive selection and deselection, mixed settin
 The compact tactile button retains Dynamic Type for its label and scales its geometry using the title text style. Both appearances use generated Alcove semantic color tokens; the cream surface uses `alcoveSurfaceElevated`. The regular button preserves the existing Home label, capsule layers, sizing and press feedback. Extending this shared component and adding MainBackground are required by the Lighting design; Home continues using its existing background and regular button.
 
 The visually open lighting mockup also contains a permanent, nearly transparent ceiling shadow occluder built from the shared ceiling geometry. It extends to the exterior wall edges, stays active through camera cutaways and blocks direct overhead sunlight while leaving the window aperture open. Its opacity follows the existing wall-cutaway convention. Device rendering must confirm the shadow result; simulator geometry tests verify coverage and persistence, not GPU shadow output.
+
+
+### Shared studio chrome and floor north
+
+Lighting and the other studio stages reuse a 32pt Cleanow title, 40pt five-step progress dots, 44pt tactile navigation pills, 45pt camera/AR buttons and the same camera-menu content. Lighting inspector headings use the catalog's 20pt Cleanow style, semantic Alcove surfaces and 2.5pt panel outlines. Feature-specific controls and callbacks stay in their respective workspaces.
+
+North is a room-space floor decal with an unlit arrow, label and translucent cream backing. Its initial corner is chosen to reduce overlap with furniture footprints. It does not cast shadows or add collision targets, and orbit/zoom never changes its compass bearing. Uncaptured rooms show N? for the existing sample orientation.

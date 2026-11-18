@@ -505,12 +505,34 @@ struct LightingWorkspaceTests {
     @Test func rendererBudgetUsesBrightestEnabledFixtures() {
         let fixtures = (1...10).map { LightFixture(name: "Lamp \($0)", layer: .ambient, lumens: Double($0 * 100)) }
         var settings = LightingSimulationSettings()
-        let rendered = settings.renderedFixtureIDs(in: fixtures)
+        let rendered = settings.renderedFixtureIDs(in: fixtures, maximumCount: 7)
         #expect(rendered.count == 7)
         #expect(rendered.contains(fixtures[9].id))
         #expect(!rendered.contains(fixtures[0].id))
         settings.layoutOnly = true
-        #expect(settings.renderedFixtureIDs(in: fixtures).isEmpty)
+        #expect(settings.renderedFixtureIDs(in: fixtures, maximumCount: 7).isEmpty)
+    }
+
+    @Test func modernLightBudgetDoesNotSilentlyDropTheEighthFixture() {
+        var fixtures = (1...12).map { LightFixture(name: "Lamp \($0)", layer: .ambient, lumens: 800) }
+        fixtures[0].isOn = false
+        fixtures[1].lumens = 0
+        var settings = LightingSimulationSettings()
+        let limit = StudioLightBudget.limit(supportsExtendedLights: true, sunlightActive: true)
+        #expect(limit == nil)
+        let rendered = settings.renderedFixtureIDs(in: fixtures, maximumCount: limit)
+        #expect(rendered.count == 10)
+        #expect(rendered.contains(fixtures[11].id))
+        #expect(!rendered.contains(fixtures[0].id))
+        #expect(!rendered.contains(fixtures[1].id))
+        settings.artificialLightsOn = false
+        #expect(settings.renderedFixtureIDs(in: fixtures, maximumCount: limit).isEmpty)
+    }
+
+    @Test func olderLightBudgetOnlyReservesASlotForActiveSunlight() {
+        #expect(StudioLightBudget.limit(supportsExtendedLights: false, sunlightActive: true) == 7)
+        #expect(StudioLightBudget.limit(supportsExtendedLights: false, sunlightActive: false) == 8)
+        #expect(StudioLightBudget.limit(supportsExtendedLights: true, sunlightActive: false) == nil)
     }
 
     @Test func baselineCannotBeUsedAsEditableLayout() throws {

@@ -38,17 +38,15 @@ struct SharedStudioCameraTests {
         #expect(lighting.cameraController.distance == distance)
     }
 
-    @Test func northMarkerStaysAlignedWithCapturedNorthAcrossCameraPresets() throws {
+    @Test func floorNorthDoesNotChangeCutawayShadows() throws {
         for bearing in [0.0, 90, 180, 270] {
             let room = SampleData.createStarterRoom()
             room.compassOrientation = RoomCompassOrientation(magneticForwardBearingDegrees: bearing)
             let scene = LightingRoomScene(snapshot: LightingRoomSnapshot(room: room))
-            let marker = try #require(scene.root.findEntity(named: "RoomNorthMarker"))
-            let expected = try #require(room.compassOrientation).direction(forBearingDegrees: 0)
+            #expect(scene.root.findEntity(named: "RoomNorthMarker") != nil)
             let view = ARView(frame: .zero, cameraMode: .nonAR, automaticallyConfigureSession: false)
             for preset in ViewportPreset.allCases {
                 scene.apply(LightingSimulationSettings(), preset: preset, in: view)
-                #expect(simd_distance(marker.orientation.act([0, 0, -1]), expected) < 0.001)
                 for name in ["FrontWallGroup", "BackWallGroup", "LeftWallGroup", "RightWallGroup"] {
                     let wall = try #require(scene.root.findEntity(named: name))
                     #expect(wall.isEnabled)
@@ -60,25 +58,19 @@ struct SharedStudioCameraTests {
         }
     }
 
-    @Test func auditNorthIndicatorIsVisibleWithoutFurnitureSelection() {
+    @Test func auditFloorNorthStaysFixedWithoutFurnitureSelection() throws {
         let room = SampleData.createStarterRoom()
         room.compassOrientation = RoomCompassOrientation(magneticForwardBearingDegrees: 90)
         let audit = Studio3DViewport(room: room, selectedFurnitureID: .constant(nil),
                                      selectedFurnitureScreenPosition: .constant(nil)).makeCoordinator()
-        let view = ARView(frame: CGRect(x: 0, y: 0, width: 1024, height: 768),
-                          cameraMode: .nonAR, automaticallyConfigureSession: false)
-        audit.install(in: view)
-        defer { audit.updateSubscription?.cancel(); view.scene.anchors.removeAll() }
+        let marker = try #require(audit.root.findEntity(named: "RoomNorthMarker"))
+        let original = marker.transform
         for preset in ViewportPreset.allCases {
             audit.snapToViewport(preset, animated: false)
-            audit.updateSelectedProjection()
-            #expect(audit.northIndicator.superview === view)
-            #expect(!audit.northIndicator.isHidden)
-            #expect(view.bounds.contains(audit.northIndicator.frame))
+            #expect(marker.isEnabled)
+            #expect(marker.transform == original)
+            #expect(marker.position.y < 0.03)
         }
-        room.compassOrientation = nil
-        audit.updateSelectedProjection()
-        #expect(audit.northIndicator.isHidden)
     }
 
     @Test func supersedingAnAnimatedSnapCancelsItsUpdates() async {

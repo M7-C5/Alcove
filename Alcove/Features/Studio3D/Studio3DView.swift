@@ -36,6 +36,11 @@ public struct Studio3DView: View {
                     settings: $viewModel.lightingSettings,
                     isARPresented: isARWalkthroughPresented,
                     onOpenAR: { isARWalkthroughPresented = true },
+                    onNextStage: {
+                        viewModel.markLayoutDirty()
+                        viewModel.triggerStageEvaluation()
+                    },
+                    isAdvancing: viewModel.isEvaluating,
                     onSelectStage: { targetStage in
                         viewModel.switchToStage(targetStage)
                         playSnapFeedback()
@@ -45,6 +50,31 @@ public struct Studio3DView: View {
                 }
             } else {
                 furnitureStudio
+            }
+        }
+        .fullScreenCover(isPresented: $isARWalkthroughPresented) {
+            ARWalkthroughView(room: room)
+        }
+        .sheet(isPresented: $viewModel.showingEvaluationSheet) {
+            if let result = viewModel.evaluationResult {
+                StageEvaluationSheet(
+                    result: result,
+                    stage: viewModel.currentStage,
+                    onProceedAnyway: {
+                        if viewModel.currentStage == .harmony {
+                            isARWalkthroughPresented = true
+                        } else {
+                            viewModel.advanceToNextStage(result: result)
+                        }
+                    },
+                    onKeepRefining: {
+                        // User stays to refine
+                    },
+                    onReevaluate: {
+                        viewModel.triggerStageEvaluation(forceReprompt: true)
+                    }
+                )
+                .presentationBackground(.clear)
             }
         }
     }
@@ -279,30 +309,8 @@ public struct Studio3DView: View {
             }
         }
         .onChange(of: viewModel.currentStage) { _, newStage in
-            if newStage == .rearrangement {
+            if newStage == .audit || newStage == .rearrangement {
                 viewModel.startWalkthroughIfNeeded()
-            }
-        }
-        .sheet(isPresented: $viewModel.showingEvaluationSheet) {
-            if let result = viewModel.evaluationResult {
-                StageEvaluationSheet(
-                    result: result,
-                    stage: viewModel.currentStage,
-                    onProceedAnyway: {
-                        if viewModel.currentStage == .harmony {
-                            isARWalkthroughPresented = true
-                        } else {
-                            viewModel.advanceToNextStage(result: result)
-                        }
-                    },
-                    onKeepRefining: {
-                        // User stays to refine
-                    },
-                    onReevaluate: {
-                        viewModel.triggerStageEvaluation(forceReprompt: true)
-                    }
-                )
-                .presentationBackground(.clear)
             }
         }
         .sheet(isPresented: $viewModel.showingScorecardSheet) {
@@ -325,9 +333,6 @@ public struct Studio3DView: View {
             .presentationDetents([.fraction(0.85), .large])
             .presentationDragIndicator(.visible)
         }
-        .fullScreenCover(isPresented: $isARWalkthroughPresented) {
-            ARWalkthroughView(room: room)
-        }
         .alert("AR Room Walkthrough", isPresented: $viewModel.showingARPlaceholder) {
             Button("Got it!", role: .cancel) {}
         } message: {
@@ -338,9 +343,9 @@ public struct Studio3DView: View {
     // MARK: - Top Header & 5-Step Stage Stepper (Figma / Light Stage Style)
 
     private var studioHeader: some View {
-        HStack(spacing: 12) {
+        StudioHeaderLayout(title: stageHeaderTitle) {
             if viewModel.currentStage != .audit {
-                Button {
+                StudioStageButton(title: "Previous Stage", role: .previous) {
                     switch viewModel.currentStage {
                     case .rearrangement:
                         viewModel.switchToStage(.audit)
@@ -351,51 +356,13 @@ public struct Studio3DView: View {
                     case .audit:
                         break
                     }
-                } label: {
-                    HStack(spacing: 5) {
-                        Image(systemName: "chevron.left")
-                            .font(.system(.subheadline, design: .rounded, weight: .heavy))
-                        Text("Previous Stage")
-                            .font(.custom("Cleanow", size: 16, relativeTo: .subheadline))
-                    }
-                    .foregroundStyle(Color(red: 0x6D / 255.0, green: 0x45 / 255.0, blue: 0x31 / 255.0))
-                    .padding(.horizontal, 16)
-                    .frame(minWidth: 44, minHeight: 44)
-                    .background {
-                        ZStack {
-                            Capsule()
-                                .fill(Color(red: 0x6D / 255.0, green: 0x45 / 255.0, blue: 0x31 / 255.0))
-
-                            ZStack {
-                                VStack(spacing: 0) {
-                                    Color(red: 0xF9 / 255.0, green: 0xE4 / 255.0, blue: 0xC9 / 255.0)
-                                    Color(red: 0xE9 / 255.0, green: 0xC7 / 255.0, blue: 0x9D / 255.0)
-                                }
-
-                                Capsule()
-                                    .fill(Color(red: 0xFF / 255.0, green: 0xF7 / 255.0, blue: 0xE7 / 255.0))
-                                    .padding(.top, 2)
-                                    .padding(.bottom, 3.5)
-                            }
-                            .clipShape(Capsule())
-                            .padding(2)
-                        }
-                    }
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Previous Stage")
             } else {
                 Color.clear
                     .frame(width: 100, height: 44)
             }
 
-            Text(stageHeaderTitle)
-                .font(.custom("Cleanow", size: 32, relativeTo: .title))
-                .foregroundStyle(Color.alcoveText)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-                .frame(maxWidth: .infinity)
-
+        } actions: {
             HStack(spacing: 10) {
                 Button {
                     withAnimation(.spring(response: 0.34, dampingFraction: 0.78)) {
@@ -416,20 +383,6 @@ public struct Studio3DView: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel("Camera view")
 
-                Button {
-                    isARWalkthroughPresented = true
-                    playSnapFeedback()
-                } label: {
-                    Text("AR")
-                        .font(.system(.caption, design: .rounded, weight: .heavy))
-                        .foregroundStyle(Color(red: 0x6D / 255.0, green: 0x45 / 255.0, blue: 0x31 / 255.0))
-                        .frame(width: 45, height: 45)
-                        .background {
-                            tactileCircleBackground(isCoralActive: false)
-                        }
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Launch 1:1 Life-Size AR Walkthrough")
 
                 if viewModel.currentStage.unlockedTools.contains(.inventoryArchive) && viewModel.currentStage != .harmony {
                     Button {
@@ -487,233 +440,28 @@ public struct Studio3DView: View {
     }
 
     private var cameraMenuPopover: some View {
-        let brown = Color(red: 0x6D / 255.0, green: 0x45 / 255.0, blue: 0x31 / 255.0)
-        let peach = Color(red: 0xFE / 255.0, green: 0xEE / 255.0, blue: 0xDE / 255.0)
-        let anglePresets = ViewportPreset.allCases.filter { $0 != .dollhouse }
-
-        return VStack(alignment: .leading, spacing: 2) {
-            ForEach(anglePresets) { preset in
-                Button {
-                    selectedCameraPreset = preset
-                    viewModel.snapToViewport?(preset)
-                    playSnapFeedback()
-                    withAnimation(.spring(response: 0.32, dampingFraction: 0.80)) {
-                        isCameraMenuPresented = false
-                    }
-                } label: {
-                    HStack(spacing: 12) {
-                        Image(systemName: "checkmark")
-                            .font(.system(size: 13, weight: .bold))
-                            .foregroundStyle(brown)
-                            .opacity(selectedCameraPreset == preset ? 1 : 0)
-                            .frame(width: 16)
-
-                        Image(systemName: preset.systemImage)
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(brown)
-                            .frame(width: 22)
-
-                        Text(preset.title)
-                            .font(.system(.subheadline, design: .rounded, weight: .bold))
-                            .foregroundStyle(brown)
-
-                        Spacer()
-                    }
-                    .padding(.horizontal, 16)
-                    .frame(minHeight: 40)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
+        StudioCameraMenuContent(selected: selectedCameraPreset) { preset in
+            selectedCameraPreset = preset
+            viewModel.snapToViewport?(preset)
+            playSnapFeedback()
+            withAnimation(.spring(response: 0.32, dampingFraction: 0.80)) {
+                isCameraMenuPresented = false
             }
-
-            Rectangle()
-                .fill(brown)
-                .frame(height: 1.5)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 6)
-
-            Button {
-                selectedCameraPreset = .dollhouse
-                viewModel.snapToViewport?(.dollhouse)
-                playSnapFeedback()
-                withAnimation(.spring(response: 0.32, dampingFraction: 0.80)) {
-                    isCameraMenuPresented = false
-                }
-            } label: {
-                HStack(spacing: 12) {
-                    Color.clear
-                        .frame(width: 16, height: 16)
-
-                    Image(systemName: "arrow.counterclockwise")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(brown)
-                        .frame(width: 22)
-
-                    Text("Reset Angle")
-                        .font(.system(.subheadline, design: .rounded, weight: .bold))
-                        .foregroundStyle(brown)
-
-                    Spacer()
-                }
-                .padding(.horizontal, 16)
-                .frame(minHeight: 40)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
         }
-        .padding(.vertical, 12)
-        .frame(width: 230)
-        .background(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(peach)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .stroke(brown, lineWidth: 2.5)
-        )
     }
 
-    @ViewBuilder
     private func tactileCircleBackground(isCoralActive: Bool) -> some View {
-        let border = Color(red: 0x6D / 255.0, green: 0x45 / 255.0, blue: 0x31 / 255.0)
-        let topHighlight = isCoralActive
-            ? Color(red: 0xFE / 255.0, green: 0xF6 / 255.0, blue: 0xED / 255.0)
-            : Color(red: 0xF9 / 255.0, green: 0xE4 / 255.0, blue: 0xC9 / 255.0)
-        let bottomLip = isCoralActive
-            ? Color(red: 0xD2 / 255.0, green: 0x7D / 255.0, blue: 0x5C / 255.0)
-            : Color(red: 0xE9 / 255.0, green: 0xC7 / 255.0, blue: 0x9D / 255.0)
-        let face = isCoralActive
-            ? Color(red: 0xFE / 255.0, green: 0xBC / 255.0, blue: 0xA3 / 255.0)
-            : Color(red: 0xFF / 255.0, green: 0xF7 / 255.0, blue: 0xE7 / 255.0)
-
-        ZStack {
-            Circle()
-                .fill(border)
-
-            ZStack {
-                VStack(spacing: 0) {
-                    topHighlight
-                    bottomLip
-                }
-
-                Circle()
-                    .fill(face)
-                    .padding(.top, 1.5)
-                    .padding(.bottom, 3)
-            }
-            .clipShape(Circle())
-            .padding(2)
-        }
-        .animation(.easeInOut(duration: 0.16), value: isCoralActive)
+        StudioTactileCircleBackground(active: isCoralActive)
     }
 
-    private enum StepStatus {
-        case done(Int)
-        case active(Int)
-        case upcoming(Int)
-    }
-
-    private func status(for stage: StageType, number: Int) -> StepStatus {
-        if viewModel.currentStage == stage {
-            return .active(number)
-        } else if room.isCompleted(stage) {
-            return .done(number)
-        } else {
-            return .upcoming(number)
-        }
-    }
-
-    private var progressSteps: [(title: String, status: StepStatus, stage: StageType?)] {
-        [
-            ("Scan", .done(1), nil),
-            ("Check", status(for: .audit, number: 2), .audit),
-            ("Rearrange", status(for: .rearrangement, number: 3), .rearrangement),
-            ("Lighting", status(for: .illumination, number: 4), .illumination),
-            ("Result", status(for: .harmony, number: 5), .harmony)
-        ]
-    }
-
-    @ViewBuilder
     private var stageProgressBar: some View {
-        if dynamicTypeSize.isAccessibilitySize {
-            Text(stageHeaderTitle)
-                .font(.custom("Cleanow", size: 22, relativeTo: .headline))
-                .foregroundStyle(Color.alcoveText)
-        } else {
-            let steps = progressSteps
-            HStack(alignment: .top, spacing: 6) {
-                ForEach(Array(steps.enumerated()), id: \.offset) { index, step in
-                    let stepLabel = VStack(spacing: 6) {
-                        ZStack {
-                            switch step.status {
-                            case .done(let number):
-                                Circle()
-                                    .fill(Color.alcoveProgressDone)
-                                Circle()
-                                    .stroke(Color.alcoveBorder, lineWidth: 2)
-                                Text("\(number)")
-                                    .font(.system(.headline, design: .rounded, weight: .bold))
-                                    .foregroundStyle(Color.alcoveText)
-                            case .active(let number):
-                                Circle()
-                                    .fill(Color.alcovePrimaryFill)
-                                Circle()
-                                    .stroke(Color.alcoveBorder, lineWidth: 2)
-                                Text("\(number)")
-                                    .font(.system(.headline, design: .rounded, weight: .bold))
-                                    .foregroundStyle(Color.alcoveText)
-                            case .upcoming(let number):
-                                Circle()
-                                    .fill(Color.alcoveProgressInactive)
-                                Circle()
-                                    .stroke(Color.alcoveMutedInk.opacity(0.45), lineWidth: 1.5)
-                                Text("\(number)")
-                                    .font(.system(.headline, design: .rounded, weight: .bold))
-                                    .foregroundStyle(Color.alcoveMutedInk.opacity(0.65))
-                            }
-                        }
-                        .frame(width: 40, height: 40)
-
-                        Text(step.title)
-                            .font(.system(.caption, design: .rounded, weight: .semibold))
-                            .foregroundStyle({
-                                switch step.status {
-                                case .done, .active: return Color.alcoveText
-                                case .upcoming: return Color.alcoveMutedInk.opacity(0.7)
-                                }
-                            }())
-                    }
-                    .frame(width: 66)
-                    .contentShape(Rectangle())
-
-                    if case .done = step.status, let targetStage = step.stage {
-                        Button {
-                            viewModel.switchToStage(targetStage)
-                            playSnapFeedback()
-                        } label: {
-                            stepLabel
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Go to \(step.title) stage")
-                    } else {
-                        stepLabel
-                    }
-
-                    if index < steps.count - 1 {
-                        let lineDone: Bool = {
-                            if case .done = step.status { return true }
-                            return false
-                        }()
-                        Capsule()
-                            .fill(lineDone ? Color.alcoveProgressDone : Color.alcoveMutedInk.opacity(0.3))
-                            .frame(maxWidth: 72)
-                            .frame(height: 2)
-                            .padding(.top, 19)
-                    }
-                }
-            }
-            .frame(maxWidth: 660)
-            .frame(maxWidth: .infinity)
+        StudioStageProgress(
+            stage: viewModel.currentStage,
+            room: room,
+            accessibilityTitle: stageHeaderTitle
+        ) { targetStage in
+            viewModel.switchToStage(targetStage)
+            playSnapFeedback()
         }
     }
 

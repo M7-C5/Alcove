@@ -49,7 +49,7 @@ public final class Studio3DViewModel {
     public var isWalkthroughActive: Bool = false
     public var walkthroughStepIndex: Int = 0
     public var walkthroughSteps: [WalkthroughStep] = []
-    public private(set) var seenWalkthroughStages: Set<StageType> = []
+    private var introducedStages: Set<StageType> = []
 
     public init(
         room: Room,
@@ -463,6 +463,7 @@ public final class Studio3DViewModel {
         isEvaluating = false
         room.completeStage(currentStage, score: result.score, feedback: result.dialogue)
         if let next = currentStage.nextStage {
+            dismissStageIntroduction()
             currentStage = next
             updateMascotGreeting()
             evaluationResult = nil
@@ -473,6 +474,12 @@ public final class Studio3DViewModel {
 
     public func switchToStage(_ stage: StageType) {
         guard room.isUnlocked(stage) else { return }
+        if stage != currentStage {
+            if stage.stageNumber < currentStage.stageNumber {
+                introducedStages.insert(stage)
+            }
+            dismissStageIntroduction()
+        }
         evaluationTask?.cancel()
         evaluationTask = nil
         isEvaluating = false
@@ -669,13 +676,13 @@ public final class Studio3DViewModel {
 
     // MARK: - Interactive Walkthrough Orchestration (Figma Image 1 & 2)
     public func startWalkthroughIfNeeded() {
-        guard !seenWalkthroughStages.contains(currentStage),
-              !room.isCompleted(currentStage) else { return }
         startWalkthrough()
     }
 
     public func startWalkthrough() {
-        seenWalkthroughStages.insert(currentStage)
+        // Completed stages remain introduction-free even in a new studio session.
+        guard !room.isCompleted(currentStage), !introducedStages.contains(currentStage) else { return }
+        introducedStages.insert(currentStage)
         walkthroughSteps = buildWalkthroughSteps(for: currentStage)
         walkthroughStepIndex = 0
         isWalkthroughActive = !walkthroughSteps.isEmpty
@@ -684,6 +691,13 @@ public final class Studio3DViewModel {
             mascotEmotion = first.emotion
             feedbackService.speak(first.text)
         }
+    }
+
+    private func dismissStageIntroduction() {
+        if isWalkthroughActive { feedbackService.stopSpeaking() }
+        isWalkthroughActive = false
+        walkthroughSteps = []
+        walkthroughStepIndex = 0
     }
 
     public func advanceWalkthrough() {
