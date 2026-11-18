@@ -462,4 +462,46 @@ struct AlcoveCoreTests {
         #expect(result.canAdvance == false)
         #expect(result.bottlenecks.contains { $0.severity == .critical && $0.title == "Collision" })
     }
+
+    @Test func longTableWithTuckedChairsDoesNotTriggerCollisionOrWalkwayWarning() {
+        let rulebook = FastPathRulebook()
+        let roomDims = (width: 4.5, length: 4.5)
+
+        let longTable = Furniture(
+            name: "Long Dining Table",
+            category: .table,
+            positionX: 0.0,
+            positionY: 0.0,
+            positionZ: 0.0,
+            rotationYaw: 0.0,
+            width: 1.9,
+            length: 0.95
+        )
+        let chairLeft = Furniture(
+            name: "Dining Chair 1",
+            category: .seating,
+            positionX: -0.45,
+            positionY: 0.0,
+            positionZ: 0.30,
+            rotationYaw: .pi,
+            width: 0.55,
+            length: 0.55
+        )
+        let chairRight = Furniture(
+            name: "Dining Chair 2",
+            category: .seating,
+            positionX: 0.45,
+            positionY: 0.0,
+            positionZ: 0.30,
+            rotationYaw: .pi,
+            width: 0.55,
+            length: 0.55
+        )
+
+        let warnings = rulebook.evaluateSpatialWarnings(
+            furnitures: [longTable, chairLeft, chairRight],
+            roomDimensions: roomDims
+        )
+        #expect(warnings.isEmpty)
+    }
 }
