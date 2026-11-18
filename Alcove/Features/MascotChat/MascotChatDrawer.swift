@@ -1,9 +1,11 @@
 import SwiftUI
+import UIKit
 
 /// Inline Otter chat overlay matching Alcove's 3D Figma inspector design.
 public struct MascotChatDrawer: View {
     @Environment(\.dismiss) private var dismiss
     @State private var viewModel: MascotChatViewModel
+    @State private var keyboardHeight: CGFloat = 0
     private let onClose: (() -> Void)?
 
     public init(
@@ -122,7 +124,7 @@ public struct MascotChatDrawer: View {
                                 }
                                 .frame(maxWidth: .infinity, alignment: .leading)
                             }
-                            .frame(maxHeight: 156)
+                            .frame(maxHeight: keyboardHeight > 0 ? 110 : 156)
                             .onChange(of: viewModel.chatHistory.count) {
                                 if let lastID = viewModel.chatHistory.last?.id {
                                     withAnimation(.easeOut(duration: 0.2)) {
@@ -159,7 +161,7 @@ public struct MascotChatDrawer: View {
                             .padding(.trailing, 58)
                             .padding(.top, 16)
                             .padding(.bottom, 34)
-                            .frame(maxWidth: .infinity, minHeight: 108, alignment: .topLeading)
+                            .frame(maxWidth: .infinity, minHeight: keyboardHeight > 0 ? 78 : 108, alignment: .topLeading)
                             .onSubmit {
                                 viewModel.sendMessage()
                             }
@@ -200,23 +202,10 @@ public struct MascotChatDrawer: View {
                         )
                     }
 
-                    // Bottom-Right Chevron Row to Dismiss Chat
-                    HStack {
-                        Spacer()
-                        Button(action: closeDrawer) {
-                            Image(systemName: "chevron.right")
-                                .font(.system(.title3, design: .rounded, weight: .bold))
-                                .foregroundStyle(Color.alcoveText)
-                                .frame(width: 44, height: 44)
-                                .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Close chat")
-                    }
                 }
                 .padding(.horizontal, 44)
                 .padding(.top, 38)
-                .padding(.bottom, 12)
+                .padding(.bottom, 26)
                 .frame(maxWidth: 980, alignment: .leading)
                 .background {
                     AlcoveTactileCardBackground(
@@ -241,9 +230,21 @@ public struct MascotChatDrawer: View {
                         .allowsHitTesting(false)
                 }
                 .padding(.horizontal, 40)
-                .padding(.bottom, 24)
+                .padding(.bottom, max(24, keyboardHeight + 16))
                 .safeAreaPadding(.bottom)
+                .animation(.easeOut(duration: 0.25), value: keyboardHeight)
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { notification in
+            guard let frame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect else { return }
+            let screenHeight = UIApplication.shared.connectedScenes
+                .compactMap { $0 as? UIWindowScene }
+                .first?.screen.bounds.height ?? frame.maxY
+            let overlap = max(0, screenHeight - frame.minY)
+            keyboardHeight = overlap
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+            keyboardHeight = 0
         }
     }
 
