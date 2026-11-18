@@ -63,15 +63,7 @@ public struct FurnitureCatalogSheet: View {
             .frame(maxHeight: 270)
         }
         .frame(width: 390)
-        .background(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(CatalogFigmaPalette.panelPeach)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .stroke(CatalogFigmaPalette.borderBrown, lineWidth: 2.5)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .background(CatalogFigmaPalette.panelPeach)
     }
 
     private var categoryFilterBar: some View {
