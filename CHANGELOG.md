@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Make completed stage stepper circles tappable except Scan.
 - Preserve numbered green stage progress and skip repeated walkthroughs.
 - Add interactive game-style step-by-step tutorial.
 - Render scanned 3D room thumbnails and wire full-screen scanner.
