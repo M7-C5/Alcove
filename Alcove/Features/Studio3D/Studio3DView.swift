@@ -42,17 +42,14 @@ public struct Studio3DView: View {
                         viewModel.triggerStageEvaluation()
                     },
                     isAdvancing: viewModel.isEvaluating,
-                    onSelectStage: { targetStage in
-                        viewModel.switchToStage(targetStage)
-                        playSnapFeedback()
-                    },
-                    onNextStage: {
-                        viewModel.triggerStageEvaluation()
-                    },
-                    onOpenChat: {
+                    onTapOtter: {
                         withAnimation(.easeInOut(duration: 0.2)) {
                             viewModel.showingChatDrawer = true
                         }
+                    },
+                    onSelectStage: { targetStage in
+                        viewModel.switchToStage(targetStage)
+                        playSnapFeedback()
                     }
                 ) {
                     viewModel.switchToStage(.rearrangement)
