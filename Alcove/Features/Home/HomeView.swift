@@ -38,36 +38,37 @@ public struct HomeView: View {
                     VStack(spacing: 0) {
                         // Top spacer positioned below the Alcove logo
                         Spacer()
-                            .frame(height: geometry.size.height * 0.47)
+                            .frame(height: geometry.size.height * 0.475)
 
-                        VStack(spacing: 18) {
-                            // "Scan Your Room" Header in Cleanow
-                            Text("Scan Your Room")
-                                .font(.custom("Cleanow", size: 32, relativeTo: .largeTitle))
+                        VStack(spacing: 12) {
+                            // "Let's Explore Your Room" Header in Cleanow
+                            Text("Let's Explore Your Room")
+                                .font(.custom("Cleanow", size: 42, relativeTo: .largeTitle))
                                 .foregroundStyle(.alcoveText)
                                 .multilineTextAlignment(.center)
+                                .lineLimit(1)
                                 .minimumScaleFactor(0.8)
 
                             // Explanatory Subtitle in SF Pro Rounded
-                            Text("Turn your space into a 3D\nroom with a single scan.")
-                                .font(.system(.title3, design: .rounded, weight: .semibold))
-                                .foregroundStyle(.alcoveText)
+                            Text("Start by scanning your room\nand see it come to life in 3D!")
+                                .font(.system(size: 28, weight: .semibold, design: .rounded))
+                                .foregroundStyle(Color.alcoveSubtitleInk)
                                 .multilineTextAlignment(.center)
                                 .lineSpacing(4)
                                 .minimumScaleFactor(0.85)
-                                .frame(maxWidth: 320)
+                                .frame(maxWidth: 360)
 
-                            // Chunky Tactile Pill "Start >" in Cleanow
-                            TactilePillButton(title: "Start >", accessibilityLabel: "Start") {
+                            // Chunky Tactile Pill "Start" with chevron in Cleanow
+                            TactilePillButton(title: "Start", accessibilityLabel: "Start", systemImage: "chevron.right") {
                                 viewModel.start()
                             }
-                            .padding(.top, 18)
+                            .padding(.top, 22)
                         }
-                        .frame(maxWidth: 340)
+                        .frame(maxWidth: 420)
 
                         Spacer(minLength: 16)
                     }
-                    .frame(width: geometry.size.width * 0.50)
+                    .frame(width: geometry.size.width * 0.475)
 
                     Spacer(minLength: 0)
                 }
