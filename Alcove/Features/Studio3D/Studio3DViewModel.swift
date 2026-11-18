@@ -42,6 +42,7 @@ public final class Studio3DViewModel {
     public var chatHistory: [ChatMessage] = []
     public var showingEvaluationSheet: Bool = false
     public var evaluationResult: StageEvaluationResult?
+    public private(set) var evaluationPresentationStage: StageType?
     public var isEvaluating: Bool = false
     /// Tracks if the room layout has been modified since the last stage evaluation (prevents redundant API calls)
     public private(set) var hasPendingLayoutChanges: Bool = true
@@ -443,6 +444,7 @@ public final class Studio3DViewModel {
             return nil
         }
         self.evaluationResult = result
+        self.evaluationPresentationStage = requestedStage
         self.hasPendingLayoutChanges = false
         self.isEvaluating = false
         self.showingEvaluationSheet = true
@@ -466,6 +468,12 @@ public final class Studio3DViewModel {
     }
 
     public func advanceToNextStage(result: StageEvaluationResult) {
+        guard !congratulationsAwaitingDismissal else { return }
+        let preserveClosingEvaluation = currentStage == .illumination && showingEvaluationSheet
+        if preserveClosingEvaluation {
+            evaluationPresentationStage = currentStage
+            evaluationResult = result
+        }
         evaluationTask?.cancel()
         evaluationTask = nil
         isEvaluating = false
@@ -479,7 +487,10 @@ public final class Studio3DViewModel {
                 showingEvaluationSheet = false
             }
             updateMascotGreeting()
-            evaluationResult = nil
+            if !preserveClosingEvaluation {
+                evaluationResult = nil
+                evaluationPresentationStage = nil
+            }
             hasPendingLayoutChanges = true
         }
         feedbackService.playNotification(.success)
@@ -487,8 +498,10 @@ public final class Studio3DViewModel {
 
     /// Called after the evaluation's dismissal animation, never underneath the departing sheet.
     public func evaluationSheetDidDismiss() {
-        guard congratulationsAwaitingDismissal else { return }
+        guard congratulationsAwaitingDismissal, !showingEvaluationSheet else { return }
         congratulationsAwaitingDismissal = false
+        evaluationResult = nil
+        evaluationPresentationStage = nil
         guard currentStage == .harmony else { return }
         showingCongratulations = true
     }
@@ -509,6 +522,7 @@ public final class Studio3DViewModel {
         currentStage = stage
         updateMascotGreeting()
         evaluationResult = nil
+        evaluationPresentationStage = nil
         hasPendingLayoutChanges = true
         feedbackService.playImpact(.soft)
     }

@@ -241,11 +241,33 @@ struct Studio3DViewModelTests {
         #expect(!vm.showingCongratulations)
         #expect(vm.congratulationsAwaitingDismissal)
         #expect(!vm.showingEvaluationSheet)
+        #expect(vm.evaluationPresentationStage == .illumination)
+        #expect(vm.evaluationResult?.dialogue == result.dialogue)
+        // A second tap during dismissal must not complete Stage 5 as well.
+        vm.advanceToNextStage(result: result)
+        #expect(!room.isCompleted(.harmony))
         vm.evaluationSheetDidDismiss()
         #expect(vm.showingCongratulations)
         #expect(!vm.congratulationsAwaitingDismissal)
+        #expect(vm.evaluationResult == nil)
+        #expect(vm.evaluationPresentationStage == nil)
         #expect(room.isCompleted(.illumination))
         #expect(!room.isCompleted(.harmony))
+    }
+
+    @Test func deferredCongratulationsCannotCoverANewEvaluation() async {
+        let room = SampleData.createStarterRoom()
+        let vm = Studio3DViewModel(room: room, stage: .illumination)
+        let result = await vm.mascotService.evaluateStage(stage: .illumination, room: room)
+        vm.showingEvaluationSheet = true
+        vm.advanceToNextStage(result: result)
+        vm.showingEvaluationSheet = true
+        vm.evaluationSheetDidDismiss()
+        #expect(!vm.showingCongratulations)
+        #expect(vm.congratulationsAwaitingDismissal)
+        vm.showingEvaluationSheet = false
+        vm.evaluationSheetDidDismiss()
+        #expect(vm.showingCongratulations)
     }
 
     @Test func navigatingAwayCancelsDeferredCongratulations() async {
