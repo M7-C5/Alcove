@@ -30,7 +30,7 @@ public struct Studio3DView: View {
     }
 
     public var body: some View {
-        Group {
+        ZStack {
             if viewModel.currentStage == .illumination {
                 LightingWorkspaceView(
                     room: room,
@@ -48,12 +48,38 @@ public struct Studio3DView: View {
                     },
                     onNextStage: {
                         viewModel.triggerStageEvaluation()
+                    },
+                    onOpenChat: {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            viewModel.showingChatDrawer = true
+                        }
                     }
                 ) {
                     viewModel.switchToStage(.rearrangement)
                 }
             } else {
                 furnitureStudio
+            }
+
+            // Inline Otter Chat Overlay over any active stage (including Lighting)
+            if viewModel.showingChatDrawer {
+                MascotChatDrawer(
+                    mascotService: viewModel.mascotService,
+                    feedbackService: viewModel.feedbackService,
+                    currentStage: viewModel.currentStage,
+                    room: viewModel.room,
+                    initialHistory: viewModel.chatHistory,
+                    onHistoryUpdated: { updated in
+                        viewModel.chatHistory = updated
+                    },
+                    onClose: {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            viewModel.showingChatDrawer = false
+                        }
+                    }
+                )
+                .transition(.opacity)
+                .zIndex(32)
             }
         }
         .fullScreenCover(isPresented: $isARWalkthroughPresented) {
@@ -276,26 +302,6 @@ public struct Studio3DView: View {
                     .zIndex(30)
                 }
 
-                // Inline Otter Chat Overlay over the 3D Room
-                if viewModel.showingChatDrawer {
-                    MascotChatDrawer(
-                        mascotService: viewModel.mascotService,
-                        feedbackService: viewModel.feedbackService,
-                        currentStage: viewModel.currentStage,
-                        room: viewModel.room,
-                        initialHistory: viewModel.chatHistory,
-                        onHistoryUpdated: { updated in
-                            viewModel.chatHistory = updated
-                        },
-                        onClose: {
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                viewModel.showingChatDrawer = false
-                            }
-                        }
-                    )
-                    .transition(.opacity)
-                    .zIndex(32)
-                }
             }
             .coordinateSpace(name: "Studio3DViewportSpace")
             .animation(.spring(response: 0.32, dampingFraction: 0.84), value: viewModel.isWalkthroughActive)
