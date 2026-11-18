@@ -2,29 +2,52 @@ import RealityKit
 import UIKit
 import simd
 
-/// A floor marker in room coordinates, so orbiting the camera never changes north.
+/// A floor decal in room coordinates. Camera movement never changes its north bearing.
 @MainActor
 enum RoomNorthMarker {
-    static func build(orientation: RoomCompassOrientation, width: Double, length: Double) -> Entity {
+    static func build(snapshot: LightingRoomSnapshot) -> Entity {
         let marker = Entity()
         marker.name = "RoomNorthMarker"
-        marker.position = [Float(-width / 2 + 0.5), 0.025, Float(length / 2 - 0.5)]
-        let direction = orientation.direction(forBearingDegrees: 0)
-        marker.orientation = simd_quatf(from: SIMD3<Float>(0, 0, -1), to: direction)
-        let material = UnlitMaterial(color: .systemBrown)
-        let shaft = ModelEntity(mesh: .generateBox(size: [0.035, 0.008, 0.32]), materials: [material])
-        marker.addChild(shaft)
+        let halfW = Float(snapshot.geometry.width / 2)
+        let halfL = Float(snapshot.geometry.length / 2)
+        let inset: Float = min(0.6, min(halfW, halfL) * 0.6)
+        let corners: [SIMD2<Float>] = [[-halfW + inset, -halfL + inset],
+                                      [-halfW + inset, halfL - inset],
+                                      [halfW - inset, -halfL + inset], [halfW - inset, halfL - inset]]
+        func occupied(_ point: SIMD2<Float>) -> Int {
+            snapshot.furnishings.filter { item in
+                let delta = point - SIMD2<Float>(item.position.x, item.position.z)
+                let x = delta.x * cos(item.yaw) - delta.y * sin(item.yaw)
+                let z = delta.x * sin(item.yaw) + delta.y * cos(item.yaw)
+                return abs(x) < item.dimensions.x / 2 + 0.3 && abs(z) < item.dimensions.z / 2 + 0.3
+            }.count
+        }
+        let position = corners.min { occupied($0) < occupied($1) } ?? .zero
+        marker.position = [position.x, 0.018, position.y]
+        let bearing = snapshot.compassOrientation?.magneticForwardBearingDegrees ?? 180
+        marker.orientation = simd_quatf(angle: Float(bearing * .pi / 180), axis: [0, 1, 0])
+
+        let ink = UnlitMaterial(color: UIColor(named: "AlcoveInk") ?? .brown)
+        var halo = UnlitMaterial(color: UIColor(named: "AlcoveSurfaceElevated") ?? .white)
+        halo.blending = .transparent(opacity: .init(floatLiteral: 0.55))
+        let disc = ModelEntity(mesh: .generateCylinder(height: 0.002, radius: 0.3), materials: [halo])
+        marker.addChild(disc)
+        let stem = ModelEntity(mesh: .generateBox(size: [0.028, 0.004, 0.28]), materials: [ink])
+        stem.position = [0, 0.004, 0.015]
+        marker.addChild(stem)
         for sign: Float in [-1, 1] {
-            let wing = ModelEntity(mesh: .generateBox(size: [0.035, 0.008, 0.17]), materials: [material])
-            wing.position = [sign * 0.055, 0, -0.11]
+            let wing = ModelEntity(mesh: .generateBox(size: [0.028, 0.004, 0.14]), materials: [ink])
+            wing.position = [sign * 0.045, 0.004, -0.085]
             wing.orientation = simd_quatf(angle: sign * .pi / 4, axis: [0, 1, 0])
             marker.addChild(wing)
         }
-        let label = ModelEntity(mesh: .generateText("N", extrusionDepth: 0.001,
-                                                   font: .boldSystemFont(ofSize: 0.12)), materials: [material])
-        label.orientation = simd_quatf(angle: -.pi / 2, axis: [1, 0, 0])
-        label.position = [-0.045, 0, -0.23]
-        marker.addChild(label)
+        let sample = snapshot.compassOrientation == nil
+        let text = ModelEntity(mesh: .generateText(sample ? "N?" : "N", extrusionDepth: 0.001,
+                                                  font: .boldSystemFont(ofSize: 0.095)), materials: [ink])
+        text.name = sample ? "NorthSampleLabel" : "NorthLabel"
+        text.orientation = simd_quatf(angle: -.pi / 2, axis: [1, 0, 0])
+        text.position = [sample ? -0.065 : -0.035, 0.006, -0.175]
+        marker.addChild(text)
         disableShadows(marker)
         return marker
     }
@@ -33,44 +56,5 @@ enum RoomNorthMarker {
         entity.components.set(DynamicLightShadowComponent(castsShadow: false))
         entity.components.set(GroundingShadowComponent(castsShadow: false))
         for child in entity.children { disableShadows(child) }
-    }
-}
-
-/// Screen overlay remains readable even when the floor marker is behind furniture or a cutaway wall.
-@MainActor
-final class RoomNorthIndicator: UIView {
-    private let arrow = UIImageView(image: UIImage(systemName: "arrow.up"))
-    private let label = UILabel()
-
-    override init(frame: CGRect) {
-        super.init(frame: frame)
-        isUserInteractionEnabled = false
-        backgroundColor = .secondarySystemBackground
-        layer.cornerRadius = 16
-        layer.borderWidth = 1
-        layer.borderColor = UIColor.systemBrown.withAlphaComponent(0.3).cgColor
-        arrow.tintColor = .systemBrown
-        arrow.contentMode = .scaleAspectFit
-        label.text = "N"
-        label.font = .preferredFont(forTextStyle: .caption1).withSize(14)
-        label.textAlignment = .center
-        label.textColor = .systemBrown
-        addSubview(arrow)
-        addSubview(label)
-        isAccessibilityElement = true
-        accessibilityLabel = "Magnetic north"
-    }
-
-    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
-
-    func update(in view: ARView, orientation: RoomCompassOrientation?, cameraOrientation: simd_quatf) {
-        guard let orientation else { isHidden = true; return }
-        isHidden = false
-        frame = CGRect(x: view.safeAreaInsets.left + 20, y: view.safeAreaInsets.top + 90, width: 64, height: 76)
-        let direction = cameraOrientation.inverse.act(orientation.direction(forBearingDegrees: 0))
-        arrow.transform = .identity
-        arrow.frame = CGRect(x: 17, y: 12, width: 30, height: 36)
-        arrow.transform = CGAffineTransform(rotationAngle: CGFloat(atan2(direction.x, direction.y)))
-        label.frame = CGRect(x: 0, y: 51, width: 64, height: 20)
     }
 }

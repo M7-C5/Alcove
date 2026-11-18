@@ -60,3 +60,9 @@ camera bearing without that transform would misalign north.
 
 - [Apple: Magnetic north reference frame](https://developer.apple.com/documentation/coremotion/cmattitudereferenceframe/xmagneticnorthzvertical)
 - [Apple: Processed device-motion data](https://developer.apple.com/documentation/coremotion/getting-processed-device-motion-data)
+
+### Shared studio daylight
+
+Audit/Rearrange and Lighting use one daylight rig: fixed room-space shadow projection, north-aligned sun pose, permanent cutaway ceiling occluder, and nonzero-opacity wall cutaways. The earlier stage previews use the same default 12:00 sample time as a newly opened Lighting session; changing the camera cannot change the sun or occluders. Saved fixture definitions reuse the Lighting model, optics, brightness and light-budget selection in those viewports. Earlier stages no longer add a separate overhead directional fill light.
+
+The existing educational arc runs from east (08:00) through south to west (20:00), relative to captured magnetic north. It is illustrative, without latitude/date/true-north declination inputs. Rooms without compass data retain their explicitly labelled sample orientation.

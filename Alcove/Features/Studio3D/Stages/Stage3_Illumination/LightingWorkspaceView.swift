@@ -10,13 +10,16 @@ struct LightingWorkspaceView: View {
     let onBack: () -> Void
     let isARPresented: Bool
     let onOpenAR: () -> Void
+    let onNextStage: () -> Void
+    let isAdvancing: Bool
+    let onTapOtter: () -> Void
     let onSelectStage: ((StageType) -> Void)?
+    @State private var otterTapTrigger = 0
     @State private var editor: LightingSetupViewModel
     @State private var preset: ViewportPreset = .top
     @State private var cameraRequestID = 0
     @State private var placement = LightingPlacementState()
     @State private var showingDelete = false
-    @State private var headerActionsWidth: CGFloat = 300
     @State private var headerOverlapped = false
     @State private var sourcesExpanded = true
     @State private var previewExpanded = true
@@ -24,7 +27,8 @@ struct LightingWorkspaceView: View {
     @State private var saveError: String?
 
     init(room: Room, settings: Binding<LightingSimulationSettings>, isARPresented: Bool,
-         onOpenAR: @escaping () -> Void,
+         onOpenAR: @escaping () -> Void, onNextStage: @escaping () -> Void,
+         isAdvancing: Bool = false, onTapOtter: @escaping () -> Void = {},
          onSelectStage: ((StageType) -> Void)? = nil,
          onBack: @escaping () -> Void) {
         self.room = room
@@ -32,6 +36,9 @@ struct LightingWorkspaceView: View {
         self.onBack = onBack
         self.isARPresented = isARPresented
         self.onOpenAR = onOpenAR
+        self.onNextStage = onNextStage
+        self.isAdvancing = isAdvancing
+        self.onTapOtter = onTapOtter
         self.onSelectStage = onSelectStage
         let editor = LightingSetupViewModel(room: room)
         editor.selectedID = editor.drafts.first?.id
@@ -52,28 +59,56 @@ struct LightingWorkspaceView: View {
                             editor.place(unitX: 0.5, unitZ: 0.5)
                         }
                 }
-                VStack(spacing: 10) {
-                    header
+                VStack(spacing: 12) {
+                    header.zIndex(30)
                     stageProgress
                         .opacity(headerOverlapped ? 0 : 1)
                         .accessibilityHidden(headerOverlapped)
+
                     Text(viewportPrompt)
                         .font(.caption)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 60)
+                        .padding(.top, 10)
                         .opacity(headerOverlapped ? 0 : 1)
                     Spacer(minLength: 0)
                     viewportControls
-                    Text(room.compassOrientation == nil ? "Sunlight preview · Sample direction" : "Sunlight preview · Aligned to magnetic north")
-                        .font(.caption2)
+//                    Text(room.compassOrientation == nil ? "Sunlight preview · Sample direction" : "Sunlight preview · Aligned to magnetic north")
+//                        .font(.caption2)
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, max(52, proxy.safeAreaInsets.top + 20))
+                .padding(.horizontal, 28)
+                .padding(.top, 16)
+                .safeAreaPadding(.top)
                 .padding(.bottom, max(32, proxy.safeAreaInsets.bottom + 12))
+                .animation(.easeInOut(duration: 0.2), value: headerOverlapped)
+                .zIndex(30)
 
                 floatingPanels(width: panelWidth, height: max(200, proxy.size.height - 262))
                     .padding(.top, 192)
                     .padding(.bottom, 70)
+
+                VStack {
+                    Spacer(minLength: 0)
+                    HStack {
+                        otterBadgeButton
+                        Spacer(minLength: 0)
+                    }
+                }
+                .padding(.leading, 24)
+                .padding(.bottom, 24)
+
+                VStack {
+                    Spacer(minLength: 0)
+                    HStack {
+                        Spacer(minLength: 0)
+                        StudioStageButton(title: "Next Stage", role: .next,
+                                          action: continueToNextStage)
+                            .disabled(isAdvancing)
+                            .accessibilityLabel("Save lighting and continue to next stage")
+                    }
+                }
+                .padding(.trailing, 20)
+                .padding(.bottom, max(24, proxy.safeAreaInsets.bottom + 12))
             }
 
         }
@@ -84,9 +119,27 @@ struct LightingWorkspaceView: View {
         .tint(LightingTheme.ink)
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
-        .confirmationDialog(editor.selectionCount > 1 ? "Delete \(editor.selectionCount) selected lights?" : "Delete this light?", isPresented: $showingDelete, titleVisibility: .visible) {
-            Button(editor.selectionCount > 1 ? "Delete \(editor.selectionCount) Lights" : "Delete Light", role: .destructive) { editor.deleteSelected() }
+        .overlay {
+            if showingDelete {
+                ZStack {
+                    Color.black.opacity(0.28).ignoresSafeArea()
+                    LayoutAlert(type: .delete, layoutName: .constant("this light source"),
+                                customTitle: editor.selectionCount > 1
+                                    ? "Are you sure you want to delete these light sources?"
+                                    : "Are you sure you want to delete this light source?",
+                                compact: true,
+                                onCancel: { showingDelete = false },
+                                onConfirm: {
+                                    editor.deleteSelected()
+                                    showingDelete = false
+                                })
+                }
+                .accessibilityAddTraits(.isModal)
+                .transition(.opacity)
+            }
         }
+        .animation(.easeInOut(duration: 0.2), value: showingDelete)
+        .buttonStyle(.plain)
         .alert("Could not save lights", isPresented: Binding(
             get: { saveError != nil }, set: { if !$0 { saveError = nil } }
         )) {
@@ -96,168 +149,77 @@ struct LightingWorkspaceView: View {
     }
 
     private var header: some View {
-        ZStack {
-            Text("Stage 4: Mark & Simulate Your Room Lighting")
-                .font(.custom("Cleanow", size: 36, relativeTo: .largeTitle))
-                .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity)
-                .padding(.horizontal, headerActionsWidth + 16)
-                .opacity(headerOverlapped ? 0 : 1)
-                .accessibilityHidden(headerOverlapped)
-
-            HStack {
-                Button(action: onBack) {
-                    HStack(spacing: 5) {
-                        Image(systemName: "chevron.left")
-                            .font(.system(.subheadline, design: .rounded, weight: .heavy))
-                        Text("Previous Stage")
-                            .font(.custom("Cleanow", size: 16, relativeTo: .subheadline))
-                    }
-                    .foregroundStyle(Color(red: 0x6D / 255.0, green: 0x45 / 255.0, blue: 0x31 / 255.0))
-                    .padding(.horizontal, 16)
-                    .frame(minWidth: 44, minHeight: 44)
-                    .background {
-                        ZStack {
-                            Capsule()
-                                .fill(Color(red: 0x6D / 255.0, green: 0x45 / 255.0, blue: 0x31 / 255.0))
-
-                            ZStack {
-                                VStack(spacing: 0) {
-                                    Color(red: 0xF9 / 255.0, green: 0xE4 / 255.0, blue: 0xC9 / 255.0)
-                                    Color(red: 0xE9 / 255.0, green: 0xC7 / 255.0, blue: 0x9D / 255.0)
-                                }
-
-                                Capsule()
-                                    .fill(Color(red: 0xFF / 255.0, green: 0xF7 / 255.0, blue: 0xE7 / 255.0))
-                                    .padding(.top, 2)
-                                    .padding(.bottom, 3.5)
-                            }
-                            .clipShape(Capsule())
-                            .padding(2)
-                        }
-                    }
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Previous Stage")
-                Spacer(minLength: 0)
-                HStack(spacing: 16) {
-                    TactilePillButton(title: "Save", size: .compact, systemImage: "checkmark", action: save)
-                        .disabled(!editor.hasUnsavedChanges)
-                        .opacity(editor.hasUnsavedChanges ? 1 : 0.55)
-                    StudioViewportActions(
-                        onSelectPreset: { preset = $0; cameraRequestID += 1 },
-                        onOpenAR: onOpenAR,
-                        cameraDisabled: placement.isActive,
-                        layoutOnly: $settings.layoutOnly
-                    )
-                }
-                .fixedSize(horizontal: true, vertical: false)
-                .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { headerActionsWidth = $0 }
+        StudioHeaderLayout(title: "Stage 4: Mark & Simulate Your Room Lighting", titleHidden: headerOverlapped) {
+            StudioStageButton(title: "Previous Stage", role: .previous) {
+                do {
+                    try editor.save(in: room, context: modelContext)
+                    onBack()
+                } catch { saveError = error.localizedDescription }
             }
-        }
-        .frame(maxWidth: .infinity)
-    }
-
-    @ViewBuilder private var stageProgress: some View {
-        if dynamicTypeSize.isAccessibilitySize {
-            Text("Step 4 of 5 · Lighting")
-                .font(.headline)
-                .frame(maxWidth: .infinity)
-        } else {
-            stageBadges
+        } actions: {
+            StudioViewportActions(
+                onSelectPreset: { preset = $0; cameraRequestID += 1 },
+                onOpenAR: onOpenAR,
+                cameraDisabled: placement.isActive,
+                layoutOnly: $settings.layoutOnly
+            )
         }
     }
 
-    private var stageBadges: some View {
-        let titles = ["Scan", "Check", "Rearrange", "Lighting", "Result"]
-        let completedColor = Color(red: 0.87, green: 0.87, blue: 0.69)
-        let upcomingColor = Color(red: 0.91, green: 0.91, blue: 0.91)
-        let upcomingInk = Color(red: 0.71, green: 0.71, blue: 0.71)
-        return HStack(alignment: .top, spacing: 8) {
-            ForEach(titles.indices, id: \.self) { index in
-                let active = index == 3
-                let stageType: StageType? = switch index {
-                case 1: .audit
-                case 2: .rearrangement
-                case 4: .harmony
-                default: nil
-                }
-                let completed: Bool = switch index {
-                case 0: true
-                case 1: room.isCompleted(.audit)
-                case 2: room.isCompleted(.rearrangement)
-                case 4: room.isCompleted(.harmony)
-                default: false
-                }
-                let badgeContent = VStack(spacing: 8) {
-                    ZStack {
-                        Circle().fill(completed ? completedColor : active ? Color.alcovePrimaryFill : upcomingColor)
-                        Circle().stroke(active || completed ? LightingTheme.ink : upcomingInk, lineWidth: 2)
-                        Text("\(index + 1)")
-                            .font(.custom("Cleanow", size: 24, relativeTo: .title2))
-                    }
-                    .foregroundStyle(active || completed ? LightingTheme.ink : upcomingInk)
-                    .frame(width: 56, height: 56)
-                    Text(titles[index])
-                        .font(.system(size: 14, weight: .semibold))
-                }
-                .frame(width: 76)
-                .contentShape(Rectangle())
-
-                Group {
-                    if completed, let stageType, let onSelectStage {
-                        Button {
-                            onSelectStage(stageType)
-                        } label: {
-                            badgeContent
-                        }
-                        .buttonStyle(.plain)
-                    } else {
-                        badgeContent
-                    }
-                }
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel("Step \(index + 1), \(titles[index]), \(completed ? "completed" : active ? "current" : "upcoming")")
-                .accessibilityAddTraits(active ? .isSelected : [])
-                if index < titles.count - 1 {
-                    Capsule()
-                        .fill(completed ? completedColor : upcomingInk)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 3)
-                        .padding(.top, 27)
-                }
-            }
-        }
-        .frame(maxWidth: 760)
-        .frame(maxWidth: .infinity)
+    private var stageProgress: some View {
+        StudioStageProgress(
+            stage: .illumination,
+            room: room,
+            accessibilityTitle: "Step 4 of 5 · Lighting",
+            onSelectStage: onSelectStage
+        )
     }
 
     private func floatingPanels(width: Double, height: Double) -> some View {
-        HStack(alignment: .top, spacing: 0) {
+        // Reserve a separate footer row for Otter and Next Stage. Both columns
+        // share this bottom edge rather than stretching Settings down to the button.
+        let columnHeight = max(200, height - min(112, max(0, height - 560)))
+        let previewHeight = min(225, height * 0.38)
+        let editingHeight = max(160, columnHeight - previewHeight - 20)
+        return HStack(alignment: .top, spacing: 0) {
             LightingCollapsiblePanel(title: "Your lights", expanded: $sourcesExpanded, edge: .leading, width: width) {
                 LightingSourcePanel(editor: editor, isAdding: placement.isActive, onAdd: togglePlacement)
-                    .frame(width: width, height: height)
+                    .frame(width: width, height: columnHeight)
             }
-            .frame(height: height)
+            .frame(height: columnHeight)
             Spacer(minLength: 0)
             VStack(alignment: .trailing, spacing: 20) {
                 LightingCollapsiblePanel(title: "Lighting preview", expanded: $previewExpanded, edge: .trailing, width: width) {
                     LightingSimulationPanel(settings: $settings,
                         activeFixtureCount: editor.drafts.filter { settings.output(for: $0) > 0 }.count)
-                    .frame(width: width, height: min(225, height * 0.38))
+                    .frame(width: width, height: previewHeight)
                 }
-                .frame(height: min(225, height * 0.38))
+                .frame(height: previewHeight)
                 LightingCollapsiblePanel(title: "Light settings", expanded: $editingExpanded, edge: .trailing, width: width) {
-                    LightingEditPanel(editor: editor, minimumHeight: max(160, height - min(225, height * 0.38) - 20),
+                    LightingEditPanel(editor: editor, minimumHeight: editingHeight,
                                       onDelete: { showingDelete = true })
-                    .frame(width: width, height: max(160, height - min(225, height * 0.38) - 20))
+                    .frame(width: width, height: editingHeight)
                 }
-                .frame(height: max(160, height - min(225, height * 0.38) - 20))
+                .frame(height: editingHeight)
             }
         }
         .padding(.horizontal, 16)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+
+    /// UI integration point only; the parent can supply the assistant action later.
+    private var otterBadgeButton: some View {
+        Button {
+            otterTapTrigger += 1
+            onTapOtter()
+        } label: {
+            OtterAvatarBadgeView(size: 72, showsQuestionBadge: true)
+                .frame(width: 72, height: 72)
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .sensoryFeedback(.impact(weight: .light), trigger: otterTapTrigger)
+        .accessibilityLabel("Otter assistant")
     }
 
     private var lightingPreview: some View {
@@ -312,8 +274,13 @@ struct LightingWorkspaceView: View {
         return "Tap a light to edit it. Drag the move icon to reposition it."
     }
 
-    private func save() {
-        do { try editor.save(in: room, context: modelContext) }
-        catch { saveError = error.localizedDescription }
+    private func continueToNextStage() {
+        guard !isAdvancing else { return }
+        do {
+            try editor.save(in: room, context: modelContext)
+            onNextStage()
+        } catch {
+            saveError = error.localizedDescription
+        }
     }
 }

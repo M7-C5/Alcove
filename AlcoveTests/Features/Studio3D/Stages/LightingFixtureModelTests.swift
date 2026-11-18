@@ -133,22 +133,38 @@ struct LightingFixtureModelTests {
         #expect(simd_distance(model.emitterPosition, mounted) < 0.001)
     }
 
+    @Test func ambientAndAccentFixturesIlluminateBroaderRoomAreas() throws {
+        for (kind, angle, radius): (LightKind, Float, Float) in [(.ceilingLight, 110, 15),
+                                                               (.pendantLight, 100, 12), (.wallLight, 90, 7.5)] {
+            let light = LightingFixtureLight(optics: LightingFixtureOptics(kind: kind))
+            let spot = try #require(light.entity as? SpotLight)
+            #expect(spot.light.outerAngleInDegrees == angle)
+            #expect(spot.light.attenuationRadius == radius)
+            #expect(spot.light.innerAngleInDegrees < spot.light.outerAngleInDegrees)
+        }
+    }
+
     @Test func taskLampUsesFocusedLightAndStandingLampUsesDiffuseLight() throws {
         let focused = LightingFixtureLight(optics: LightingFixtureOptics(kind: .deskLamp))
         let spot = try #require(focused.entity as? SpotLight)
-        #expect(spot.light.outerAngleInDegrees == 52)
+        #expect(spot.light.outerAngleInDegrees == 70)
         focused.apply(output: 1000, kelvin: 2700, enabled: true)
-        #expect(spot.isEnabled && spot.light.intensity == 12000)
+        #expect(spot.isEnabled && spot.light.intensity == 24000)
         let warm = spot.light.color
         focused.apply(output: 500, kelvin: 6500, enabled: true)
-        #expect(spot.light.intensity == 6000)
+        #expect(spot.light.intensity == 12000)
         #expect(spot.light.color != warm)
         focused.apply(output: 500, kelvin: 6500, enabled: false)
         #expect(!spot.isEnabled)
         focused.apply(output: 0, kelvin: 6500, enabled: true)
         #expect(!spot.isEnabled && spot.light.intensity == 0)
         let diffuse = LightingFixtureLight(optics: LightingFixtureOptics(kind: .standingLamp))
-        #expect(diffuse.entity is PointLight)
+        let point = try #require(diffuse.entity as? PointLight)
+        #expect(point.light.attenuationRadius == 10.5)
+        diffuse.apply(output: 1000, kelvin: 4000, enabled: true)
+        #expect(point.light.intensity == 24000)
+        diffuse.apply(output: 0, kelvin: 4000, enabled: true)
+        #expect(!point.isEnabled && point.light.intensity == 0)
     }
 
     @Test func colorAndBrightnessUpdateModelAndChangingKindReplacesOnlyFixture() throws {

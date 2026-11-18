@@ -2,18 +2,18 @@ import SwiftUI
 
 enum LightingTheme {
     static let background = Color("LightingBackground")
-    static let panel = Color("LightingPanel")
+    static let panel = Color.alcoveSurface
     static let border = Color("LightingBorder")
-    static let ink = Color("LightingInk")
-    static let accent = Color("LightingAccent")
+    static let ink = Color.alcoveInk
+    static let accent = Color.alcovePrimaryFill
     static let canvas = Color("LightingCanvas")
-    static let row = Color("LightingRow")
+    static let row = Color.alcoveSurfaceElevated
 }
 
 extension View {
     func lightingPanel() -> some View {
-        background(LightingTheme.panel, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 28, style: .continuous).stroke(LightingTheme.ink, lineWidth: 2.5))
+        background(LightingTheme.panel, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).stroke(LightingTheme.ink, lineWidth: 2.5))
     }
 }
 

@@ -46,7 +46,13 @@ struct MascotRoamControllerTests {
         )
 
         let controller = MascotRoamController()
-        controller.configureInitialPosition(roomSize: roomSize, obstacles: [bed])
+        // Ensure the Otter starts far enough from the bed approach point to visibly waddle
+        for _ in 0..<20 {
+            controller.configureInitialPosition(roomSize: roomSize, obstacles: [bed])
+            if simd_distance(controller.state.position, bed.center) > 1.5 {
+                break
+            }
+        }
         controller.focusOnFurniture(bed, roomSize: roomSize, obstacles: [bed])
 
         guard case .walking(let path, let lookAt) = controller.state.activity,

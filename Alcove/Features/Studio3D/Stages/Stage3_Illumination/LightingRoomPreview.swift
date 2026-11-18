@@ -158,14 +158,7 @@ final class LightingRoomScene: NSObject {
         root.addChild(camera)
         sun.name = "Sunlight"
         sun.light.intensity = 0
-        #if !targetEnvironment(simulator)
-        let span = Float(max(snapshot.geometry.width, snapshot.geometry.length, snapshot.geometry.height))
-        // A fixed projection stays anchored to the sun rather than following the camera frustum.
-        sun.shadow = DirectionalLightComponent.Shadow(
-            shadowProjection: .fixed(zNear: 0.01, zFar: span * 6, orthographicScale: span * 3),
-            depthBias: 1
-        )
-        #endif
+        StudioDaylightRig.configure(sun, geometry: snapshot.geometry)
         root.addChild(sun)
     }
 
@@ -189,22 +182,19 @@ final class LightingRoomScene: NSObject {
         let daylight = IlluminationSimulationEngine().calculateDaylight(hourOfDay: settings.hourOfDay)
         let fraction = settings.sunlightOn ? Float(daylight.intensityLux / 10000) : 0
         view.environment.lighting.intensityExponent = settings.layoutOnly || isPlacementMode ? 1 : -5 + fraction * 2
-        sun.isEnabled = settings.sunlightOn && !settings.layoutOnly && !isPlacementMode && fraction > 0
-        sun.light.intensity = Float(daylight.intensityLux)
-        sun.light.color = color(kelvin: daylight.kelvin)
-        let target: SIMD3<Float> = [0, 0, 0]
-        let distance = Float(max(snapshot.geometry.width, snapshot.geometry.length, snapshot.geometry.height)) * 3
-        let direction = IlluminationSimulationEngine().sunlightDirection(for: daylight, orientation: snapshot.compassOrientation)
-        let source = simd_normalize(direction) * distance
-        sun.look(at: target, from: source, relativeTo: root)
-        let renderedIDs = settings.renderedFixtureIDs(in: fixtureDefinitions)
+        StudioDaylightRig.update(sun, in: root, geometry: snapshot.geometry,
+                                 orientation: snapshot.compassOrientation, daylight: daylight,
+                                 enabled: settings.sunlightOn && !settings.layoutOnly && !isPlacementMode)
+        let renderedIDs = settings.renderedFixtureIDs(in: fixtureDefinitions,
+            maximumCount: StudioLightBudget.maximumFixtures(sunlightActive: sun.isEnabled))
         for fixture in fixtures {
             let output = settings.output(for: fixture.definition)
             fixture.model.present(onPlacementLayer: isPlacementMode ? placementHeight : nil)
             fixture.light.position(at: fixture.model.emitterPosition, direction: fixture.model.emissionDirection)
             let enabled = !isPlacementMode && renderedIDs.contains(fixture.definition.id)
             fixture.light.apply(output: output, kelvin: fixture.definition.colorTemperatureKelvin, enabled: enabled)
-            fixture.model.applyAppearance(output: enabled ? output : 0, kelvin: fixture.definition.colorTemperatureKelvin)
+            fixture.model.applyAppearance(output: isPlacementMode ? 0 : output,
+                                          kelvin: fixture.definition.colorTemperatureKelvin)
         }
     }
 
@@ -249,7 +239,7 @@ final class LightingRoomScene: NSObject {
             } else {
                 badge = UIImageView(image: UIImage(systemName: "arrow.up.and.down.and.arrow.left.and.right"))
                 badge.preferredSymbolConfiguration = .init(textStyle: .caption1)
-                badge.tintColor = UIColor(named: "LightingInk") ?? .label
+                badge.tintColor = UIColor(named: "AlcoveInk") ?? .label
                 badge.contentMode = .scaleAspectFit
                 badge.isUserInteractionEnabled = false
                 view.addSubview(badge)
@@ -348,19 +338,8 @@ final class LightingRoomScene: NSObject {
         let shell = ProceduralRoomShellBuilder.buildShell(width: geometry.width, length: geometry.length,
                                                         height: geometry.height, includeCeiling: false)
         root.addChild(shell)
-        // The dollhouse is visually open, but sunlight must see a closed roof.
-        // Reuse the architectural ceiling mesh and the same shadow-preserving cutaway
-        // opacity as the walls. Keep it outside wall groups so camera cutaways never disable it.
-        let roof = ProceduralRoomShellBuilder.buildCeiling(width: geometry.width + 0.24,
-                                                         length: geometry.length + 0.24, height: geometry.height)
-        roof.name = "SunlightRoofOccluder"
-        roof.components.set(OpacityComponent(opacity: 0.001))
-        roof.components.set(DynamicLightShadowComponent(castsShadow: true))
-        roof.components.set(GroundingShadowComponent(castsShadow: false))
-        root.addChild(roof)
-        if let orientation = snapshot.compassOrientation {
-            root.addChild(RoomNorthMarker.build(orientation: orientation, width: geometry.width, length: geometry.length))
-        }
+        root.addChild(RoomNorthMarker.build(snapshot: snapshot))
+        root.addChild(StudioDaylightRig.roofOccluder(geometry: geometry))
         let wallGroups: [(String, SIMD3<Float>)] = [
             ("FrontWallGroup", WallCutawayEvaluator.frontNormal),
             ("BackWallGroup", WallCutawayEvaluator.backNormal),
@@ -430,18 +409,7 @@ final class LightingRoomScene: NSObject {
         for wall in walls {
             let hidden = WallCutawayEvaluator.isWallHidden(wallNormal: wall.normal,
                                                            orientation: orientation, pitch: pitch)
-            if #available(iOS 18.0, *) {
-                // Avoid zero opacity: the renderer may discard the wall from the shadow pass.
-                // A visually imperceptible opacity keeps its geometry contributing to shadows.
-                wall.entity.isEnabled = true
-                if hidden {
-                    wall.entity.components.set(OpacityComponent(opacity: 0.001))
-                } else {
-                    wall.entity.components.remove(OpacityComponent.self)
-                }
-            } else {
-                wall.entity.isEnabled = !hidden
-            }
+            StudioDaylightRig.setCutaway(wall.entity, hidden: hidden)
         }
     }
 
@@ -538,13 +506,10 @@ final class LightingRoomScene: NSObject {
         onPlaceLight?(unit)
     }
 
-    private func color(kelvin: Int) -> UIColor {
-        let rgb = IlluminationSimulationEngine().blackbodyRGB(kelvin: kelvin)
-        return UIColor(red: rgb.red, green: rgb.green, blue: rgb.blue, alpha: 1)
-    }
+
 }
 
-/// A single real light per fixture keeps the viewport within its dynamic light budget.
+/// One real light per fixture; the device capability determines the active-light budget.
 @MainActor
 final class LightingFixtureLight {
     let entity: Entity
@@ -589,7 +554,7 @@ final class LightingFixtureLight {
         let rgb = IlluminationSimulationEngine().blackbodyRGB(kelvin: kelvin)
         let color = UIColor(red: rgb.red, green: rgb.green, blue: rgb.blue, alpha: 1)
         // Match viewport exposure; this is an educational preview, not calibrated photometry.
-        let intensity = Float(max(0, output)) * 12
+        let intensity = Float(max(0, output)) * 24
         spot?.light.color = color
         spot?.light.intensity = intensity
         point?.light.color = color
@@ -616,28 +581,28 @@ struct LightingFixtureOptics: Sendable {
             distribution = .focused
             direction = simd_normalize([0, -1, -0.35])
             emitterPosition = SIMD3<Float>(0, 0.40, -0.18) + direction * 0.015
-            innerAngle = 25; outerAngle = 52; reach = 4; height = 0.57
+            innerAngle = 35; outerAngle = 70; reach = 6; height = 0.57
         case .standingLamp:
             distribution = .diffuse
             emitterPosition = [0, 1.6, 0]; direction = [0, -1, 0]
-            innerAngle = 55; outerAngle = 85; reach = 7; height = 1.76
+            innerAngle = 55; outerAngle = 85; reach = 10.5; height = 1.76
         case .tableLamp:
             distribution = .diffuse
             emitterPosition = [0, 0.46, 0]; direction = [0, -1, 0]
-            innerAngle = 55; outerAngle = 85; reach = 4; height = 0.58
+            innerAngle = 55; outerAngle = 85; reach = 6; height = 0.58
         case .ceilingLight:
             distribution = .focused
             emitterPosition = [0, -0.07, 0]; direction = [0, -1, 0]
-            innerAngle = 55; outerAngle = 85; reach = 10; height = 0.08
+            innerAngle = 70; outerAngle = 110; reach = 15; height = 0.08
         case .pendantLight:
             distribution = .focused
             emitterPosition = [0, -0.68, 0]; direction = [0, -1, 0]
-            innerAngle = 38; outerAngle = 70; reach = 8; height = 0.68
+            innerAngle = 60; outerAngle = 100; reach = 12; height = 0.68
         case .wallLight:
             distribution = .focused
             direction = simd_normalize([0, -1, 0.35])
             emitterPosition = SIMD3<Float>(0, -0.1, 0.18) + direction * 0.015
-            innerAngle = 30; outerAngle = 65; reach = 5; height = 0.35
+            innerAngle = 45; outerAngle = 90; reach = 7.5; height = 0.35
         }
     }
 }
