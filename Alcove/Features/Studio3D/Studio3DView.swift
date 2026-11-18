@@ -159,11 +159,13 @@ public struct Studio3DView: View {
                     Color.black.opacity(0.001)
                         .ignoresSafeArea()
                         .onTapGesture {
-                            withAnimation(.easeInOut(duration: 0.16)) {
-                                isCameraMenuPresented = false
-                                viewModel.isFurnitureCatalogPresented = false
-                                viewModel.swapTargetFurnitureID = nil
+                            if isCameraMenuPresented {
+                                withAnimation(.easeInOut(duration: 0.16)) {
+                                    isCameraMenuPresented = false
+                                }
                             }
+                            viewModel.isFurnitureCatalogPresented = false
+                            viewModel.swapTargetFurnitureID = nil
                         }
                         .zIndex(27)
                 }
@@ -179,7 +181,7 @@ public struct Studio3DView: View {
                         }
                         Spacer()
                     }
-                    .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .topTrailing)))
+                    .transition(.identity)
                     .zIndex(28)
                 }
 
@@ -194,12 +196,10 @@ public struct Studio3DView: View {
                                 swapTarget: swapTarget,
                                 onSelectItem: { item in
                                     playSnapFeedback()
-                                    withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
-                                        if let target = swapTarget {
-                                            viewModel.swapFurniture(target, with: item)
-                                        } else {
-                                            viewModel.addFurniture(from: item)
-                                        }
+                                    if let target = swapTarget {
+                                        viewModel.swapFurniture(target, with: item)
+                                    } else {
+                                        viewModel.addFurniture(from: item)
                                     }
                                 },
                                 onDismiss: {
@@ -213,7 +213,7 @@ public struct Studio3DView: View {
                         }
                         Spacer()
                     }
-                    .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .topTrailing)))
+                    .transition(.identity)
                     .zIndex(28)
                 }
 
