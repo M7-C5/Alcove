@@ -104,15 +104,38 @@ struct LightingWorkspaceView: View {
 
             HStack {
                 Button(action: onBack) {
-                    Image(systemName: "chevron.left")
-                        .font(.headline.bold())
-                        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
-                        .frame(width: 44, height: 44)
-                        .background(LightingTheme.row, in: Circle())
-                        .overlay(Circle().stroke(LightingTheme.ink, lineWidth: 2))
+                    HStack(spacing: 5) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(.subheadline, design: .rounded, weight: .heavy))
+                        Text("Previous Stage")
+                            .font(.custom("Cleanow", size: 16, relativeTo: .subheadline))
+                    }
+                    .foregroundStyle(Color(red: 0x6D / 255.0, green: 0x45 / 255.0, blue: 0x31 / 255.0))
+                    .padding(.horizontal, 16)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .background {
+                        ZStack {
+                            Capsule()
+                                .fill(Color(red: 0x6D / 255.0, green: 0x45 / 255.0, blue: 0x31 / 255.0))
+
+                            ZStack {
+                                VStack(spacing: 0) {
+                                    Color(red: 0xF9 / 255.0, green: 0xE4 / 255.0, blue: 0xC9 / 255.0)
+                                    Color(red: 0xE9 / 255.0, green: 0xC7 / 255.0, blue: 0x9D / 255.0)
+                                }
+
+                                Capsule()
+                                    .fill(Color(red: 0xFF / 255.0, green: 0xF7 / 255.0, blue: 0xE7 / 255.0))
+                                    .padding(.top, 2)
+                                    .padding(.bottom, 3.5)
+                            }
+                            .clipShape(Capsule())
+                            .padding(2)
+                        }
+                    }
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Back")
+                .accessibilityLabel("Previous Stage")
                 Spacer(minLength: 0)
                 HStack(spacing: 16) {
                     TactilePillButton(title: "Save", size: .compact, systemImage: "checkmark", action: save)
@@ -149,19 +172,20 @@ struct LightingWorkspaceView: View {
         let upcomingInk = Color(red: 0.71, green: 0.71, blue: 0.71)
         return HStack(alignment: .top, spacing: 8) {
             ForEach(titles.indices, id: \.self) { index in
-                let completed = index < 3
                 let active = index == 3
+                let completed: Bool = switch index {
+                case 0: true
+                case 1: room.isCompleted(.audit)
+                case 2: room.isCompleted(.rearrangement)
+                case 4: room.isCompleted(.harmony)
+                default: false
+                }
                 VStack(spacing: 8) {
                     ZStack {
                         Circle().fill(completed ? completedColor : active ? Color.alcovePrimaryFill : upcomingColor)
                         Circle().stroke(active || completed ? LightingTheme.ink : upcomingInk, lineWidth: 2)
-                        if completed {
-                            Image(systemName: "checkmark")
-                                .font(.system(size: 23, weight: .semibold))
-                        } else {
-                            Text("\(index + 1)")
-                                .font(.custom("Cleanow", size: 24, relativeTo: .title2))
-                        }
+                        Text("\(index + 1)")
+                            .font(.custom("Cleanow", size: 24, relativeTo: .title2))
                     }
                     .foregroundStyle(active || completed ? LightingTheme.ink : upcomingInk)
                     .frame(width: 56, height: 56)
@@ -174,7 +198,7 @@ struct LightingWorkspaceView: View {
                 .accessibilityAddTraits(active ? .isSelected : [])
                 if index < titles.count - 1 {
                     Capsule()
-                        .fill(index < 3 ? completedColor : upcomingInk)
+                        .fill(completed ? completedColor : upcomingInk)
                         .frame(maxWidth: .infinity)
                         .frame(height: 3)
                         .padding(.top, 27)
