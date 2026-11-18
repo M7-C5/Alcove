@@ -42,14 +42,20 @@ public struct TactilePillButton: View {
             action()
         } label: {
             if size == .regular {
-                Text(title)
-                    .font(.custom("Cleanow", size: 32, relativeTo: .title))
-                    .foregroundStyle(.alcoveText)
+                HStack(spacing: 12) {
+                    Text(title)
+                        .font(.custom("Cleanow", size: 38, relativeTo: .title))
+                    if let systemImage {
+                        Image(systemName: systemImage)
+                            .font(.system(size: 32, weight: .heavy))
+                    }
+                }
+                .foregroundStyle(.alcoveText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
                     .padding(.horizontal, 44)
                     .padding(.vertical, 20)
-                    .frame(minWidth: 188, minHeight: 80)
+                    .frame(minWidth: 188, minHeight: 100)
                     .background {
                         // Outer border capsule wraps the inner clipped fill so
                         // the stroke never covers the top highlight or bottom rim crescents.
