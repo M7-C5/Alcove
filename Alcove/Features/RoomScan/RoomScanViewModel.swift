@@ -144,7 +144,6 @@ public final class RoomScanViewModel {
         roomName: String
     ) async {
         guard let room = prepareValidatedRoom(from: payload, roomName: roomName) else { return }
-        room.thumbnailData = await RoomThumbnailRenderer.renderThumbnailData(for: room)
         guard !isCancelled else { return }
         persistScannedRoom(room, in: modelContext)
     }
@@ -183,12 +182,9 @@ public final class RoomScanViewModel {
     public func loadMockRoom(modelContext: ModelContext, name: String = "Scanned Room") {
         state = .processing
         let room = MockRoomGenerator.generateBedroomOfficeCombo(name: name)
-        Task { @MainActor in
-            room.thumbnailData = await RoomThumbnailRenderer.renderThumbnailData(for: room)
-            modelContext.insert(room)
-            try? modelContext.save()
-            state = .completed(roomId: room.id)
-        }
+        modelContext.insert(room)
+        try? modelContext.save()
+        state = .completed(roomId: room.id)
     }
     #endif
 

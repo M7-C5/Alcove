@@ -70,16 +70,6 @@ public struct RoomScanView: View {
                 break
             }
         }
-        .alert("Scan Incomplete", isPresented: isShowingErrorAlert) {
-            Button("Try Again") {
-                viewModel.startScanning()
-            }
-            Button("Cancel", role: .cancel) {
-                viewModel.cancelScanning()
-            }
-        } message: {
-            Text(errorMessage)
-        }
     }
 
     private var scannerView: some View {
@@ -102,6 +92,7 @@ public struct RoomScanView: View {
 
             RoomScanOverlayView(
                 state: viewModel.state,
+                isHidingControls: viewModel.isShowingConfirmationAlert || isShowingErrorAlert.wrappedValue,
                 onDone: {
                     withAnimation(.easeInOut(duration: 0.24)) {
                         viewModel.requestFinishScanning()
@@ -132,6 +123,29 @@ public struct RoomScanView: View {
                     onYes: {
                         withAnimation(.easeInOut(duration: 0.24)) {
                             viewModel.confirmFinishScanning()
+                        }
+                    }
+                )
+                .offset(y: -36)
+                .transition(.opacity.combined(with: .scale(scale: 0.92)))
+                .zIndex(2)
+            } else if isShowingErrorAlert.wrappedValue {
+                Color.black.opacity(0.32)
+                    .ignoresSafeArea()
+                    .transition(.opacity)
+                    .zIndex(1)
+
+                RoomScanMascotAlert(
+                    title: "Scan Incomplete",
+                    message: errorMessage,
+                    secondaryTitle: "Cancel",
+                    onSecondary: {
+                        viewModel.cancelScanning()
+                    },
+                    primaryTitle: "Try Again",
+                    onPrimary: {
+                        withAnimation(.easeInOut(duration: 0.24)) {
+                            viewModel.startScanning()
                         }
                     }
                 )

@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import simd
 
 /// Maps sanitized RoomPlan capture payloads into Alcove's dual-layout `Room` model.
 public final class RoomCaptureMapper: Sendable {
@@ -19,6 +20,10 @@ public final class RoomCaptureMapper: Sendable {
             ? nil
             : RoomPlanSnapshot(walls: payload.walls, floorLevel: payload.floorLevel)
 
+        // RoomPlanSnapshot aligns local X along the longest wall (primaryWall) and Z perpendicular to it.
+        let roomWidth = snapshot != nil ? longerSide : shorterSide
+        let roomLength = snapshot != nil ? shorterSide : longerSide
+
         let sanitizedObjects = sanitizer.sanitize(
             objects: payload.objects,
             roomWidth: payload.roomWidth,
@@ -29,23 +34,34 @@ public final class RoomCaptureMapper: Sendable {
 
         var furnitures: [Furniture] = []
         for obj in sanitizedObjects {
-            let posX: Float
-            let posY: Float
-            let posZ: Float
+            let rawX: Float
+            let rawY: Float
+            let rawZ: Float
             let yaw: Float
 
             if let snapshot {
                 let local = snapshot.localCoordinates(worldX: obj.position.x, worldZ: obj.position.z)
-                posX = local.x
-                posZ = local.y
+                rawX = local.x
+                rawZ = local.y
                 yaw = snapshot.localYaw(obj.rotationYaw)
-                posY = max(0.0, obj.position.y - payload.floorLevel)
+                rawY = max(0.0, obj.position.y - payload.floorLevel)
             } else {
-                posX = obj.position.x
-                posY = max(0.0, obj.position.y - payload.floorLevel)
-                posZ = obj.position.z
+                rawX = obj.position.x
+                rawY = max(0.0, obj.position.y - payload.floorLevel)
+                rawZ = obj.position.z
                 yaw = obj.rotationYaw
             }
+
+            let objWidth = Double(max(0.25, obj.dimensions.x))
+            let objLength = Double(max(0.25, obj.dimensions.z))
+            let clamped = FurnitureTransformEngine.clampPosition(
+                position: SIMD3<Float>(rawX, rawY, rawZ),
+                furnitureWidth: Float(objWidth),
+                furnitureLength: Float(objLength),
+                rotationYaw: yaw,
+                roomWidth: Float(roomWidth),
+                roomLength: Float(roomLength)
+            )
 
             let mapped = Self.mapCategoryAndName(
                 sanitizedCategory: obj.category,
@@ -56,12 +72,12 @@ public final class RoomCaptureMapper: Sendable {
             let furniture = Furniture(
                 name: mapped.name,
                 category: mapped.category,
-                positionX: Double(posX),
-                positionY: Double(posY),
-                positionZ: Double(posZ),
+                positionX: Double(clamped.x),
+                positionY: Double(clamped.y),
+                positionZ: Double(clamped.z),
                 rotationYaw: Double(yaw),
-                width: Double(max(0.25, obj.dimensions.x)),
-                length: Double(max(0.25, obj.dimensions.z)),
+                width: objWidth,
+                length: objLength,
                 height: Double(max(0.25, obj.dimensions.y)),
                 isArchived: false,
                 isUserAdded: false
@@ -78,8 +94,8 @@ public final class RoomCaptureMapper: Sendable {
 
         let room = Room(
             name: roomName,
-            dimensionsWidth: shorterSide,
-            dimensionsLength: longerSide,
+            dimensionsWidth: roomWidth,
+            dimensionsLength: roomLength,
             dimensionsHeight: roomHeight,
             baselineLayout: baseline,
             workingLayout: working
