@@ -131,26 +131,40 @@ public struct StageEvaluationSheet: View {
 
                             VStack(alignment: .leading, spacing: 10) {
                                 ForEach(result.bottlenecks) { bottleneck in
+                                    let isCritical = bottleneck.severity == .critical
+                                    let cardFill: Color = switch bottleneck.severity {
+                                    case .critical: EvaluationReviewPalette.improveRed
+                                    case .warning: EvaluationReviewPalette.goldHighlight
+                                    case .notice: EvaluationReviewPalette.innerCream
+                                    }
+                                    let primaryInk: Color = isCritical ? .white : EvaluationReviewPalette.borderBrown
+                                    let secondaryInk: Color = isCritical ? .white.opacity(0.95) : EvaluationReviewPalette.borderBrown.opacity(0.88)
+                                    let iconName: String = switch bottleneck.severity {
+                                    case .critical: "exclamationmark.triangle.fill"
+                                    case .warning: "exclamationmark.circle.fill"
+                                    case .notice: "info.circle.fill"
+                                    }
+
                                     HStack(alignment: .top, spacing: 10) {
-                                        Image(systemName: "exclamationmark.triangle.fill")
+                                        Image(systemName: iconName)
                                             .font(.system(size: 16, weight: .bold))
-                                            .foregroundStyle(.white)
+                                            .foregroundStyle(primaryInk)
                                             .padding(.top, 2)
 
                                         VStack(alignment: .leading, spacing: 3) {
                                             Text(bottleneck.title)
                                                 .font(.system(.subheadline, design: .rounded, weight: .bold))
-                                                .foregroundStyle(.white)
+                                                .foregroundStyle(primaryInk)
                                             Text(bottleneck.detail)
                                                 .font(.system(.caption, design: .rounded, weight: .medium))
-                                                .foregroundStyle(.white.opacity(0.95))
+                                                .foregroundStyle(secondaryInk)
                                         }
                                     }
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                     .padding(14)
                                     .background(
                                         RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                            .fill(EvaluationReviewPalette.improveRed)
+                                            .fill(cardFill)
                                     )
                                     .overlay(
                                         RoundedRectangle(cornerRadius: 14, style: .continuous)
