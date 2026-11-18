@@ -45,6 +45,9 @@ public struct Studio3DView: View {
                     onSelectStage: { targetStage in
                         viewModel.switchToStage(targetStage)
                         playSnapFeedback()
+                    },
+                    onNextStage: {
+                        viewModel.triggerStageEvaluation()
                     }
                 ) {
                     viewModel.switchToStage(.rearrangement)
