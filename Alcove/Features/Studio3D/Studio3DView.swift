@@ -612,7 +612,7 @@ public struct Studio3DView: View {
             ("Check", status(for: .audit, number: 2), .audit),
             ("Rearrange", status(for: .rearrangement, number: 3), .rearrangement),
             ("Lighting", status(for: .illumination, number: 4), .illumination),
-            ("AR", status(for: .harmony, number: 5), .harmony)
+            ("Result", status(for: .harmony, number: 5), .harmony)
         ]
     }
 
