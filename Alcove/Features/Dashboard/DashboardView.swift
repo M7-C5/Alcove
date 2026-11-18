@@ -190,34 +190,6 @@ public struct DashboardView: View {
                 .foregroundStyle(Color.alcoveInk)
 
             Spacer()
-
-            Button {
-                viewModel.seedBedroomOfficeCombo(modelContext: modelContext)
-            } label: {
-                Label("Add Mock Room", systemImage: "plus.square.dashed")
-                    .font(.system(.subheadline, design: .rounded, weight: .semibold))
-                    .foregroundStyle(Color.alcoveInk)
-                    .padding(.horizontal, 14)
-                    .frame(minWidth: 44, minHeight: 44)
-                    .background(Color.alcoveSurface.opacity(0.92), in: Capsule())
-                    .overlay(Capsule().strokeBorder(Color.alcoveInk, lineWidth: 2))
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Add mock bedroom layout")
-
-            Button {
-                viewModel.startLightingTest()
-            } label: {
-                Label("Test Lighting", systemImage: "lightbulb.fill")
-                    .font(.system(.subheadline, design: .rounded, weight: .semibold))
-                    .foregroundStyle(Color.alcoveInk)
-                    .padding(.horizontal, 14)
-                    .frame(minWidth: 44, minHeight: 44)
-                    .background(Color.alcoveSurface.opacity(0.92), in: Capsule())
-                    .overlay(Capsule().strokeBorder(Color.alcoveInk, lineWidth: 2))
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Open lighting test playground")
         }
         .padding(.horizontal, 34)
         .padding(.top, 18)
@@ -288,6 +260,7 @@ public struct DashboardView: View {
     @ViewBuilder
     private func roomCard(for room: Room, cardWidth: CGFloat, cardHeight: CGFloat) -> some View {
         LayoutCardView(
+            room: room,
             layoutID: room.id,
             layoutName: room.name,
             thumbnailData: room.thumbnailData,
@@ -297,7 +270,7 @@ public struct DashboardView: View {
                 withAnimation(.easeInOut(duration: 0.18)) {
                     openMenuRoomID = nil
                 }
-                router.push(.stageList(room))
+                router.push(.studio(room: room, stage: room.currentStage))
             },
             onEdit: {
                 withAnimation(.easeInOut(duration: 0.18)) {

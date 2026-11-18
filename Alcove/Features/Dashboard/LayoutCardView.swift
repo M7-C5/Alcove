@@ -3,6 +3,7 @@ import UIKit
 
 struct LayoutCardView: View {
 
+    let room: Room?
     let layoutID: UUID
     let layoutName: String
     let thumbnailData: Data?
@@ -16,6 +17,7 @@ struct LayoutCardView: View {
     @Binding var openMenuLayoutID: UUID?
 
     init(
+        room: Room? = nil,
         layoutID: UUID,
         layoutName: String,
         thumbnailData: Data? = nil,
@@ -26,6 +28,7 @@ struct LayoutCardView: View {
         onDelete: @escaping () -> Void,
         openMenuLayoutID: Binding<UUID?>
     ) {
+        self.room = room
         self.layoutID = layoutID
         self.layoutName = layoutName
         self.thumbnailData = thumbnailData
@@ -237,7 +240,15 @@ struct LayoutCardView: View {
     // Room thumbnail
     @ViewBuilder
     private var roomThumbnail: some View {
-        if let thumbnailData, let renderedImage = UIImage(data: thumbnailData) {
+        if let room {
+            RoomThumbnail3DView(room: room)
+                .frame(
+                    width: cardWidth * 0.90,
+                    height: cardHeight * 0.70
+                )
+                .allowsHitTesting(false)
+                .clipped()
+        } else if let thumbnailData, let renderedImage = UIImage(data: thumbnailData) {
             Image(uiImage: renderedImage)
                 .resizable()
                 .scaledToFill()

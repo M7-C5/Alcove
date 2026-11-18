@@ -76,6 +76,18 @@ public final class Room {
         progress(for: stage)?.isCompleted ?? false
     }
 
+    /// Returns the active stage for this room: the first unlocked incomplete stage,
+    /// or `.harmony` if all stages are completed, falling back to `.audit`.
+    public var currentStage: StageType {
+        if let active = StageType.allCases.first(where: { isUnlocked($0) && !isCompleted($0) }) {
+            return active
+        }
+        if isCompleted(.harmony) || isUnlocked(.harmony) {
+            return .harmony
+        }
+        return StageType.allCases.last(where: { isUnlocked($0) }) ?? .audit
+    }
+
     public func completeStage(_ stage: StageType, score: Int, feedback: String) {
         if let current = progress(for: stage) {
             current.isCompleted = true
