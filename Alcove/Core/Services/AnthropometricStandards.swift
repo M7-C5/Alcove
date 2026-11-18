@@ -157,11 +157,15 @@ extension AnthropometricStandards {
         let isSeatingA = categoryA == .seating ||
             nameA.localizedCaseInsensitiveContains("chair") ||
             nameA.localizedCaseInsensitiveContains("sofa") ||
-            nameA.localizedCaseInsensitiveContains("seat")
+            nameA.localizedCaseInsensitiveContains("seat") ||
+            nameA.localizedCaseInsensitiveContains("stool") ||
+            nameA.localizedCaseInsensitiveContains("bench")
         let isSeatingB = categoryB == .seating ||
             nameB.localizedCaseInsensitiveContains("chair") ||
             nameB.localizedCaseInsensitiveContains("sofa") ||
-            nameB.localizedCaseInsensitiveContains("seat")
+            nameB.localizedCaseInsensitiveContains("seat") ||
+            nameB.localizedCaseInsensitiveContains("stool") ||
+            nameB.localizedCaseInsensitiveContains("bench")
 
         // 1. Task & Accent Lighting: Lamps standing beside seating (chairs, sofas) or resting on/beside surfaces (desks, tables, nightstands)
         // Karlen & Benya (Lighting Design Basics): Task lighting belongs in direct proximity to visual tasks (reading by a chair, working at a desk).
