@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Celebrate the Stage 4 to Stage 5 transition with a bounded Otter GIF, sparse, smooth center-out confetti bursts whose particles fall to the screen edges, and View My Room / Back to Home actions.
+
 - Make completed stage stepper circles tappable except Scan.
 - Preserve numbered green stage progress and skip repeated walkthroughs.
 - Add interactive game-style step-by-step tutorial.
@@ -77,6 +79,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Replace the clear-room preview mode with fixture visibility that preserves lighting; align the camera menu beside its button and remove native lamp-picker chrome.
+
 - Unify Lighting and studio header, progress, navigation, camera menus and quick-action styling; present north as a shadow-free floor decal.
 
 - Remove interactive game-style tutorial overlay.
@@ -97,6 +101,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Structure autonomous vertical slices with dedicated view models and components.
 
 ### Fixed
+
+- Predecode celebration textures off the main thread, wait for evaluation dismissal before presenting, and start playback after the fade to avoid first-frame stalls and clipping.
+
+- Stabilize spotlight shadow clipping and avoid redundant cutaway component writes while orbiting; use the requested orange for Lights and Sunlight toggles.
 
 - Return Lighting directly to Rearrange, suppress repeated Otter introductions on previous-stage navigation, and remove the viewport top inset.
 - Unify Lighting button fades, camera menus, lamp-type selection and Otter delete confirmation.
