@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Preserve numbered green stage progress and skip repeated walkthroughs.
 - Add interactive game-style step-by-step tutorial.
 - Render scanned 3D room thumbnails and wire full-screen scanner.
 - Add RoomPlan scanning view, overlay pills, and confirmation alert.
@@ -89,6 +90,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Remove close chevron and lift Otter chat above software keyboard.
+- Prevent Color.clear from expanding camera angle popover full height.
 - Pass isARPresented and onOpenAR to LightingWorkspaceView.
 - Block advance on live collisions and restyle bottom warning banner.
 - Preserve 44pt minimum hit targets on scaled scan buttons.
