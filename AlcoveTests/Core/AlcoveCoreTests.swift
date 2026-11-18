@@ -504,4 +504,44 @@ struct AlcoveCoreTests {
         )
         #expect(warnings.isEmpty)
     }
+
+    @Test func stage2EvaluationUsesWarningSeverityForYellowTightWalkway() async {
+        let sofa = Furniture(
+            name: "Sofa",
+            category: .seating,
+            positionX: 0.0,
+            positionY: 0.0,
+            positionZ: -0.9,
+            rotationYaw: 0.0,
+            width: 1.8,
+            length: 0.9
+        )
+        // 0.35m edge gap: tight walkway (yellow .caution), not physically colliding
+        let console = Furniture(
+            name: "Bookshelf",
+            category: .storage,
+            positionX: 0.0,
+            positionY: 0.0,
+            positionZ: -0.9 + 0.45 + 0.35 + 0.20,
+            rotationYaw: 0.0,
+            width: 1.2,
+            length: 0.4
+        )
+        let working = Layout(name: "Working", isBaseline: false, furnitures: [sofa, console])
+        let baseline = Layout(name: "Baseline", isBaseline: true, furnitures: [])
+        let room = Room(
+            name: "Tight Walkway Room",
+            dimensionsWidth: 4.5,
+            dimensionsLength: 4.5,
+            dimensionsHeight: 2.6,
+            baselineLayout: baseline,
+            workingLayout: working
+        )
+
+        let mascot = MockMascotAIService()
+        let result = await mascot.evaluateStage(stage: .rearrangement, room: room)
+        #expect(result.canAdvance == true)
+        #expect(!result.bottlenecks.isEmpty)
+        #expect(result.bottlenecks.allSatisfy { $0.severity == .warning })
+    }
 }
