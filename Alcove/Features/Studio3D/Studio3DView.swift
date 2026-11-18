@@ -322,54 +322,55 @@ public struct Studio3DView: View {
 
     private var studioHeader: some View {
         HStack(spacing: 12) {
-            Button {
-                switch viewModel.currentStage {
-                case .rearrangement:
-                    viewModel.switchToStage(.audit)
-                case .illumination:
-                    viewModel.switchToStage(.rearrangement)
-                case .harmony:
-                    viewModel.switchToStage(.illumination)
-                case .audit:
-                    if let router, !router.isEmpty {
-                        router.pop()
-                    } else {
-                        dismiss()
+            if viewModel.currentStage != .audit {
+                Button {
+                    switch viewModel.currentStage {
+                    case .rearrangement:
+                        viewModel.switchToStage(.audit)
+                    case .illumination:
+                        viewModel.switchToStage(.rearrangement)
+                    case .harmony:
+                        viewModel.switchToStage(.illumination)
+                    case .audit:
+                        break
                     }
-                }
-            } label: {
-                HStack(spacing: 5) {
-                    Image(systemName: "chevron.left")
-                        .font(.system(.subheadline, design: .rounded, weight: .heavy))
-                    Text("Previous Stage")
-                        .font(.custom("Cleanow", size: 16, relativeTo: .subheadline))
-                }
-                .foregroundStyle(Color(red: 0x6D / 255.0, green: 0x45 / 255.0, blue: 0x31 / 255.0))
-                .padding(.horizontal, 16)
-                .frame(minWidth: 44, minHeight: 44)
-                .background {
-                    ZStack {
-                        Capsule()
-                            .fill(Color(red: 0x6D / 255.0, green: 0x45 / 255.0, blue: 0x31 / 255.0))
-
+                } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(.subheadline, design: .rounded, weight: .heavy))
+                        Text("Previous Stage")
+                            .font(.custom("Cleanow", size: 16, relativeTo: .subheadline))
+                    }
+                    .foregroundStyle(Color(red: 0x6D / 255.0, green: 0x45 / 255.0, blue: 0x31 / 255.0))
+                    .padding(.horizontal, 16)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .background {
                         ZStack {
-                            VStack(spacing: 0) {
-                                Color(red: 0xF9 / 255.0, green: 0xE4 / 255.0, blue: 0xC9 / 255.0)
-                                Color(red: 0xE9 / 255.0, green: 0xC7 / 255.0, blue: 0x9D / 255.0)
-                            }
-
                             Capsule()
-                                .fill(Color(red: 0xFF / 255.0, green: 0xF7 / 255.0, blue: 0xE7 / 255.0))
-                                .padding(.top, 2)
-                                .padding(.bottom, 3.5)
+                                .fill(Color(red: 0x6D / 255.0, green: 0x45 / 255.0, blue: 0x31 / 255.0))
+
+                            ZStack {
+                                VStack(spacing: 0) {
+                                    Color(red: 0xF9 / 255.0, green: 0xE4 / 255.0, blue: 0xC9 / 255.0)
+                                    Color(red: 0xE9 / 255.0, green: 0xC7 / 255.0, blue: 0x9D / 255.0)
+                                }
+
+                                Capsule()
+                                    .fill(Color(red: 0xFF / 255.0, green: 0xF7 / 255.0, blue: 0xE7 / 255.0))
+                                    .padding(.top, 2)
+                                    .padding(.bottom, 3.5)
+                            }
+                            .clipShape(Capsule())
+                            .padding(2)
                         }
-                        .clipShape(Capsule())
-                        .padding(2)
                     }
                 }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Previous Stage")
+            } else {
+                Color.clear
+                    .frame(width: 100, height: 44)
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Previous Stage")
 
             Text(stageHeaderTitle)
                 .font(.custom("Cleanow", size: 32, relativeTo: .title))
