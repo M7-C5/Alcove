@@ -357,6 +357,22 @@ public struct Studio3DView: View {
 
     private var studioHeader: some View {
         StudioHeaderLayout(title: stageHeaderTitle) {
+            Button {
+                if let router {
+                    router.popToRoot()
+                } else {
+                    dismiss()
+                }
+                playSnapFeedback()
+            } label: {
+                Image(systemName: "house")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(Color(red: 0x6D / 255.0, green: 0x45 / 255.0, blue: 0x31 / 255.0))
+                    .frame(width: 45, height: 45)
+                    .background { tactileCircleBackground(isCoralActive: false) }
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Home")
             if viewModel.currentStage != .audit {
                 StudioStageButton(title: "Previous Stage", role: .previous) {
                     switch viewModel.currentStage {
