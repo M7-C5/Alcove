@@ -22,6 +22,7 @@ public struct Studio3DView: View {
     @State private var viewportFrame: CGRect = .zero
     @State private var isCameraMenuPresented: Bool = false
     @State private var selectedCameraPreset: ViewportPreset = .dollhouse
+    @State private var congratulationsAssets = CongratulationsAssetStore()
 
     public init(room: Room, stage: StageType = .rearrangement) {
         self.room = room
@@ -79,10 +80,35 @@ public struct Studio3DView: View {
                 .zIndex(32)
             }
         }
+        .overlay {
+            if viewModel.showingCongratulations {
+                RoomCongratulationsView(assets: congratulationsAssets, onViewRoom: {
+                    viewModel.showingCongratulations = false
+                    isARWalkthroughPresented = true
+                }, onBackHome: {
+                    viewModel.showingCongratulations = false
+                    if let router { router.popToRoot() } else { dismiss() }
+                })
+                .transition(.opacity)
+                .zIndex(100)
+            }
+        }
+        .task(id: viewModel.currentStage == .illumination) {
+            if viewModel.currentStage == .illumination {
+                await congratulationsAssets.prepare()
+            }
+        }
+
         .fullScreenCover(isPresented: $isARWalkthroughPresented) {
             ARWalkthroughView(room: room)
         }
-        .sheet(isPresented: $viewModel.showingEvaluationSheet) {
+        .sheet(isPresented: $viewModel.showingEvaluationSheet, onDismiss: {
+            guard viewModel.congratulationsAwaitingDismissal else { return }
+            Task {
+                await congratulationsAssets.prepare()
+                viewModel.evaluationSheetDidDismiss()
+            }
+        }) {
             if let result = viewModel.evaluationResult {
                 StageEvaluationSheet(
                     result: result,

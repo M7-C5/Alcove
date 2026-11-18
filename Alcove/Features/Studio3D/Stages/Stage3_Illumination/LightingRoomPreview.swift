@@ -181,13 +181,14 @@ final class LightingRoomScene: NSObject {
         previousSettings = settings
         let daylight = IlluminationSimulationEngine().calculateDaylight(hourOfDay: settings.hourOfDay)
         let fraction = settings.sunlightOn ? Float(daylight.intensityLux / 10000) : 0
-        view.environment.lighting.intensityExponent = settings.layoutOnly || isPlacementMode ? 1 : -5 + fraction * 2
+        view.environment.lighting.intensityExponent = isPlacementMode ? 1 : -5 + fraction * 2
         StudioDaylightRig.update(sun, in: root, geometry: snapshot.geometry,
                                  orientation: snapshot.compassOrientation, daylight: daylight,
-                                 enabled: settings.sunlightOn && !settings.layoutOnly && !isPlacementMode)
+                                 enabled: settings.sunlightOn && !isPlacementMode)
         let renderedIDs = settings.renderedFixtureIDs(in: fixtureDefinitions,
             maximumCount: StudioLightBudget.maximumFixtures(sunlightActive: sun.isEnabled))
         for fixture in fixtures {
+            fixture.model.root.isEnabled = settings.showsLightFixtures
             let output = settings.output(for: fixture.definition)
             fixture.model.present(onPlacementLayer: isPlacementMode ? placementHeight : nil)
             fixture.light.position(at: fixture.model.emitterPosition, direction: fixture.model.emissionDirection)
@@ -228,6 +229,10 @@ final class LightingRoomScene: NSObject {
     }
 
     func updateMoveBadges(in view: ARView) {
+        guard previousSettings?.showsLightFixtures != false else {
+            removeMoveBadges()
+            return
+        }
         for id in Array(moveBadges.keys) where !selectedIDs.contains(id) {
             moveBadges.removeValue(forKey: id)?.removeFromSuperview()
         }
@@ -454,6 +459,7 @@ final class LightingRoomScene: NSObject {
     }
 
     private func fixtureID(at point: CGPoint, in view: ARView) -> UUID? {
+        guard previousSettings?.showsLightFixtures != false else { return nil }
         if let badge = moveBadges.first(where: { !$0.value.isHidden && $0.value.frame.insetBy(dx: -13, dy: -13).contains(point) }) {
             return badge.key
         }
@@ -525,9 +531,6 @@ final class LightingFixtureLight {
             spot = light
             point = nil
             entity = light
-            #if !targetEnvironment(simulator)
-            light.components.set(SpotLightComponent.Shadow())
-            #endif
         case .diffuse:
             let light = PointLight()
             point = light
@@ -542,6 +545,19 @@ final class LightingFixtureLight {
         spot?.light.outerAngleInDegrees = optics.outerAngle
         spot?.light.attenuationRadius = optics.reach
         point?.light.attenuationRadius = optics.reach
+        #if !targetEnvironment(simulator)
+        if let spot { spot.components.set(Self.shadowConfiguration(for: optics)) }
+        #endif
+    }
+
+    /// Room-space clipping stays fixed when the camera cuts walls away.
+    /// Keep the full cone in the shadow map, including surfaces close to wall sconces.
+    static func shadowConfiguration(for optics: LightingFixtureOptics) -> SpotLightComponent.Shadow {
+        var shadow = SpotLightComponent.Shadow()
+        shadow.zNear = .fixed(0.01)
+        shadow.zFar = .fixed(max(0.02, optics.reach))
+        shadow.depthBias = 1
+        return shadow
     }
 
     func position(at position: SIMD3<Float>, direction: SIMD3<Float>) {

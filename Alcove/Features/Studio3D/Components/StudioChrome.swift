@@ -138,20 +138,24 @@ struct StudioStageButton: View {
     let role: Role
     var systemImage: String? = nil
     var fillsWidth = false
+    var showsNavigationChevron = true
+    var fontSize: CGFloat? = nil
+    var minimumHeight: CGFloat = 44
     let action: () -> Void
     var body: some View {
         Button(action: action) {
             HStack(spacing: 6) {
                 if role == .previous { Image(systemName: "chevron.left") }
                 if role == .add { Image(systemName: systemImage ?? "plus.circle") }
-                Text(title).font(.custom("Cleanow", size: role == .next ? 17 : 16, relativeTo: .subheadline))
+                else if let systemImage { Image(systemName: systemImage) }
+                Text(title).font(.custom("Cleanow", size: fontSize ?? (role == .next ? 17 : 16), relativeTo: .subheadline))
                     .contentTransition(.opacity)
-                if role == .next { Image(systemName: "chevron.right") }
+                if role == .next && showsNavigationChevron { Image(systemName: "chevron.right") }
             }
             .font(.system(.subheadline, design: .rounded, weight: .heavy))
             .foregroundStyle(Color.alcoveInk)
             .padding(.horizontal, role == .next ? 20 : 16)
-            .frame(minWidth: 44, minHeight: 44)
+            .frame(minWidth: 44, minHeight: minimumHeight)
             .frame(maxWidth: fillsWidth ? .infinity : nil)
             .background {
                 ZStack {
@@ -194,7 +198,6 @@ struct StudioTactileCircleBackground: View {
 struct StudioCameraMenuContent: View {
     let selected: ViewportPreset
     let onSelect: (ViewportPreset) -> Void
-    var layoutOnly: Binding<Bool>? = nil
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             ForEach(ViewportPreset.allCases.filter { $0 != .dollhouse }) { preset in
@@ -202,11 +205,7 @@ struct StudioCameraMenuContent: View {
             }
             Rectangle().fill(Color.alcoveInk).frame(height: 1.5).padding(.horizontal, 14).padding(.vertical, 6)
             row(.dollhouse)
-            if let layoutOnly {
-                Toggle("Show room clearly", isOn: layoutOnly)
-                    .font(.system(.subheadline, design: .rounded, weight: .bold))
-                    .padding(.horizontal, 16).frame(minHeight: 44)
-            }
+
         }
         .padding(.vertical, 12).frame(width: 230)
         .foregroundStyle(Color.alcoveInk)

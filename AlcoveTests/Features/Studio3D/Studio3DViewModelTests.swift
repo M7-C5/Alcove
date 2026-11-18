@@ -136,6 +136,7 @@ struct Studio3DViewModelTests {
 
         #expect(room.isCompleted(.audit) == true)
         #expect(vm.currentStage == .rearrangement)
+        #expect(!vm.showingCongratulations)
     }
 
     @Test func evaluationCachingReusesResultUntilLayoutChanges() async {
@@ -228,6 +229,51 @@ struct Studio3DViewModelTests {
 
         let report = vm.currentIlluminationReport
         #expect(report.daylightState.hour == 12.0)
+    }
+
+    @Test func advancingFromLightingPresentsCongratulationsOverStageFive() async {
+        let room = SampleData.createStarterRoom()
+        let vm = Studio3DViewModel(room: room, stage: .illumination)
+        let result = await vm.mascotService.evaluateStage(stage: .illumination, room: room)
+        vm.showingEvaluationSheet = true
+        vm.advanceToNextStage(result: result)
+        #expect(vm.currentStage == .harmony)
+        #expect(!vm.showingCongratulations)
+        #expect(vm.congratulationsAwaitingDismissal)
+        #expect(!vm.showingEvaluationSheet)
+        vm.evaluationSheetDidDismiss()
+        #expect(vm.showingCongratulations)
+        #expect(!vm.congratulationsAwaitingDismissal)
+        #expect(room.isCompleted(.illumination))
+        #expect(!room.isCompleted(.harmony))
+    }
+
+    @Test func navigatingAwayCancelsDeferredCongratulations() async {
+        let room = SampleData.createStarterRoom()
+        room.completeStage(.audit, score: 90, feedback: "Passed")
+        room.completeStage(.rearrangement, score: 90, feedback: "Passed")
+        let vm = Studio3DViewModel(room: room, stage: .illumination)
+        let result = await vm.mascotService.evaluateStage(stage: .illumination, room: room)
+        vm.showingEvaluationSheet = true
+        vm.advanceToNextStage(result: result)
+        vm.switchToStage(.illumination)
+        vm.evaluationSheetDidDismiss()
+        #expect(!vm.showingCongratulations)
+        #expect(!vm.congratulationsAwaitingDismissal)
+    }
+
+    @Test func completingCurriculumDoesNotRepeatLightingCongratulations() {
+        let room = SampleData.createStarterRoom()
+        let vm = Studio3DViewModel(room: room, stage: .harmony)
+        vm.showingEvaluationSheet = true
+        vm.showingScorecardSheet = true
+        #expect(!vm.showingCongratulations)
+        vm.completeHarmonyCurriculum()
+        #expect(!vm.showingCongratulations)
+        #expect(room.isCompleted(.harmony))
+        #expect(!vm.showingEvaluationSheet)
+        #expect(!vm.showingScorecardSheet)
+        #expect(vm.mascotEmotion == .celebrating)
     }
 
     @Test func harmonyMetricsComputation() {
