@@ -173,12 +173,13 @@ public struct Studio3DView: View {
                 }
 
                 if isCameraMenuPresented {
+                    let cameraTrailing: CGFloat = viewModel.canManipulateFurniture ? 193 : 83
                     VStack {
                         HStack {
                             Spacer()
                             cameraMenuPopover
-                                .padding(.trailing, 24)
-                                .padding(.top, 12)
+                                .padding(.trailing, cameraTrailing)
+                                .padding(.top, 16)
                                 .safeAreaPadding(.top)
                         }
                         Spacer()
@@ -216,8 +217,8 @@ public struct Studio3DView: View {
                                     }
                                 }
                             )
-                            .padding(.trailing, 24)
-                            .padding(.top, 12)
+                            .padding(.trailing, 28)
+                            .padding(.top, 16)
                             .safeAreaPadding(.top)
                         }
                         Spacer()
