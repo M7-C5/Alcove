@@ -5,7 +5,7 @@ struct LightingSimulationSettings: Equatable, Sendable {
     var artificialLightsOn = true
     var sunlightOn = true
     var minuteOfDay = 12 * 60
-    var layoutOnly = false
+    var showsLightFixtures = true
 
     var clampedMinute: Int { min(1439, max(0, minuteOfDay)) }
     var hourOfDay: Double { Double(clampedMinute) / 60 }
@@ -14,7 +14,7 @@ struct LightingSimulationSettings: Equatable, Sendable {
     }
 
     func output(for fixture: LightFixture) -> Double {
-        guard artificialLightsOn, fixture.isOn, !layoutOnly, fixture.lumens.isFinite else { return 0 }
+        guard artificialLightsOn, fixture.isOn, fixture.lumens.isFinite else { return 0 }
         return max(0, fixture.lumens)
     }
 

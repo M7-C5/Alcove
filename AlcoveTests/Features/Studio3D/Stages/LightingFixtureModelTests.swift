@@ -6,6 +6,47 @@ import simd
 
 @Suite("Lighting fixture models") @MainActor
 struct LightingFixtureModelTests {
+    @Test(arguments: [LightKind.ceilingLight, .pendantLight, .wallLight])
+    func spotlightShadowsUseFixedClippingForEntireLightCone(kind: LightKind) {
+        let optics = LightingFixtureOptics(kind: kind)
+        let shadow = LightingFixtureLight.shadowConfiguration(for: optics)
+        #expect(shadow.zNear == .fixed(0.01))
+        #expect(shadow.zFar == .fixed(optics.reach))
+        #expect(shadow.depthBias == 1)
+    }
+
+    @Test func everyLampRemainsEnabledAcrossCutawayCameraChanges() throws {
+        let room = MockRoomGenerator.generateBedroomOfficeCombo()
+        let kinds: [LightKind] = [.wallLight, .pendantLight, .ceilingLight]
+        let fixtures = (0..<15).map { index in
+            LightFixture(name: "Lamp \(index)", layer: .ambient,
+                         positionX: index.isMultiple(of: 2) ? -1.8 : 1.8,
+                         positionZ: Double(index % 5) * 0.6 - 1.2,
+                         elevationY: 1.8, kind: kinds[index % kinds.count])
+        }
+        room.workingLayout?.lightFixtures = fixtures
+        let scene = LightingRoomScene(snapshot: LightingRoomSnapshot(room: room))
+        let view = ARView(frame: .zero, cameraMode: .nonAR, automaticallyConfigureSession: false)
+        let settings = LightingSimulationSettings()
+        scene.apply(settings, preset: .front, in: view)
+        let lights = try fixtures.map { fixture in
+            try #require(scene.root.findEntity(named: "LightingFixture-\(fixture.id)") as? SpotLight)
+        }
+        let transforms = lights.map(\.transform)
+        let intensities = lights.map { $0.light.intensity }
+        let limit = StudioLightBudget.maximumFixtures(sunlightActive: true)
+        let active = settings.renderedFixtureIDs(in: fixtures, maximumCount: limit)
+        for preset in ViewportPreset.allCases + ViewportPreset.allCases.reversed() {
+            scene.apply(settings, preset: preset, in: view)
+            for (index, light) in lights.enumerated() {
+                #expect(light.isEnabled == active.contains(fixtures[index].id))
+                #expect(light.transform == transforms[index])
+                #expect(light.light.intensity == intensities[index])
+                #expect(scene.root.findEntity(named: light.name) === light)
+            }
+        }
+    }
+
     @Test func previewUsesSharedShellAndDetailedFurnitureWithoutRebuildingOnFixtureEdits() throws {
         let room = MockRoomGenerator.generateBedroomOfficeCombo()
         let snapshot = LightingRoomSnapshot(room: room)

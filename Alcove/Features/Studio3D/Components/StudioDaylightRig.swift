@@ -41,10 +41,12 @@ enum StudioDaylightRig {
 
     static func setCutaway(_ entity: Entity, hidden: Bool) {
         // Camera cutaways affect visibility, never the geometry in the shadow pass.
-        entity.isEnabled = true
+        if !entity.isEnabled { entity.isEnabled = true }
+        let opacity = entity.components[OpacityComponent.self]?.opacity
         if hidden {
+            guard opacity != cutawayOpacity else { return }
             entity.components.set(OpacityComponent(opacity: cutawayOpacity))
-        } else {
+        } else if opacity != nil {
             entity.components.remove(OpacityComponent.self)
         }
     }

@@ -509,7 +509,7 @@ struct LightingWorkspaceTests {
         #expect(rendered.count == 7)
         #expect(rendered.contains(fixtures[9].id))
         #expect(!rendered.contains(fixtures[0].id))
-        settings.layoutOnly = true
+        settings.artificialLightsOn = false
         #expect(settings.renderedFixtureIDs(in: fixtures, maximumCount: 7).isEmpty)
     }
 

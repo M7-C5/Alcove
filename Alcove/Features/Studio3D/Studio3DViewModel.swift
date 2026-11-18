@@ -32,6 +32,8 @@ public final class Studio3DViewModel {
     public var revealMode: HarmonyRevealMode = .splitSlider
     public var showingARPlaceholder: Bool = false
     public var showingScorecardSheet: Bool = false
+    public var showingCongratulations: Bool = false
+    public private(set) var congratulationsAwaitingDismissal = false
     public var isTouringCinematicWalkthrough: Bool = false
     public let harmonyEngine = HarmonySynthesisEngine()
 
@@ -471,6 +473,11 @@ public final class Studio3DViewModel {
         if let next = currentStage.nextStage {
             dismissStageIntroduction()
             currentStage = next
+            if next == .harmony {
+                congratulationsAwaitingDismissal = showingEvaluationSheet
+                showingCongratulations = !showingEvaluationSheet
+                showingEvaluationSheet = false
+            }
             updateMascotGreeting()
             evaluationResult = nil
             hasPendingLayoutChanges = true
@@ -478,9 +485,19 @@ public final class Studio3DViewModel {
         feedbackService.playNotification(.success)
     }
 
+    /// Called after the evaluation's dismissal animation, never underneath the departing sheet.
+    public func evaluationSheetDidDismiss() {
+        guard congratulationsAwaitingDismissal else { return }
+        congratulationsAwaitingDismissal = false
+        guard currentStage == .harmony else { return }
+        showingCongratulations = true
+    }
+
     public func switchToStage(_ stage: StageType) {
         guard room.isUnlocked(stage) else { return }
         if stage != currentStage {
+            congratulationsAwaitingDismissal = false
+            showingCongratulations = false
             if stage.stageNumber < currentStage.stageNumber {
                 introducedStages.insert(stage)
             }
@@ -671,6 +688,8 @@ public final class Studio3DViewModel {
     }
 
     public func completeHarmonyCurriculum() {
+        showingEvaluationSheet = false
+        showingScorecardSheet = false
         let metrics = currentHarmonyMetrics
         room.completeStage(.harmony, score: metrics.overallHarmonyScore, feedback: metrics.summaryVerdict)
         mascotEmotion = .celebrating

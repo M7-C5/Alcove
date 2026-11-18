@@ -20,6 +20,7 @@ struct LightingWorkspaceView: View {
     @State private var cameraRequestID = 0
     @State private var placement = LightingPlacementState()
     @State private var showingDelete = false
+    @State private var lampTypeMenuPresented = false
     @State private var headerOverlapped = false
     @State private var sourcesExpanded = true
     @State private var previewExpanded = true
@@ -119,6 +120,28 @@ struct LightingWorkspaceView: View {
         .tint(LightingTheme.ink)
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
+        .overlayPreferenceValue(LightingLampTypeAnchorKey.self) { anchor in
+            GeometryReader { geometry in
+                if lampTypeMenuPresented, let anchor {
+                    let field = geometry[anchor]
+                    ZStack(alignment: .topLeading) {
+                        Color.black.opacity(0.001)
+                            .ignoresSafeArea()
+                            .onTapGesture { lampTypeMenuPresented = false }
+                        LightingLampTypeMenu(
+                            current: editor.selected == nil ? editor.placementKind : editor.commonKind
+                        ) { kind in
+                            editor.chooseKind(kind)
+                            lampTypeMenuPresented = false
+                        }
+                        .offset(x: max(16, min(geometry.size.width - 286, field.minX - 48)),
+                                y: max(16, field.minY - 96))
+                        .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .topTrailing)))
+                    }
+                }
+            }
+        }
+        .animation(.easeInOut(duration: 0.16), value: lampTypeMenuPresented)
         .overlay {
             if showingDelete {
                 ZStack {
@@ -160,8 +183,7 @@ struct LightingWorkspaceView: View {
             StudioViewportActions(
                 onSelectPreset: { preset = $0; cameraRequestID += 1 },
                 onOpenAR: onOpenAR,
-                cameraDisabled: placement.isActive,
-                layoutOnly: $settings.layoutOnly
+                cameraDisabled: placement.isActive
             )
         }
     }
@@ -179,7 +201,7 @@ struct LightingWorkspaceView: View {
         // Reserve a separate footer row for Otter and Next Stage. Both columns
         // share this bottom edge rather than stretching Settings down to the button.
         let columnHeight = max(200, height - min(112, max(0, height - 560)))
-        let previewHeight = min(225, height * 0.38)
+        let previewHeight = min(270, max(250, height * 0.44))
         let editingHeight = max(160, columnHeight - previewHeight - 20)
         return HStack(alignment: .top, spacing: 0) {
             LightingCollapsiblePanel(title: "Your lights", expanded: $sourcesExpanded, edge: .leading, width: width) {
@@ -196,7 +218,7 @@ struct LightingWorkspaceView: View {
                 }
                 .frame(height: previewHeight)
                 LightingCollapsiblePanel(title: "Light settings", expanded: $editingExpanded, edge: .trailing, width: width) {
-                    LightingEditPanel(editor: editor, minimumHeight: editingHeight,
+                    LightingEditPanel(typePickerPresented: $lampTypeMenuPresented, editor: editor, minimumHeight: editingHeight,
                                       onDelete: { showingDelete = true })
                     .frame(width: width, height: editingHeight)
                 }

@@ -119,10 +119,22 @@ struct LightingSimulationPanel: View {
                 .font(.custom("Cleanow", size: 20, relativeTo: .headline))
                 .fixedSize(horizontal: false, vertical: true)
             HStack(alignment: .top, spacing: 16) {
-                lightToggle("Lights", isOn: $settings.artificialLightsOn)
+                VStack(spacing: 0) {
+                    lightToggle("Lights", isOn: $settings.artificialLightsOn)
+                    Button { settings.showsLightFixtures.toggle() } label: {
+                        Label(settings.showsLightFixtures ? "Hide fixtures" : "Show fixtures",
+                              systemImage: settings.showsLightFixtures ? "eye.slash" : "eye")
+                            .font(.caption.weight(.semibold))
+                            .frame(minHeight: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityValue(settings.showsLightFixtures ? "Visible" : "Hidden")
+                    .accessibilityHint("Hides the lamp models while keeping their light on.")
+                }
+                .frame(maxWidth: .infinity)
                 lightToggle("Sunlight", isOn: $settings.sunlightOn)
             }
-            .disabled(settings.layoutOnly)
             VStack(spacing: 0) {
                 HStack {
                     Text("12 AM")
@@ -139,8 +151,8 @@ struct LightingSimulationPanel: View {
                     .accessibilityLabel("Time of day")
                     .accessibilityValue(settings.timeLabel)
             }
-            .disabled(settings.layoutOnly || !settings.sunlightOn)
-            let sunlightActive = settings.sunlightOn && !settings.layoutOnly &&
+            .disabled(!settings.sunlightOn)
+            let sunlightActive = settings.sunlightOn &&
                 IlluminationSimulationEngine().calculateDaylight(hourOfDay: settings.hourOfDay).intensityLux > 0
             if let limit = StudioLightBudget.maximumFixtures(sunlightActive: sunlightActive), activeFixtureCount > limit {
                 Text("Showing the \(limit) brightest lights on this device.").font(.caption)
@@ -154,7 +166,7 @@ struct LightingSimulationPanel: View {
             Text(title).font(.subheadline.bold())
             Toggle(title, isOn: isOn)
                 .labelsHidden()
-                .tint(LightingTheme.accent)
+                .tint(Color("AlcoveLightingToggle"))
                 .frame(minHeight: 44)
         }
         .frame(maxWidth: .infinity)
@@ -163,7 +175,7 @@ struct LightingSimulationPanel: View {
 }
 
 struct LightingEditPanel: View {
-    @State private var typePickerPresented = false
+    @Binding var typePickerPresented: Bool
     @Bindable var editor: LightingSetupViewModel
     var minimumHeight: Double = 0
     let onDelete: () -> Void
@@ -226,37 +238,7 @@ struct LightingEditPanel: View {
         .buttonStyle(.plain)
         .accessibilityLabel("Lamp type")
         .disabled(editor.isSelectingMultiple && editor.selected == nil)
-        .popover(isPresented: $typePickerPresented, arrowEdge: .top) {
-            VStack(alignment: .leading, spacing: 0) {
-                ForEach(LightKind.lightingKinds) { kind in
-                    Button {
-                        editor.chooseKind(kind)
-                        typePickerPresented = false
-                    } label: {
-                        HStack(spacing: 10) {
-                            Image(systemName: "checkmark").frame(width: 18)
-                                .opacity(current == kind ? 1 : 0)
-                            Image(systemName: kind.icon).frame(width: 24)
-                            Text(kind.title)
-                            Spacer(minLength: 0)
-                        }
-                        .font(.custom("Cleanow", size: 17, relativeTo: .subheadline))
-                        .foregroundStyle(LightingTheme.ink)
-                        .padding(.horizontal, 18)
-                        .frame(minHeight: 44)
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(.vertical, 12)
-            .frame(width: 270)
-            .background(LightingTheme.row, in: RoundedRectangle(cornerRadius: 32))
-            .overlay(RoundedRectangle(cornerRadius: 32).strokeBorder(LightingTheme.ink, lineWidth: 3))
-            .padding(4)
-            .presentationBackground(.clear)
-            .presentationCompactAdaptation(.popover)
-        }
+        .anchorPreference(key: LightingLampTypeAnchorKey.self, value: .bounds) { $0 }
     }
 
     private func fixtureControls(_ fixture: LightFixture) -> some View {
@@ -291,5 +273,44 @@ struct LightingEditPanel: View {
                 HStack { Text("Dim"); Spacer(); Text("Bright") }.font(.caption)
             }
         }
+    }
+}
+
+/// Rendered by the workspace above every panel, without native popover chrome.
+struct LightingLampTypeAnchorKey: PreferenceKey {
+    static let defaultValue: Anchor<CGRect>? = nil
+    static func reduce(value: inout Anchor<CGRect>?, nextValue: () -> Anchor<CGRect>?) {
+        value = nextValue() ?? value
+    }
+}
+
+struct LightingLampTypeMenu: View {
+    let current: LightKind?
+    let onSelect: (LightKind) -> Void
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(LightKind.lightingKinds) { kind in
+                Button { onSelect(kind) } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "checkmark").frame(width: 18)
+                            .opacity(current == kind ? 1 : 0)
+                        Image(systemName: kind.icon).frame(width: 24)
+                        Text(kind.title)
+                        Spacer(minLength: 0)
+                    }
+                    .font(.custom("Cleanow", size: 17, relativeTo: .subheadline))
+                    .foregroundStyle(LightingTheme.ink)
+                    .padding(.horizontal, 18)
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(current == kind ? .isSelected : [])
+            }
+        }
+        .padding(.vertical, 12)
+        .frame(width: 270)
+        .background(LightingTheme.row, in: RoundedRectangle(cornerRadius: 32))
+        .overlay(RoundedRectangle(cornerRadius: 32).strokeBorder(LightingTheme.ink, lineWidth: 3))
     }
 }

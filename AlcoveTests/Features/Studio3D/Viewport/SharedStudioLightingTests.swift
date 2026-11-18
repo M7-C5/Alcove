@@ -42,6 +42,41 @@ struct SharedStudioLightingTests {
         #expect(studio.root.findEntity(named: studioFixture.name) === studioFixture)
     }
 
+    @Test func hidingFixturesPreservesTheirLightAndSunlight() throws {
+        let room = SampleData.createStarterRoom()
+        let fixture = LightFixture(name: "Ceiling Light 1", layer: .ambient, kind: .ceilingLight)
+        room.workingLayout?.lightFixtures = [fixture]
+        let scene = LightingRoomScene(snapshot: LightingRoomSnapshot(room: room))
+        let view = ARView(frame: CGRect(x: 0, y: 0, width: 1024, height: 768),
+                          cameraMode: .nonAR, automaticallyConfigureSession: false)
+        var settings = LightingSimulationSettings()
+        scene.apply(settings, preset: .top, in: view)
+        let model = try #require(scene.root.findEntity(named: "LampModel-\(fixture.id)"))
+        let light = try #require(scene.root.findEntity(named: "LightingFixture-\(fixture.id)") as? SpotLight)
+        let sun = try #require(scene.root.findEntity(named: "Sunlight") as? DirectionalLight)
+        let intensity = light.light.intensity
+        let sunIntensity = sun.light.intensity
+        #expect(model.isEnabled)
+        #expect(light.isEnabled && intensity > 0)
+
+        settings.showsLightFixtures = false
+        scene.apply(settings, preset: .top, in: view)
+        #expect(!model.isEnabled)
+        #expect(light.isEnabled)
+        #expect(light.light.intensity == intensity)
+        #expect(sun.isEnabled && sun.light.intensity == sunIntensity)
+        #expect(settings.renderedFixtureIDs(in: [fixture]).contains(fixture.id))
+
+        settings.showsLightFixtures = true
+        scene.apply(settings, preset: .top, in: view)
+        #expect(model.isEnabled)
+        #expect(light.light.intensity == intensity)
+        settings.showsLightFixtures = false
+        settings.artificialLightsOn = false
+        scene.apply(settings, preset: .top, in: view)
+        #expect(!model.isEnabled && !light.isEnabled)
+    }
+
     @Test(arguments: [0.0, 90, 180, 270])
     func sunriseAndSunsetFollowCapturedNorthForEveryRoomHeading(heading: Double) throws {
         let orientation = try #require(RoomCompassOrientation(magneticForwardBearingDegrees: heading))
