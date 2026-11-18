@@ -173,7 +173,7 @@ public struct Studio3DView: View {
                         HStack {
                             Spacer()
                             cameraMenuPopover
-                                .padding(.trailing, 28)
+                                .padding(.trailing, 72)
                                 .padding(.top, 70)
                                 .safeAreaPadding(.top)
                         }
@@ -522,7 +522,7 @@ public struct Studio3DView: View {
             } label: {
                 HStack(spacing: 12) {
                     Color.clear
-                        .frame(width: 16)
+                        .frame(width: 16, height: 16)
 
                     Image(systemName: "arrow.counterclockwise")
                         .font(.system(size: 15, weight: .semibold))
