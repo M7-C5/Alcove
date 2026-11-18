@@ -29,87 +29,87 @@ public struct SplitCurtainDividerView: View {
     }
 
     public var body: some View {
+        let brown = Color(red: 0x6D / 255.0, green: 0x45 / 255.0, blue: 0x31 / 255.0)
+        let cream = Color(red: 0xFF / 255.0, green: 0xF7 / 255.0, blue: 0xE7 / 255.0)
+        let gold = Color(red: 0xFB / 255.0, green: 0xD4 / 255.0, blue: 0x60 / 255.0)
+        let beforeDot = Color(red: 0xD4 / 255.0, green: 0x63 / 255.0, blue: 0x63 / 255.0)
+        let afterDot = Color(red: 0x6B / 255.0, green: 0x9E / 255.0, blue: 0x5B / 255.0)
+
         ZStack(alignment: .topLeading) {
-            // Floating "BEFORE" and "AFTER" Badges at Top of Screen
+            // Floating "Before" and "After" Badges positioned cleanly below the header & stepper
             HStack {
-                // BEFORE Pill (Baseline Layout)
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
                     Circle()
-                        .fill(Color.orange)
-                        .frame(width: 8, height: 8)
-                    Text("BEFORE")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(splitFraction > 0.15 ? .primary : .secondary)
+                        .fill(beforeDot)
+                        .frame(width: 10, height: 10)
+                    Text("Before")
+                        .font(.custom("Cleanow", size: 17, relativeTo: .subheadline))
+                        .foregroundStyle(brown)
                 }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 7)
-                .background(.regularMaterial, in: Capsule())
-                .overlay(
-                    Capsule()
-                        .stroke(Color.primary.opacity(0.08), lineWidth: 1)
-                )
-                .shadow(color: Color.black.opacity(0.08), radius: 8, y: 2)
-                .padding(.leading, 24)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(cream, in: Capsule())
+                .overlay(Capsule().stroke(brown, lineWidth: 2))
+                .opacity(splitFraction > 0.12 ? 1.0 : 0.45)
+                .padding(.leading, 28)
 
                 Spacer()
 
-                // AFTER Pill (Optimized Layout)
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
                     Circle()
-                        .fill(Color.green)
-                        .frame(width: 8, height: 8)
-                    Text("AFTER")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(splitFraction < 0.85 ? .primary : .secondary)
+                        .fill(afterDot)
+                        .frame(width: 10, height: 10)
+                    Text("After")
+                        .font(.custom("Cleanow", size: 17, relativeTo: .subheadline))
+                        .foregroundStyle(brown)
                 }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 7)
-                .background(.regularMaterial, in: Capsule())
-                .overlay(
-                    Capsule()
-                        .stroke(Color.primary.opacity(0.08), lineWidth: 1)
-                )
-                .shadow(color: Color.black.opacity(0.08), radius: 8, y: 2)
-                .padding(.trailing, 24)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(cream, in: Capsule())
+                .overlay(Capsule().stroke(brown, lineWidth: 2))
+                .opacity(splitFraction < 0.88 ? 1.0 : 0.45)
+                .padding(.trailing, 28)
             }
-            .padding(.top, 76)
+            .padding(.top, 146)
+            .safeAreaPadding(.top)
             .frame(width: totalWidth)
+            .allowsHitTesting(false)
 
-            // Vertical Divider Line Across Full Screen Height
-            Rectangle()
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(0.15),
-                            Color.white.opacity(0.95),
-                            Color.white.opacity(0.95),
-                            Color.white.opacity(0.15)
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-                .frame(width: 2.5, height: totalHeight)
-                .shadow(color: Color.black.opacity(0.40), radius: 4, x: 0, y: 0)
-                .position(x: dividerX, y: totalHeight / 2)
-
-            // Interactive Center Circular Handle Knob (< | >)
+            // Vertical Divider Line + Center Handle Knob (ONLY the 44pt line strip captures drags;
+            // the rest of the 3D viewport passes touches through so orbit & pinch-to-zoom work freely)
             ZStack {
-                Circle()
-                    .fill(Color.white)
-                    .frame(width: 48, height: 48)
-                    .shadow(color: Color.black.opacity(0.35), radius: 10, x: 0, y: 3)
+                Rectangle()
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                brown.opacity(0.20),
+                                brown.opacity(0.95),
+                                brown.opacity(0.95),
+                                brown.opacity(0.20)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .frame(width: 3, height: totalHeight)
 
-                Image(systemName: "arrow.left.and.right")
-                    .font(.body.weight(.bold))
-                    .foregroundStyle(Color.black.opacity(0.85))
+                ZStack {
+                    Circle()
+                        .fill(gold)
+                        .frame(width: 46, height: 46)
+                        .overlay(Circle().stroke(brown, lineWidth: 2.5))
+
+                    Image(systemName: "arrow.left.and.right")
+                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                        .foregroundStyle(brown)
+                }
+                .scaleEffect(isDragging ? 1.12 : 1.0)
+                .animation(.spring(response: 0.24, dampingFraction: 0.72), value: isDragging)
             }
-            .position(x: dividerX, y: totalHeight / 2)
-            .contentShape(Circle().inset(by: -16))
-            .scaleEffect(isDragging ? 1.15 : 1.0)
-            .animation(.spring(response: 0.24, dampingFraction: 0.72), value: isDragging)
+            .frame(width: 44, height: totalHeight)
+            .contentShape(Rectangle())
             .gesture(
-                DragGesture(minimumDistance: 0)
+                DragGesture(minimumDistance: 4, coordinateSpace: .named("SplitCurtainSpace"))
                     .onChanged { gesture in
                         isDragging = true
                         let rawFraction = Double(gesture.location.x / totalWidth)
@@ -133,7 +133,9 @@ public struct SplitCurtainDividerView: View {
                         hasHapticSnappedCenter = false
                     }
             )
+            .position(x: dividerX, y: totalHeight / 2)
         }
-        .allowsHitTesting(true)
+        .frame(width: totalWidth, height: totalHeight, alignment: .topLeading)
+        .coordinateSpace(name: "SplitCurtainSpace")
     }
 }
