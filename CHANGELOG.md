@@ -102,6 +102,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Preserve the closing Lighting evaluation until dismissal, prevent duplicate stage advances, and defer celebration while another evaluation is presented.
+
 - Predecode celebration textures off the main thread, wait for evaluation dismissal before presenting, and start playback after the fade to avoid first-frame stalls and clipping.
 
 - Stabilize spotlight shadow clipping and avoid redundant cutaway component writes while orbiting; use the requested orange for Lights and Sunlight toggles.

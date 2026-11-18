@@ -84,11 +84,12 @@ public struct Studio3DView: View {
             }
         }) {
             if let result = viewModel.evaluationResult {
+                let presentedStage = viewModel.evaluationPresentationStage ?? viewModel.currentStage
                 StageEvaluationSheet(
                     result: result,
-                    stage: viewModel.currentStage,
+                    stage: presentedStage,
                     onProceedAnyway: {
-                        if viewModel.currentStage == .harmony {
+                        if presentedStage == .harmony {
                             isARWalkthroughPresented = true
                         } else {
                             viewModel.advanceToNextStage(result: result)
