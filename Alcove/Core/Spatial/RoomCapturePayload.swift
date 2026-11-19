@@ -6,7 +6,7 @@
 import Foundation
 import simd
 
-public struct ScannedWallPayload: Sendable, Equatable {
+nonisolated public struct ScannedWallPayload: Sendable, Equatable {
     public let id: UUID
     public let position: SIMD3<Float>
     public let dimensions: SIMD3<Float> // x: length, y: height, z: thickness
