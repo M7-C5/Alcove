@@ -4,17 +4,20 @@ import SwiftUI
 public struct StudioBottomHUD: View {
     let mascotEmotion: MascotEmotion
     let mascotMessage: String
+    let showsNextStage: Bool
     let onTriggerEvaluation: () -> Void
     let onOpenChat: () -> Void
 
     public init(
         mascotEmotion: MascotEmotion,
         mascotMessage: String,
+        showsNextStage: Bool = true,
         onTriggerEvaluation: @escaping () -> Void,
         onOpenChat: @escaping () -> Void
     ) {
         self.mascotEmotion = mascotEmotion
         self.mascotMessage = mascotMessage
+        self.showsNextStage = showsNextStage
         self.onTriggerEvaluation = onTriggerEvaluation
         self.onOpenChat = onOpenChat
     }
@@ -37,8 +40,10 @@ public struct StudioBottomHUD: View {
 
             Spacer()
 
-            StudioStageButton(title: "Next Stage", role: .next, action: onTriggerEvaluation)
-                .accessibilityLabel("Next Stage")
+            if showsNextStage {
+                StudioStageButton(title: "Next Stage", role: .next, action: onTriggerEvaluation)
+                    .accessibilityLabel("Next Stage")
+            }
         }
         .padding(.horizontal, 24)
         .padding(.bottom, 20)

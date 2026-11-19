@@ -36,7 +36,7 @@ struct StudioStageProgress: View {
     private func status(for candidate: StageType, number: Int) -> StepStatus {
         if stage == candidate {
             return .active(number)
-        } else if room.isCompleted(candidate) {
+        } else if room.isCompleted(candidate) || room.isUnlocked(candidate) {
             return .done(number)
         } else {
             return .upcoming(number)
@@ -177,6 +177,12 @@ struct StudioStageButton: View {
     }
 }
 
+enum ResultWorkspaceMode: Equatable {
+    case overview
+    case lighting
+    case rearrange
+}
+
 struct StudioTactileCircleBackground: View {
     var active = false
     var body: some View {
@@ -198,6 +204,60 @@ struct StudioTactileCircleBackground: View {
             .clipShape(innerShape)
             .padding(2)
         }
+    }
+}
+
+struct StudioResultIconButton: View {
+    let systemImage: String?
+    let labelText: String?
+    let active: Bool
+    let accessibilityLabel: String
+    let action: () -> Void
+
+    init(
+        systemImage: String,
+        active: Bool = false,
+        accessibilityLabel: String,
+        action: @escaping () -> Void
+    ) {
+        self.systemImage = systemImage
+        self.labelText = nil
+        self.active = active
+        self.accessibilityLabel = accessibilityLabel
+        self.action = action
+    }
+
+    init(
+        labelText: String,
+        active: Bool = false,
+        accessibilityLabel: String,
+        action: @escaping () -> Void
+    ) {
+        self.systemImage = nil
+        self.labelText = labelText
+        self.active = active
+        self.accessibilityLabel = accessibilityLabel
+        self.action = action
+    }
+
+    var body: some View {
+        Button(action: action) {
+            Group {
+                if let systemImage {
+                    Image(systemName: systemImage)
+                        .font(.system(size: 18, weight: .semibold))
+                } else if let labelText {
+                    Text(labelText)
+                        .font(.system(.caption, design: .rounded, weight: .heavy))
+                }
+            }
+            .foregroundStyle(Color.alcoveInk)
+            .frame(width: 54, height: 45)
+            .background { StudioTactileCircleBackground(active: active) }
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(accessibilityLabel)
     }
 }
 

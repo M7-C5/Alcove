@@ -14,6 +14,9 @@ struct LightingWorkspaceView: View {
     let isAdvancing: Bool
     let onTapOtter: () -> Void
     let onSelectStage: ((StageType) -> Void)?
+    let isResultMode: Bool
+    let onSelectResultMode: ((ResultWorkspaceMode) -> Void)?
+    let onBackToDashboard: (() -> Void)?
     @State private var otterTapTrigger = 0
     @State private var editor: LightingSetupViewModel
     @State private var preset: ViewportPreset = .top
@@ -31,6 +34,9 @@ struct LightingWorkspaceView: View {
          onOpenAR: @escaping () -> Void, onNextStage: @escaping () -> Void,
          isAdvancing: Bool = false, onTapOtter: @escaping () -> Void = {},
          onSelectStage: ((StageType) -> Void)? = nil,
+         isResultMode: Bool = false,
+         onSelectResultMode: ((ResultWorkspaceMode) -> Void)? = nil,
+         onBackToDashboard: (() -> Void)? = nil,
          onBack: @escaping () -> Void) {
         self.room = room
         self._settings = settings
@@ -41,6 +47,9 @@ struct LightingWorkspaceView: View {
         self.isAdvancing = isAdvancing
         self.onTapOtter = onTapOtter
         self.onSelectStage = onSelectStage
+        self.isResultMode = isResultMode
+        self.onSelectResultMode = onSelectResultMode
+        self.onBackToDashboard = onBackToDashboard
         let editor = LightingSetupViewModel(room: room)
         editor.selectedID = editor.drafts.first?.id
         _editor = State(initialValue: editor)
@@ -62,9 +71,11 @@ struct LightingWorkspaceView: View {
                 }
                 VStack(spacing: 12) {
                     header.zIndex(30)
-                    stageProgress
-                        .opacity(headerOverlapped ? 0 : 1)
-                        .accessibilityHidden(headerOverlapped)
+                    if !isResultMode {
+                        stageProgress
+                            .opacity(headerOverlapped ? 0 : 1)
+                            .accessibilityHidden(headerOverlapped)
+                    }
 
                     Text(viewportPrompt)
                         .font(.caption)
@@ -98,18 +109,20 @@ struct LightingWorkspaceView: View {
                 .padding(.leading, 24)
                 .padding(.bottom, 24)
 
-                VStack {
-                    Spacer(minLength: 0)
-                    HStack {
+                if !isResultMode {
+                    VStack {
                         Spacer(minLength: 0)
-                        StudioStageButton(title: "Next Stage", role: .next,
-                                          action: continueToNextStage)
-                            .disabled(isAdvancing)
-                            .accessibilityLabel("Save lighting and continue to next stage")
+                        HStack {
+                            Spacer(minLength: 0)
+                            StudioStageButton(title: "Next Stage", role: .next,
+                                              action: continueToNextStage)
+                                .disabled(isAdvancing)
+                                .accessibilityLabel("Save lighting and continue to next stage")
+                        }
                     }
+                    .padding(.trailing, 20)
+                    .padding(.bottom, max(24, proxy.safeAreaInsets.bottom + 12))
                 }
-                .padding(.trailing, 20)
-                .padding(.bottom, max(24, proxy.safeAreaInsets.bottom + 12))
             }
 
         }
@@ -172,19 +185,72 @@ struct LightingWorkspaceView: View {
     }
 
     private var header: some View {
-        StudioHeaderLayout(title: "Stage 4: Mark & Simulate Your Room Lighting", titleHidden: headerOverlapped) {
-            StudioStageButton(title: "Previous Stage", role: .previous) {
+        StudioHeaderLayout(
+            title: isResultMode ? "Result: Lighting" : "Stage 4: Mark & Simulate Your Room Lighting",
+            titleHidden: headerOverlapped
+        ) {
+            StudioStageButton(title: isResultMode ? "Back" : "Previous Stage", role: .previous) {
                 do {
                     try editor.save(in: room, context: modelContext)
-                    onBack()
+                    if isResultMode, let onBackToDashboard {
+                        onBackToDashboard()
+                    } else {
+                        onBack()
+                    }
                 } catch { saveError = error.localizedDescription }
             }
         } actions: {
-            StudioViewportActions(
-                onSelectPreset: { preset = $0; cameraRequestID += 1 },
-                onOpenAR: onOpenAR,
-                cameraDisabled: placement.isActive
-            )
+            if isResultMode {
+                HStack(spacing: 10) {
+                    StudioResultIconButton(
+                        systemImage: "arrow.left.and.right",
+                        accessibilityLabel: "Before and After Result"
+                    ) {
+                        saveLightsAndSwitch { onSelectResultMode?(.overview) }
+                    }
+                    StudioViewportActions(
+                        onSelectPreset: { preset = $0; cameraRequestID += 1 },
+                        onOpenAR: onOpenAR,
+                        cameraDisabled: placement.isActive
+                    )
+                    StudioResultIconButton(
+                        systemImage: "lightbulb",
+                        active: true,
+                        accessibilityLabel: "Lighting"
+                    ) {
+                        // Already in Lighting mode
+                    }
+                    StudioResultIconButton(
+                        systemImage: "arrow.up.and.down.and.arrow.left.and.right",
+                        accessibilityLabel: "Rearrange"
+                    ) {
+                        saveLightsAndSwitch { onSelectResultMode?(.rearrange) }
+                    }
+                    StudioResultIconButton(
+                        labelText: "AR",
+                        accessibilityLabel: "Launch 1:1 Life-Size AR Walkthrough"
+                    ) {
+                        onOpenAR()
+                        StudioViewportFeedback.snap()
+                    }
+                }
+            } else {
+                StudioViewportActions(
+                    onSelectPreset: { preset = $0; cameraRequestID += 1 },
+                    onOpenAR: onOpenAR,
+                    cameraDisabled: placement.isActive
+                )
+            }
+        }
+    }
+
+    private func saveLightsAndSwitch(_ action: () -> Void) {
+        do {
+            try editor.save(in: room, context: modelContext)
+            StudioViewportFeedback.snap()
+            action()
+        } catch {
+            saveError = error.localizedDescription
         }
     }
 
