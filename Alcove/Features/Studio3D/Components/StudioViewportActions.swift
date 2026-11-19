@@ -17,9 +17,9 @@ struct StudioViewportActions: View {
                 Image(systemName: "rotate.3d")
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(Color.alcoveInk)
-                    .frame(width: 45, height: 45)
+                    .frame(width: 54, height: 45)
                     .background { StudioTactileCircleBackground(active: cameraPresented) }
-                    .contentShape(Circle())
+                    .contentShape(Capsule())
             }
             .accessibilityLabel("Camera view")
             .disabled(cameraDisabled)
