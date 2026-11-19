@@ -8,9 +8,11 @@ import simd
 /// at the default dollhouse camera angle (`yaw: 0`, `pitch: 0.62`) for `DashboardView` cards.
 public struct RoomThumbnail3DView: UIViewRepresentable {
     public let room: Room
+    public var onSnapshot: ((UIImage) -> Void)?
 
-    public init(room: Room) {
+    public init(room: Room, onSnapshot: ((UIImage) -> Void)? = nil) {
         self.room = room
+        self.onSnapshot = onSnapshot
     }
 
     public func makeCoordinator() -> Coordinator {
@@ -24,15 +26,18 @@ public struct RoomThumbnail3DView: UIViewRepresentable {
         view.renderOptions.insert([.disableMotionBlur, .disableDepthOfField])
         view.isUserInteractionEnabled = false
 
+        context.coordinator.onSnapshot = onSnapshot
         context.coordinator.install(in: view, room: room)
         return view
     }
 
     public func updateUIView(_ view: ARView, context: Context) {
-        context.coordinator.syncIfNeeded(room: room)
+        context.coordinator.onSnapshot = onSnapshot
+        context.coordinator.syncIfNeeded(in: view, room: room)
     }
 
     public static func dismantleUIView(_ view: ARView, coordinator: Coordinator) {
+        coordinator.cancelPendingSnapshot()
         view.scene.anchors.removeAll()
     }
 
@@ -41,6 +46,8 @@ public struct RoomThumbnail3DView: UIViewRepresentable {
         private let root = Entity()
         private let furnitureGroup = Entity()
         private var lastFingerprint: String = ""
+        private var snapshotTask: Task<Void, Never>?
+        var onSnapshot: ((UIImage) -> Void)?
 
         func install(in view: ARView, room: Room) {
             root.name = "ThumbnailRoot"
@@ -53,12 +60,34 @@ public struct RoomThumbnail3DView: UIViewRepresentable {
             view.scene.addAnchor(anchor)
 
             rebuildScene(for: room)
+            scheduleSnapshot(in: view)
         }
 
-        func syncIfNeeded(room: Room) {
+        func syncIfNeeded(in view: ARView, room: Room) {
             let fp = RoomThumbnailRenderer.layoutFingerprint(for: room)
             guard fp != lastFingerprint else { return }
             rebuildScene(for: room)
+            scheduleSnapshot(in: view)
+        }
+
+        func cancelPendingSnapshot() {
+            snapshotTask?.cancel()
+            snapshotTask = nil
+        }
+
+        private func scheduleSnapshot(in view: ARView) {
+            guard onSnapshot != nil else { return }
+            snapshotTask?.cancel()
+            snapshotTask = Task { @MainActor [weak self, weak view] in
+                try? await Task.sleep(nanoseconds: 280_000_000)
+                guard !Task.isCancelled, let self, let view, view.window != nil, view.bounds.width > 1 else { return }
+                view.snapshot(saveToHDR: false) { [weak self] image in
+                    guard let image else { return }
+                    Task { @MainActor in
+                        self?.onSnapshot?(image)
+                    }
+                }
+            }
         }
 
         private func rebuildScene(for room: Room) {
