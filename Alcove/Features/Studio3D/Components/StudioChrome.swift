@@ -180,17 +180,23 @@ struct StudioStageButton: View {
 struct StudioTactileCircleBackground: View {
     var active = false
     var body: some View {
+        let outerShape = RoundedRectangle(cornerRadius: 21, style: .continuous)
+        let innerShape = RoundedRectangle(cornerRadius: 18.5, style: .continuous)
+
         ZStack {
-            Circle().fill(Color.alcoveInk)
+            outerShape.fill(Color.alcoveInk)
             ZStack {
                 VStack(spacing: 0) {
                     active ? Color.alcoveBackground : Color.alcoveSecondaryHighlight
                     active ? Color.alcoveControlActiveShadow : Color.alcoveSecondaryShadow
                 }
-                Circle().fill(active ? Color.alcoveControlActiveFill : Color.alcoveSurfaceElevated)
-                    .padding(.top, 1.5).padding(.bottom, 3)
+                innerShape
+                    .fill(active ? Color.alcoveControlActiveFill : Color.alcoveSurfaceElevated)
+                    .padding(.top, active ? 3 : 2)
+                    .padding(.bottom, 4.5)
             }
-            .clipShape(Circle()).padding(2)
+            .clipShape(innerShape)
+            .padding(2.5)
         }
     }
 }
