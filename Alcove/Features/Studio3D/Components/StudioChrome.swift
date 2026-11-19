@@ -195,8 +195,7 @@ struct StudioTactileCircleBackground: View {
                     .fill(active ? Color.alcoveControlActiveShadow : Color.alcoveSecondaryShadow)
                 shape
                     .fill(active ? Color.alcoveControlActiveFill : Color.alcoveSurfaceElevated)
-                    .padding(.horizontal, 1.5)
-                    .padding(.bottom, 3.5)
+                    .offset(y: -3.5)
             }
             .clipShape(shape)
             .padding(2.5)

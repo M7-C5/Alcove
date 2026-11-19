@@ -122,6 +122,7 @@ public struct MascotChatDrawer: View {
                                         .id("thinkingIndicator")
                                     }
                                 }
+                                .padding(.horizontal, 2)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                             }
                             .frame(maxHeight: keyboardHeight > 0 ? 110 : 156)
@@ -149,6 +150,7 @@ public struct MascotChatDrawer: View {
                                 suggestionChip(query)
                             }
                         }
+                        .padding(.horizontal, 2)
                     }
 
                     // 3D Rounded Input Box with Bottom-Right Paperplane Button
@@ -233,7 +235,7 @@ public struct MascotChatDrawer: View {
                 // SwiftUI already shrinks the safe area for the software keyboard;
                 // adding `keyboardHeight` here would double-pad and push the card to the top of the screen.
                 .padding(.bottom, keyboardHeight > 0 ? 12 : 24)
-                .safeAreaPadding(.bottom)
+                .safeAreaPadding([.horizontal, .bottom])
                 .animation(.easeOut(duration: 0.25), value: keyboardHeight)
             }
         }
