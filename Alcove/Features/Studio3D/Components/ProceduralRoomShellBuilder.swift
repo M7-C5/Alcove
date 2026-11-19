@@ -9,19 +9,36 @@ public struct ProceduralRoomShellBuilder {
     /// Uses real scanned walls & openings when `room.planSnapshot` is present;
     /// otherwise builds the generic sample room shell.
     public static func buildShell(for room: Room, includeCeiling: Bool = false) -> Entity {
-        if let snapshot = room.planSnapshot, !snapshot.wallSegments.isEmpty {
+        buildShell(
+            width: room.dimensionsWidth,
+            length: room.dimensionsLength,
+            height: room.dimensionsHeight,
+            planSnapshot: room.planSnapshot,
+            includeCeiling: includeCeiling
+        )
+    }
+
+    /// Value-based entry point supporting persisted scanned room geometry when available.
+    public static func buildShell(
+        width: Double,
+        length: Double,
+        height: Double,
+        planSnapshot: RoomPlanSnapshot?,
+        includeCeiling: Bool = false
+    ) -> Entity {
+        if let snapshot = planSnapshot, !snapshot.wallSegments.isEmpty {
             return buildScannedShell(
                 snapshot: snapshot,
-                fallbackWidth: room.dimensionsWidth,
-                fallbackLength: room.dimensionsLength,
-                height: room.dimensionsHeight,
+                fallbackWidth: width,
+                fallbackLength: length,
+                height: height,
                 includeCeiling: includeCeiling
             )
         }
         return buildShell(
-            width: room.dimensionsWidth,
-            length: room.dimensionsLength,
-            height: room.dimensionsHeight,
+            width: width,
+            length: length,
+            height: height,
             includeCeiling: includeCeiling
         )
     }
@@ -108,7 +125,7 @@ public struct ProceduralRoomShellBuilder {
             wallEntity.position = SIMD3<Float>(0, segH / 2.0, 0)
             wallContainer.addChild(wallEntity)
 
-            let baseboardMesh = MeshResource.generateBox(size: SIMD3<Float>(segLength, 0.08, 0.015))
+            let baseboardMesh = MeshResource.generateBox(size: SIMD3<Float>(segLength, 0.08, wallThickness + 0.016))
             let baseboard = ModelEntity(mesh: baseboardMesh, materials: [trimMaterial])
             baseboard.position = SIMD3<Float>(0, 0.04, 0)
             wallContainer.addChild(baseboard)
@@ -143,8 +160,21 @@ public struct ProceduralRoomShellBuilder {
             isMetallic: false
         )
 
+        var passageMaterial = PhysicallyBasedMaterial()
+        passageMaterial.baseColor.tint = UIColor(red: 0.88, green: 0.86, blue: 0.82, alpha: 0.28)
+        passageMaterial.roughness = PhysicallyBasedMaterial.Roughness(floatLiteral: 0.8)
+        passageMaterial.blending = .transparent(opacity: .init(floatLiteral: 0.28))
+
         for opening in snapshot.openings {
-            let material: any RealityKit.Material = opening.type == "window" ? glassMaterial : doorMaterial
+            let material: any RealityKit.Material
+            switch opening.type {
+            case "window":
+                material = glassMaterial
+            case "opening":
+                material = passageMaterial
+            default:
+                material = doorMaterial
+            }
             let mesh = MeshResource.generateBox(size: SIMD3<Float>(opening.width, opening.height, wallThickness + 0.02))
             let entity = ModelEntity(mesh: mesh, materials: [material])
             entity.position = SIMD3<Float>(opening.centerX, opening.bottomY + opening.height / 2.0, opening.centerZ)
