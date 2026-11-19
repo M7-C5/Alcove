@@ -2,83 +2,71 @@ import Foundation
 import SwiftData
 import simd
 
-/// Maps sanitized RoomPlan capture payloads into Alcove's dual-layout `Room` model.
+/// Maps RoomPlan `CapturedRoomPayload` 1:1 into Alcove's dual-layout `Room` model,
+/// preserving exact scanned positions, rotations, dimensions, walls, and openings without merging or snapping.
 public final class RoomCaptureMapper: Sendable {
 
-    private let sanitizer: RoomCaptureSanitizer
-
-    public init(sanitizer: RoomCaptureSanitizer? = nil) {
-        self.sanitizer = sanitizer ?? RoomCaptureSanitizer()
-    }
+    public init() {}
 
     public func mapToRoom(payload: CapturedRoomPayload, roomName: String = "Scanned Room") -> Room {
-        let longerSide = Double(max(payload.roomLength, payload.roomWidth))
-        let shorterSide = Double(min(payload.roomLength, payload.roomWidth))
         let roomHeight = Double(max(2.2, payload.roomHeight))
 
         let snapshot: RoomPlanSnapshot? = payload.walls.isEmpty
             ? nil
-            : RoomPlanSnapshot(walls: payload.walls, floorLevel: payload.floorLevel)
+            : RoomPlanSnapshot(
+                walls: payload.walls,
+                openings: payload.openings,
+                floorLevel: payload.floorLevel
+            )
 
-        // RoomPlanSnapshot aligns local X along the longest wall (primaryWall) and Z perpendicular to it.
-        let roomWidth = snapshot != nil ? longerSide : shorterSide
-        let roomLength = snapshot != nil ? shorterSide : longerSide
-
-        let sanitizedObjects = sanitizer.sanitize(
-            objects: payload.objects,
-            roomWidth: payload.roomWidth,
-            roomLength: payload.roomLength,
-            walls: payload.walls,
-            floorLevel: payload.floorLevel
+        let bounds = RoomPlanBounds(
+            snapshot: snapshot,
+            fallbackWidth: payload.roomWidth,
+            fallbackLength: payload.roomLength
         )
+        let roomWidth = Double(max(1.0, bounds.width))
+        let roomLength = Double(max(1.0, bounds.length))
 
         var furnitures: [Furniture] = []
-        for obj in sanitizedObjects {
-            let rawX: Float
-            let rawY: Float
-            let rawZ: Float
+        for obj in payload.objects {
+            let posX: Float
+            let posZ: Float
             let yaw: Float
 
             if let snapshot {
                 let local = snapshot.localCoordinates(worldX: obj.position.x, worldZ: obj.position.z)
-                rawX = local.x
-                rawZ = local.y
+                posX = local.x
+                posZ = local.y
                 yaw = snapshot.localYaw(obj.rotationYaw)
-                rawY = max(0.0, obj.position.y - payload.floorLevel)
             } else {
-                rawX = obj.position.x
-                rawY = max(0.0, obj.position.y - payload.floorLevel)
-                rawZ = obj.position.z
+                posX = obj.position.x
+                posZ = obj.position.z
                 yaw = obj.rotationYaw
             }
 
-            let objWidth = Double(max(0.25, obj.dimensions.x))
-            let objLength = Double(max(0.25, obj.dimensions.z))
-            let clamped = FurnitureTransformEngine.clampPosition(
-                position: SIMD3<Float>(rawX, rawY, rawZ),
-                furnitureWidth: Float(objWidth),
-                furnitureLength: Float(objLength),
-                rotationYaw: yaw,
-                roomWidth: Float(roomWidth),
-                roomLength: Float(roomLength)
-            )
+            let objWidth = Double(max(0.20, obj.dimensions.x))
+            let objLength = Double(max(0.20, obj.dimensions.z))
+            let objHeight = Double(max(0.20, obj.dimensions.y))
+            // RoomPlan object position.y is bounding-box center; Alcove furniture rests with feet at y = 0 (or elevated if surface-mounted).
+            let bottomY = Double(max(0.0, (obj.position.y - obj.dimensions.y / 2.0) - payload.floorLevel))
+            let groundedY = bottomY < 0.15 ? 0.0 : bottomY
 
             let mapped = Self.mapCategoryAndName(
-                sanitizedCategory: obj.category,
-                width: Double(obj.dimensions.x),
-                length: Double(obj.dimensions.z)
+                rawCategory: obj.rawCategory,
+                width: objWidth,
+                length: objLength
             )
 
             let furniture = Furniture(
                 name: mapped.name,
                 category: mapped.category,
-                positionX: Double(clamped.x),
-                positionY: Double(clamped.y),
-                positionZ: Double(clamped.z),
+                positionX: Double(posX),
+                positionY: groundedY,
+                positionZ: Double(posZ),
                 rotationYaw: Double(yaw),
                 width: objWidth,
                 length: objLength,
-                height: Double(max(0.25, obj.dimensions.y)),
+                height: objHeight,
                 isArchived: false,
                 isUserAdded: false
             )
@@ -100,6 +88,7 @@ public final class RoomCaptureMapper: Sendable {
             baselineLayout: baseline,
             workingLayout: working
         )
+        room.planSnapshot = snapshot
         baseline.room = room
         working.room = room
 
@@ -107,11 +96,11 @@ public final class RoomCaptureMapper: Sendable {
     }
 
     private static func mapCategoryAndName(
-        sanitizedCategory: String,
+        rawCategory: String,
         width: Double,
         length: Double
     ) -> (category: FurnitureCategory, name: String) {
-        switch sanitizedCategory.lowercased() {
+        switch rawCategory.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
         case "bed":
             return (.bed, "Bed")
         case "desk":
@@ -125,7 +114,7 @@ public final class RoomCaptureMapper: Sendable {
             return (.seating, "Chair")
         case "sofa":
             return (.seating, "Sofa")
-        case "closet", "storage":
+        case "storage", "closet":
             return (.storage, "Wardrobe")
         case "lamp", "lighting":
             return (.lighting, "Floor Lamp")
@@ -134,7 +123,7 @@ public final class RoomCaptureMapper: Sendable {
         case "fireplace":
             return (.decor, "Fireplace")
         default:
-            return (.other, "Furniture")
+            return (.other, rawCategory.capitalized)
         }
     }
 }
