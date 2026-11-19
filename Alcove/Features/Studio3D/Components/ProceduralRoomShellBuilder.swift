@@ -5,11 +5,165 @@ import RealityKit
 /// window apertures, and dynamic ceiling planes.
 public struct ProceduralRoomShellBuilder {
 
-    /// Constructs a 3D procedural room shell entity containing floor, perimeter walls,
-    /// trim, openings, and optional ceiling plane.
+    /// Constructs a 3D architectural room shell entity.
+    /// Uses real scanned walls & openings when `room.planSnapshot` is present;
+    /// otherwise builds the generic sample room shell.
     public static func buildShell(for room: Room, includeCeiling: Bool = false) -> Entity {
-        buildShell(width: room.dimensionsWidth, length: room.dimensionsLength,
-                   height: room.dimensionsHeight, includeCeiling: includeCeiling)
+        if let snapshot = room.planSnapshot, !snapshot.wallSegments.isEmpty {
+            return buildScannedShell(
+                snapshot: snapshot,
+                fallbackWidth: room.dimensionsWidth,
+                fallbackLength: room.dimensionsLength,
+                height: room.dimensionsHeight,
+                includeCeiling: includeCeiling
+            )
+        }
+        return buildShell(
+            width: room.dimensionsWidth,
+            length: room.dimensionsLength,
+            height: room.dimensionsHeight,
+            includeCeiling: includeCeiling
+        )
+    }
+
+    private static func buildScannedShell(
+        snapshot: RoomPlanSnapshot,
+        fallbackWidth: Double,
+        fallbackLength: Double,
+        height: Double,
+        includeCeiling: Bool
+    ) -> Entity {
+        let shell = Entity()
+        shell.name = "RoomShell"
+
+        let bounds = RoomPlanBounds(
+            snapshot: snapshot,
+            fallbackWidth: Float(fallbackWidth),
+            fallbackLength: Float(fallbackLength)
+        )
+        let roomW = bounds.width
+        let roomL = bounds.length
+        let centerX = bounds.minX + roomW / 2.0
+        let centerZ = bounds.minZ + roomL / 2.0
+        let wallThickness: Float = 0.12
+
+        // Floor Plane matching the scanned room footprint
+        let floorMesh = MeshResource.generateBox(
+            size: SIMD3<Float>(roomW, 0.02, roomL),
+            cornerRadius: 0.005
+        )
+        let floorMaterial = SimpleMaterial(
+            color: UIColor(red: 0.78, green: 0.64, blue: 0.48, alpha: 1.0),
+            roughness: 0.45,
+            isMetallic: false
+        )
+        let floorEntity = ModelEntity(mesh: floorMesh, materials: [floorMaterial])
+        floorEntity.name = "Floor"
+        floorEntity.position = SIMD3<Float>(centerX, -0.01, centerZ)
+        shell.addChild(floorEntity)
+
+        if includeCeiling {
+            let ceiling = buildCeiling(width: Double(roomW), length: Double(roomL), height: height)
+            ceiling.position = SIMD3<Float>(centerX, Float(height) + 0.01, centerZ)
+            shell.addChild(ceiling)
+        }
+
+        let wallMaterial = SimpleMaterial(
+            color: UIColor(red: 0.94, green: 0.93, blue: 0.91, alpha: 1.0),
+            roughness: 0.85,
+            isMetallic: false
+        )
+        let trimMaterial = SimpleMaterial(
+            color: UIColor(red: 0.96, green: 0.96, blue: 0.95, alpha: 1.0),
+            roughness: 0.25,
+            isMetallic: false
+        )
+
+        let backGroup = Entity()
+        backGroup.name = "BackWallGroup"
+        let frontGroup = Entity()
+        frontGroup.name = "FrontWallGroup"
+        let leftGroup = Entity()
+        leftGroup.name = "LeftWallGroup"
+        let rightGroup = Entity()
+        rightGroup.name = "RightWallGroup"
+
+        for segment in snapshot.wallSegments {
+            let dx = segment.endX - segment.startX
+            let dz = segment.endZ - segment.startZ
+            let segLength = hypot(dx, dz)
+            guard segLength > 0.1 else { continue }
+
+            let midX = (segment.startX + segment.endX) / 2.0
+            let midZ = (segment.startZ + segment.endZ) / 2.0
+            let segH = max(Float(height), segment.height)
+            let angle = -atan2(dz, dx)
+
+            let wallContainer = Entity()
+            wallContainer.position = SIMD3<Float>(midX, 0, midZ)
+            wallContainer.orientation = simd_quatf(angle: angle, axis: SIMD3<Float>(0, 1, 0))
+
+            let wallMesh = MeshResource.generateBox(size: SIMD3<Float>(segLength, segH, wallThickness))
+            let wallEntity = ModelEntity(mesh: wallMesh, materials: [wallMaterial])
+            wallEntity.position = SIMD3<Float>(0, segH / 2.0, 0)
+            wallContainer.addChild(wallEntity)
+
+            let baseboardMesh = MeshResource.generateBox(size: SIMD3<Float>(segLength, 0.08, 0.015))
+            let baseboard = ModelEntity(mesh: baseboardMesh, materials: [trimMaterial])
+            baseboard.position = SIMD3<Float>(0, 0.04, 0)
+            wallContainer.addChild(baseboard)
+
+            // Assign to cardinal cutaway group based on vector from room center to wall midpoint
+            let relX = midX - centerX
+            let relZ = midZ - centerZ
+            if abs(relZ) >= abs(relX) {
+                if relZ < 0 {
+                    backGroup.addChild(wallContainer)
+                } else {
+                    frontGroup.addChild(wallContainer)
+                }
+            } else {
+                if relX < 0 {
+                    leftGroup.addChild(wallContainer)
+                } else {
+                    rightGroup.addChild(wallContainer)
+                }
+            }
+        }
+
+        // Add subtle visual markers for real scanned doors/windows (no forced fake openings)
+        var glassMaterial = PhysicallyBasedMaterial()
+        glassMaterial.baseColor.tint = UIColor(red: 0.78, green: 0.88, blue: 0.96, alpha: 0.45)
+        glassMaterial.roughness = PhysicallyBasedMaterial.Roughness(floatLiteral: 0.1)
+        glassMaterial.blending = .transparent(opacity: .init(floatLiteral: 0.45))
+
+        let doorMaterial = SimpleMaterial(
+            color: UIColor(red: 0.45, green: 0.31, blue: 0.21, alpha: 1.0),
+            roughness: 0.45,
+            isMetallic: false
+        )
+
+        for opening in snapshot.openings {
+            let material: any RealityKit.Material = opening.type == "window" ? glassMaterial : doorMaterial
+            let mesh = MeshResource.generateBox(size: SIMD3<Float>(opening.width, opening.height, wallThickness + 0.02))
+            let entity = ModelEntity(mesh: mesh, materials: [material])
+            entity.position = SIMD3<Float>(opening.centerX, opening.bottomY + opening.height / 2.0, opening.centerZ)
+            entity.orientation = simd_quatf(angle: opening.yaw, axis: SIMD3<Float>(0, 1, 0))
+
+            let relX = opening.centerX - centerX
+            let relZ = opening.centerZ - centerZ
+            if abs(relZ) >= abs(relX) {
+                if relZ < 0 { backGroup.addChild(entity) } else { frontGroup.addChild(entity) }
+            } else {
+                if relX < 0 { leftGroup.addChild(entity) } else { rightGroup.addChild(entity) }
+            }
+        }
+
+        shell.addChild(backGroup)
+        shell.addChild(frontGroup)
+        shell.addChild(leftGroup)
+        shell.addChild(rightGroup)
+        return shell
     }
 
     /// Shared ceiling geometry; viewports may use it as a visually cutaway shadow occluder.
