@@ -15,6 +15,8 @@ struct LayoutCardView: View {
     let onDelete: () -> Void
 
     @Binding var openMenuLayoutID: UUID?
+    @State private var cachedThumbnail: UIImage?
+    @State private var cachedFingerprint: String = ""
 
     init(
         room: Room? = nil,
@@ -241,13 +243,35 @@ struct LayoutCardView: View {
     @ViewBuilder
     private var roomThumbnail: some View {
         if let room {
-            RoomThumbnail3DView(room: room)
+            let currentFingerprint = RoomThumbnailRenderer.layoutFingerprint(for: room)
+            if let cachedThumbnail, cachedFingerprint == currentFingerprint {
+                Image(uiImage: cachedThumbnail)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(
+                        width: cardWidth * 0.90,
+                        height: cardHeight * 0.70
+                    )
+                    .clipped()
+            } else {
+                ZStack {
+                    if let cachedThumbnail {
+                        Image(uiImage: cachedThumbnail)
+                            .resizable()
+                            .scaledToFill()
+                    }
+                    RoomThumbnail3DView(room: room) { snapshot in
+                        cachedThumbnail = snapshot
+                        cachedFingerprint = currentFingerprint
+                    }
+                }
                 .frame(
                     width: cardWidth * 0.90,
                     height: cardHeight * 0.70
                 )
                 .allowsHitTesting(false)
                 .clipped()
+            }
         } else if let thumbnailData, let renderedImage = UIImage(data: thumbnailData) {
             Image(uiImage: renderedImage)
                 .resizable()
