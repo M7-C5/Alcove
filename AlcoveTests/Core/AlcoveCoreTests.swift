@@ -462,4 +462,86 @@ struct AlcoveCoreTests {
         #expect(result.canAdvance == false)
         #expect(result.bottlenecks.contains { $0.severity == .critical && $0.title == "Collision" })
     }
+
+    @Test func longTableWithTuckedChairsDoesNotTriggerCollisionOrWalkwayWarning() {
+        let rulebook = FastPathRulebook()
+        let roomDims = (width: 4.5, length: 4.5)
+
+        let longTable = Furniture(
+            name: "Long Dining Table",
+            category: .table,
+            positionX: 0.0,
+            positionY: 0.0,
+            positionZ: 0.0,
+            rotationYaw: 0.0,
+            width: 1.9,
+            length: 0.95
+        )
+        let chairLeft = Furniture(
+            name: "Dining Chair 1",
+            category: .seating,
+            positionX: -0.45,
+            positionY: 0.0,
+            positionZ: 0.30,
+            rotationYaw: .pi,
+            width: 0.55,
+            length: 0.55
+        )
+        let chairRight = Furniture(
+            name: "Dining Chair 2",
+            category: .seating,
+            positionX: 0.45,
+            positionY: 0.0,
+            positionZ: 0.30,
+            rotationYaw: .pi,
+            width: 0.55,
+            length: 0.55
+        )
+
+        let warnings = rulebook.evaluateSpatialWarnings(
+            furnitures: [longTable, chairLeft, chairRight],
+            roomDimensions: roomDims
+        )
+        #expect(warnings.isEmpty)
+    }
+
+    @Test func stage2EvaluationUsesWarningSeverityForYellowTightWalkway() async {
+        let sofa = Furniture(
+            name: "Sofa",
+            category: .seating,
+            positionX: 0.0,
+            positionY: 0.0,
+            positionZ: -0.9,
+            rotationYaw: 0.0,
+            width: 1.8,
+            length: 0.9
+        )
+        // 0.35m edge gap: tight walkway (yellow .caution), not physically colliding
+        let console = Furniture(
+            name: "Bookshelf",
+            category: .storage,
+            positionX: 0.0,
+            positionY: 0.0,
+            positionZ: -0.9 + 0.45 + 0.35 + 0.20,
+            rotationYaw: 0.0,
+            width: 1.2,
+            length: 0.4
+        )
+        let working = Layout(name: "Working", isBaseline: false, furnitures: [sofa, console])
+        let baseline = Layout(name: "Baseline", isBaseline: true, furnitures: [])
+        let room = Room(
+            name: "Tight Walkway Room",
+            dimensionsWidth: 4.5,
+            dimensionsLength: 4.5,
+            dimensionsHeight: 2.6,
+            baselineLayout: baseline,
+            workingLayout: working
+        )
+
+        let mascot = MockMascotAIService()
+        let result = await mascot.evaluateStage(stage: .rearrangement, room: room)
+        #expect(result.canAdvance == true)
+        #expect(!result.bottlenecks.isEmpty)
+        #expect(result.bottlenecks.allSatisfy { $0.severity == .warning })
+    }
 }

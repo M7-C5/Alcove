@@ -11,9 +11,21 @@ public final class Room {
     public var dimensionsHeight: Double
     /// Optional payload lets existing rooms migrate without inventing a north reference.
     public var compassOrientationData: Data? = nil
+    /// Encoded `RoomPlanSnapshot` storing real scanned wall & opening geometry.
+    public var planSnapshotData: Data? = nil
     /// Rendered 3D dollhouse preview PNG for the Dashboard room card.
     @Attribute(.externalStorage)
     public var thumbnailData: Data? = nil
+
+    public var planSnapshot: RoomPlanSnapshot? {
+        get {
+            guard let data = planSnapshotData else { return nil }
+            return try? JSONDecoder().decode(RoomPlanSnapshot.self, from: data)
+        }
+        set {
+            planSnapshotData = newValue.flatMap { try? JSONEncoder().encode($0) }
+        }
+    }
 
     public var compassOrientation: RoomCompassOrientation? {
         get {

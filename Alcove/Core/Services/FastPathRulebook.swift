@@ -219,11 +219,25 @@ public struct FastPathRulebook: Sendable {
                 let edgeGap = hypot(max(0.0, gapX), max(0.0, gapZ))
 
                 if AnthropometricStandards.isFunctionalCompanionPair(a: a, b: b) {
-                    let isDeskChair = (a.category == .table && b.category == .seating) ||
-                        (b.category == .table && a.category == .seating) ||
-                        (a.name.localizedCaseInsensitiveContains("desk") && b.name.localizedCaseInsensitiveContains("chair")) ||
-                        (b.name.localizedCaseInsensitiveContains("desk") && a.name.localizedCaseInsensitiveContains("chair"))
-                    let tolerance = isDeskChair ? 0.45 : 0.06
+                    let isTableA = a.category == .table ||
+                        a.name.localizedCaseInsensitiveContains("table") ||
+                        a.name.localizedCaseInsensitiveContains("desk")
+                    let isTableB = b.category == .table ||
+                        b.name.localizedCaseInsensitiveContains("table") ||
+                        b.name.localizedCaseInsensitiveContains("desk")
+                    let isSeatA = a.category == .seating ||
+                        a.name.localizedCaseInsensitiveContains("chair") ||
+                        a.name.localizedCaseInsensitiveContains("stool") ||
+                        a.name.localizedCaseInsensitiveContains("bench") ||
+                        a.name.localizedCaseInsensitiveContains("seat")
+                    let isSeatB = b.category == .seating ||
+                        b.name.localizedCaseInsensitiveContains("chair") ||
+                        b.name.localizedCaseInsensitiveContains("stool") ||
+                        b.name.localizedCaseInsensitiveContains("bench") ||
+                        b.name.localizedCaseInsensitiveContains("seat")
+                    let isTableSeating = (isTableA && isSeatB) || (isTableB && isSeatA)
+                    let minAxisExtSum = min(extA.x + extB.x, extA.z + extB.z)
+                    let tolerance = isTableSeating ? min(0.65, max(0.45, minAxisExtSum * 0.80)) : 0.06
                     if gapX < -tolerance && gapZ < -tolerance {
                         warnings.append(
                             SpatialWarning(
@@ -249,8 +263,9 @@ public struct FastPathRulebook: Sendable {
                         )
                     )
                 } else if edgeGap < AnthropometricStandards.minimumCirculation {
-                    // Side-by-side storage + desk/table/chair do not need a walkway between their sides
-                    if AnthropometricStandards.isSideBySideNonBlocking(a: a, b: b) {
+                    // Side-by-side storage + desk/table/chair or adjacent seating at a table do not need a walkway between their sides
+                    if AnthropometricStandards.isSideBySideNonBlocking(a: a, b: b) ||
+                        (a.category == .seating && b.category == .seating) {
                         continue
                     }
 

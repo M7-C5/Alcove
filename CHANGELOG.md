@@ -10,7 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Celebrate the Stage 4 to Stage 5 transition with a bounded Otter GIF, sparse, smooth center-out confetti bursts whose particles fall to the screen edges, and View My Room / Back to Home actions.
-
+- Add Home button to return to dashboard.
+- Make Otter badge clickable to open design chat.
+- Update landing copy, subtitle color token, and chevron icon.
+- Render live 3D isometric room thumbnails and route directly to active stage.
+- Unify studio UI, daylight, and stage navigation.
 - Make completed stage stepper circles tappable except Scan.
 - Preserve numbered green stage progress and skip repeated walkthroughs.
 - Add interactive game-style step-by-step tutorial.
@@ -80,18 +84,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Replace the clear-room preview mode with fixture visibility that preserves lighting; align the camera menu beside its button and remove native lamp-picker chrome.
-
 - Unify Lighting and studio header, progress, navigation, camera menus and quick-action styling; present north as a shadow-free floor decal.
-
 - Remove interactive game-style tutorial overlay.
 - Remove numerical scores and grades from evaluations.
 - Share room validation/persistence and use alcoveSurfaceElevated token.
 - Share Audit viewport controls and camera.
-- Share north-aligned daylight, fixed shadows, roof occlusion and saved fixture rendering between earlier studio stages and Lighting.
-
-- Align lighting controls with the shared tactile buttons, MainBackground artwork, and five-step progress header.
-- Keep lighting placement framed between inspectors and allow scrolling only within the light-source list.
-
 - Use SwiftUI openURL environment action.
 - Share view model warning severities with 3D viewport.
 - Adopt global alcove color tokens in home and tactile pill.
@@ -105,11 +102,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Preserve the closing Lighting evaluation until dismissal, prevent duplicate stage advances, and defer celebration while another evaluation is presented.
 
 - Predecode celebration textures off the main thread, wait for evaluation dismissal before presenting, and start playback after the fade to avoid first-frame stalls and clipping.
-
 - Stabilize spotlight shadow clipping and avoid redundant cutaway component writes while orbiting; use the requested orange for Lights and Sunlight toggles.
-
 - Return Lighting directly to Rearrange, suppress repeated Otter introductions on previous-stage navigation, and remove the viewport top inset.
 - Unify Lighting button fades, camera menus, lamp-type selection and Otter delete confirmation.
+- Show yellow warning cards for non-colliding tight clearances.
+- Support tucked chairs along long tables without false collisions.
+- Refine room scan mapper, studio sync, and scan HUD tweaks.
 - Remove close chevron and lift Otter chat above software keyboard.
 - Prevent Color.clear from expanding camera angle popover full height.
 - Pass isARPresented and onOpenAR to LightingWorkspaceView.
@@ -121,11 +119,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Disable Metal GPU validation to prevent RoomPlan debug hang.
 - Wire SwiftData persistence, NavigationRouter, and Light-only tokens.
 - Address review feedback and block overhead sunlight.
-- Remove the seven-fixture cap on GPUs supporting extended dynamic lighting and make the legacy fallback account for active sunlight.
-
-- Remove layout whitespace from fixture names and restore Dynamic Type and semantic tokens in tactile lighting buttons.
-- Add a permanent cutaway ceiling shadow occluder to prevent direct sunlight entering through the open mockup roof.
-
 - Update Otter 3D model face details and remove duplicate asset.
 - Store API key in Keychain, use header auth, and decouple chat badge.
 - Compute wall proximity from boundary extents and sanitize flowery placement wording.

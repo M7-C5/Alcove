@@ -18,12 +18,14 @@ struct LightingRoomSnapshot: Sendable {
     let fixtures: [LightFixture]
     let furnishings: [Furnishing]
     let compassOrientation: RoomCompassOrientation?
+    let planSnapshot: RoomPlanSnapshot?
 
     @MainActor init(room: Room, fixtures draftFixtures: [LightFixture]? = nil) {
         let bounds = LightingRoomGeometry(width: room.dimensionsWidth, length: room.dimensionsLength,
                                           height: room.dimensionsHeight)
         geometry = bounds
         compassOrientation = room.compassOrientation
+        planSnapshot = room.planSnapshot
         let layout = room.workingLayout ?? room.baselineLayout
         fixtures = (draftFixtures ?? layout?.lightFixtures ?? []).map { bounds.clamped($0) }
         furnishings = (layout?.furnitures ?? []).filter { !$0.isArchived }.map {
@@ -340,8 +342,13 @@ final class LightingRoomScene: NSObject {
 
     private func buildRoom() {
         let geometry = snapshot.geometry
-        let shell = ProceduralRoomShellBuilder.buildShell(width: geometry.width, length: geometry.length,
-                                                        height: geometry.height, includeCeiling: false)
+        let shell = ProceduralRoomShellBuilder.buildShell(
+            width: geometry.width,
+            length: geometry.length,
+            height: geometry.height,
+            planSnapshot: snapshot.planSnapshot,
+            includeCeiling: false
+        )
         root.addChild(shell)
         root.addChild(RoomNorthMarker.build(snapshot: snapshot))
         root.addChild(StudioDaylightRig.roofOccluder(geometry: geometry))

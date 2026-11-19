@@ -78,6 +78,15 @@ public final class MockMascotAIService: MascotAIServiceProtocol {
         case .rearrangement:
             var bottlenecks: [SpatialBottleneck] = []
             var score = 90
+            let liveWarnings = FastPathRulebook().evaluateSpatialWarnings(
+                furnitures: furnitures,
+                roomDimensions: (width: room.dimensionsWidth, length: room.dimensionsLength)
+            )
+            let collidingPairs: Set<Set<UUID>> = Set(
+                liveWarnings
+                    .filter { $0.severity == .collision && $0.furnitureIDs.count == 2 }
+                    .map { $0.furnitureIDs }
+            )
 
             // Check clearances between all pairs using Panero & Zelnik anthropometric standards
             for i in 0..<furnitures.count {
@@ -102,10 +111,10 @@ public final class MockMascotAIService: MascotAIServiceProtocol {
                             bottlenecks.append(SpatialBottleneck(
                                 title: "Bed-to-Bed Clearance Too Tight",
                                 detail: "Clearance between \(a.name) and \(b.name) is ~\(Int(clearance * 100))cm. Standard requires at least 91.4cm.",
-                                severity: .critical,
+                                severity: collidingPairs.contains([a.id, b.id]) ? .critical : .warning,
                                 affectedFurnitureName: a.name
                             ))
-                            score -= 15
+                            score -= 10
                             continue
                         }
                     }
@@ -114,13 +123,16 @@ public final class MockMascotAIService: MascotAIServiceProtocol {
                     let compliance = AnthropometricStandards.evaluateCirculation(clearanceInMeters: clearance)
                     switch compliance {
                     case .bottleneckCritical:
+                        let isPhysicallyColliding = collidingPairs.contains([a.id, b.id])
                         bottlenecks.append(SpatialBottleneck(
-                            title: "Critical Bottleneck Between \(a.name) & \(b.name)",
+                            title: isPhysicallyColliding
+                                ? "Critical Bottleneck Between \(a.name) & \(b.name)"
+                                : "Tight Walkway Between \(a.name) & \(b.name)",
                             detail: "Current clearance is ~\(Int(clearance * 100))cm. Below minimum 1-person passage of 76.2cm.",
-                            severity: .critical,
+                            severity: isPhysicallyColliding ? .critical : .warning,
                             affectedFurnitureName: a.name
                         ))
-                        score -= 15
+                        score -= isPhysicallyColliding ? 15 : 8
                     case .acceptableMinimum:
                         bottlenecks.append(SpatialBottleneck(
                             title: "Tight Walkway Between \(a.name) & \(b.name)",
@@ -135,27 +147,36 @@ public final class MockMascotAIService: MascotAIServiceProtocol {
                 }
             }
 
-            // Include exact AABB collisions, companion overlaps, and blocked doorway warnings from FastPathRulebook
-            let liveWarnings = FastPathRulebook().evaluateSpatialWarnings(
-                furnitures: furnitures,
-                roomDimensions: (width: room.dimensionsWidth, length: room.dimensionsLength)
-            )
-            for warning in liveWarnings where warning.severity == .collision {
+            // Include exact AABB collisions, companion overlaps, blocked doorways, and yellow caution warnings from FastPathRulebook
+            for warning in liveWarnings {
+                let mappedSeverity: BottleneckSeverity = warning.severity == .collision ? .critical : .warning
+                let firstFurnitureName = warning.furnitureIDs.first.flatMap { id in
+                    furnitures.first(where: { $0.id == id })?.name
+                }
                 let alreadyReported = bottlenecks.contains {
-                    $0.severity == .critical && $0.detail == warning.message
+                    ($0.severity == mappedSeverity && $0.detail == warning.message) ||
+                    (mappedSeverity == .warning && $0.severity == .warning && $0.affectedFurnitureName == firstFurnitureName && warning.furnitureIDs.count > 1)
                 }
                 if !alreadyReported {
-                    let firstFurnitureName = warning.furnitureIDs.first.flatMap { id in
-                        furnitures.first(where: { $0.id == id })?.name
-                    }
                     bottlenecks.append(SpatialBottleneck(
                         title: warning.title,
                         detail: warning.message,
-                        severity: .critical,
+                        severity: mappedSeverity,
                         affectedFurnitureName: firstFurnitureName
                     ))
-                    score -= 15
+                    score -= mappedSeverity == .critical ? 15 : 5
                 }
+            }
+
+            bottlenecks.sort { lhs, rhs in
+                let rank: (BottleneckSeverity) -> Int = {
+                    switch $0 {
+                    case .critical: return 2
+                    case .warning: return 1
+                    case .notice: return 0
+                    }
+                }
+                return rank(lhs.severity) > rank(rhs.severity)
             }
 
             let canAdvance = bottlenecks.filter { $0.severity == .critical }.isEmpty

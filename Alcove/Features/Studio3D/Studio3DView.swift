@@ -31,7 +31,7 @@ public struct Studio3DView: View {
     }
 
     public var body: some View {
-        Group {
+        ZStack {
             if viewModel.currentStage == .illumination {
                 LightingWorkspaceView(
                     room: room,
@@ -43,6 +43,11 @@ public struct Studio3DView: View {
                         viewModel.triggerStageEvaluation()
                     },
                     isAdvancing: viewModel.isEvaluating,
+                    onTapOtter: {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            viewModel.showingChatDrawer = true
+                        }
+                    },
                     onSelectStage: { targetStage in
                         viewModel.switchToStage(targetStage)
                         playSnapFeedback()
@@ -52,6 +57,27 @@ public struct Studio3DView: View {
                 }
             } else {
                 furnitureStudio
+            }
+
+            // Inline Otter Chat Overlay over any active stage (including Lighting)
+            if viewModel.showingChatDrawer {
+                MascotChatDrawer(
+                    mascotService: viewModel.mascotService,
+                    feedbackService: viewModel.feedbackService,
+                    currentStage: viewModel.currentStage,
+                    room: viewModel.room,
+                    initialHistory: viewModel.chatHistory,
+                    onHistoryUpdated: { updated in
+                        viewModel.chatHistory = updated
+                    },
+                    onClose: {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            viewModel.showingChatDrawer = false
+                        }
+                    }
+                )
+                .transition(.opacity)
+                .zIndex(32)
             }
         }
         .overlay {
@@ -300,26 +326,6 @@ public struct Studio3DView: View {
                     .zIndex(30)
                 }
 
-                // Inline Otter Chat Overlay over the 3D Room
-                if viewModel.showingChatDrawer {
-                    MascotChatDrawer(
-                        mascotService: viewModel.mascotService,
-                        feedbackService: viewModel.feedbackService,
-                        currentStage: viewModel.currentStage,
-                        room: viewModel.room,
-                        initialHistory: viewModel.chatHistory,
-                        onHistoryUpdated: { updated in
-                            viewModel.chatHistory = updated
-                        },
-                        onClose: {
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                viewModel.showingChatDrawer = false
-                            }
-                        }
-                    )
-                    .transition(.opacity)
-                    .zIndex(32)
-                }
             }
             .coordinateSpace(name: "Studio3DViewportSpace")
             .animation(.spring(response: 0.32, dampingFraction: 0.84), value: viewModel.isWalkthroughActive)
@@ -375,6 +381,22 @@ public struct Studio3DView: View {
 
     private var studioHeader: some View {
         StudioHeaderLayout(title: stageHeaderTitle) {
+            Button {
+                if let router {
+                    router.popToRoot()
+                } else {
+                    dismiss()
+                }
+                playSnapFeedback()
+            } label: {
+                Image(systemName: "house")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(Color(red: 0x6D / 255.0, green: 0x45 / 255.0, blue: 0x31 / 255.0))
+                    .frame(width: 45, height: 45)
+                    .background { tactileCircleBackground(isCoralActive: false) }
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Home")
             if viewModel.currentStage != .audit {
                 StudioStageButton(title: "Previous Stage", role: .previous) {
                     switch viewModel.currentStage {

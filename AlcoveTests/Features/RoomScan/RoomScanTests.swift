@@ -17,7 +17,8 @@ struct RoomScanTests {
         let objects = [
             ScannedObjectPayload(rawCategory: "bed", position: [-1.0, 0.4, -0.8], dimensions: [1.6, 0.85, 2.0], rotationYaw: 0),
             ScannedObjectPayload(rawCategory: "table", position: [1.2, 0.38, -1.2], dimensions: [1.3, 0.75, 0.7], rotationYaw: 0),
-            ScannedObjectPayload(rawCategory: "toilet", position: [0.0, 0.4, 0.0], dimensions: [0.5, 0.7, 0.6], rotationYaw: 0)
+            ScannedObjectPayload(rawCategory: "chair", position: [1.1, 0.45, -0.7], dimensions: [0.55, 0.85, 0.55], rotationYaw: 0.2),
+            ScannedObjectPayload(rawCategory: "chair", position: [1.4, 0.45, -0.7], dimensions: [0.55, 0.85, 0.55], rotationYaw: -0.2)
         ]
         let payload = CapturedRoomPayload(
             roomLength: 4.0,
@@ -25,7 +26,9 @@ struct RoomScanTests {
             roomHeight: 2.6,
             floorLevel: 0.0,
             walls: walls,
-            openings: [],
+            openings: [
+                ScannedOpeningPayload(type: "window", position: [0.0, 1.4, -2.0], dimensions: [1.4, 1.1, 0.1], rotationYaw: 0)
+            ],
             objects: objects
         )
 
@@ -33,10 +36,17 @@ struct RoomScanTests {
         #expect(room.name == "Scanned Bedroom")
         #expect(room.baselineLayout?.isBaseline == true)
         #expect(room.workingLayout?.isBaseline == false)
-        #expect(room.baselineLayout?.furnitures.count == 2)
-        #expect(room.workingLayout?.furnitures.count == 2)
+        // 1:1 preservation: nearby chairs and tables are not merged or moved
+        #expect(room.baselineLayout?.furnitures.count == 4)
+        #expect(room.workingLayout?.furnitures.count == 4)
         #expect(room.workingLayout?.furnitures.contains(where: { $0.category == .bed }) == true)
         #expect(room.workingLayout?.furnitures.contains(where: { $0.category == .table }) == true)
+        #expect(room.workingLayout?.furnitures.filter { $0.category == .seating }.count == 2)
+        #expect(room.planSnapshot?.wallSegments.count == 4)
+        #expect(room.planSnapshot?.openings.count == 1)
+
+        let shell = ProceduralRoomShellBuilder.buildShell(for: room)
+        #expect(shell.findEntity(named: "BackWallGroup") != nil)
     }
 
     @Test func viewModelValidatesCornerWallsAndProcessesPayload() throws {
@@ -101,14 +111,13 @@ struct RoomScanTests {
         #expect(vm.state == .cancelled)
     }
 
-    @Test func mapperAlignsLongestWallWithWidthAndClampsFurnitureInsideBounds() {
+    @Test func mapperAlignsLongestWallWithWidthAndPreservesExactPosition() {
         let walls = [
             ScannedWallPayload(position: [0, 1.3, -1.75], dimensions: [5.5, 2.6, 0.1], rotationYaw: 0),
             ScannedWallPayload(position: [0, 1.3, 1.75], dimensions: [5.5, 2.6, 0.1], rotationYaw: .pi),
             ScannedWallPayload(position: [2.75, 1.3, 0], dimensions: [3.5, 2.6, 0.1], rotationYaw: .pi / 2),
             ScannedWallPayload(position: [-2.75, 1.3, 0], dimensions: [3.5, 2.6, 0.1], rotationYaw: -.pi / 2)
         ]
-        // Sofa pushed right up to / slightly past the +X wall edge should be clamped cleanly inside room bounds.
         let objects = [
             ScannedObjectPayload(rawCategory: "sofa", position: [2.5, 0.4, 1.5], dimensions: [2.0, 0.8, 0.9], rotationYaw: 0)
         ]
@@ -122,15 +131,15 @@ struct RoomScanTests {
             objects: objects
         )
 
-        let room = RoomCaptureMapper().mapToRoom(payload: payload, roomName: "Clamped Scan")
-        #expect(room.dimensionsWidth == 5.5)
-        #expect(room.dimensionsLength == 3.5)
+        let room = RoomCaptureMapper().mapToRoom(payload: payload, roomName: "Exact Scan")
+        #expect(abs(room.dimensionsWidth - 5.5) < 0.01)
+        #expect(abs(room.dimensionsLength - 3.5) < 0.01)
 
         let sofa = room.workingLayout?.furnitures.first
         #expect(sofa != nil)
         if let sofa {
-            #expect(abs(sofa.positionX) + sofa.width / 2.0 <= room.dimensionsWidth / 2.0 + 0.001)
-            #expect(abs(sofa.positionZ) + sofa.length / 2.0 <= room.dimensionsLength / 2.0 + 0.001)
+            #expect(abs(sofa.positionX - 2.5) < 0.01)
+            #expect(abs(sofa.positionZ - 1.5) < 0.01)
         }
     }
 }

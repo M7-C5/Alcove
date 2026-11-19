@@ -52,3 +52,7 @@
 
 ### LP-017: Synced Project & Signing Discipline
 * **Rule**: `Alcove.xcodeproj/project.xcproj` uses Xcode synchronized folder groups, so new Swift files and `.colorset` assets under `Alcove/` and `AlcoveTests/` are picked up automatically. Keep local signing overrides (`DEVELOPMENT_TEAM`, `PRODUCT_BUNDLE_IDENTIFIER`) out of PRs and commits.
+
+### LP-018: Multiple Live ARView Starvation & Camera Startup Race Trap
+* **Problem**: Keeping multiple live RealityKit `ARView`s mounted (e.g., 3D thumbnail cards on `DashboardView` behind `NavigationStack`/`fullScreenCover`) starves RealityKit's shared GPU/Metal pipeline and causes `RoomCaptureView` / `ARWalkthroughView` to hang and black-screen with `FigCaptureSourceRemote err=-12784` / `-12710`. Starting `ARSession` before `AVCaptureDevice` authorization or before `bounds.size > 1` also leaves the camera feed black.
+* **Rule**: Snapshot offscreen/card 3D previews into `UIImage` once rendered and immediately dismantle the `ARView`. Only mount or run `ARView` / `RoomCaptureView` sessions after camera permission is `.authorized` and the view has a `UIWindow` with non-zero bounds (`> 1pt`).
