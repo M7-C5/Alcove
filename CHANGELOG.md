@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Enter Result hub immediately upon finishing Stage 4 Lighting.
 - Keep unlocked stages green and add post-completion Result hub.
 - Hide header on zoom overlap and use secondary style for warning override button.
 - Add smooth celebration and refine preview controls.
