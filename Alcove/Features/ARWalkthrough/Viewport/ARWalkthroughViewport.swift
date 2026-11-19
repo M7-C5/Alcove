@@ -1,6 +1,7 @@
 import SwiftUI
 import RealityKit
 import ARKit
+import AVFoundation
 import Combine
 
 /// 1:1 Life-Size AR Viewport wrapping RealityKit's `ARView(cameraMode: .ar)`.
@@ -92,10 +93,12 @@ public struct ARWalkthroughViewport: UIViewRepresentable {
         func startSessionOnce(in arView: ARView) {
             guard ARWorldTrackingConfiguration.isSupported else { return }
             guard !isSessionRunning else { return }
+            guard AVCaptureDevice.authorizationStatus(for: .video) == .authorized else { return }
+            guard arView.window != nil, arView.bounds.width > 1, arView.bounds.height > 1 else { return }
 
             let config = ARWorldTrackingConfiguration()
             config.planeDetection = [.horizontal]
-            config.environmentTexturing = .automatic
+            config.environmentTexturing = .none
             config.isLightEstimationEnabled = true
             arView.session.delegate = self
             arView.session.run(config, options: [.resetTracking, .removeExistingAnchors])
@@ -350,10 +353,30 @@ public struct ARWalkthroughViewport: UIViewRepresentable {
 public final class WalkthroughARView: ARView {
     var onWindowAttached: (() -> Void)?
 
+    public required init(frame frameRect: CGRect) {
+        super.init(frame: frameRect, cameraMode: .ar, automaticallyConfigureSession: false)
+    }
+
+    @available(*, unavailable)
+    @MainActor @preconcurrency dynamic required init?(coder decoder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
     public override func didMoveToWindow() {
         super.didMoveToWindow()
-        if window != nil {
-            onWindowAttached?()
+        notifyIfReady()
+    }
+
+    public override func layoutSubviews() {
+        super.layoutSubviews()
+        notifyIfReady()
+    }
+
+    private func notifyIfReady() {
+        guard window != nil, bounds.width > 1, bounds.height > 1 else { return }
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.window != nil, self.bounds.width > 1, self.bounds.height > 1 else { return }
+            self.onWindowAttached?()
         }
     }
 }

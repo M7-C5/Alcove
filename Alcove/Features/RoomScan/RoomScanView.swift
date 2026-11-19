@@ -5,6 +5,7 @@ import SwiftData
 public struct RoomScanView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.openURL) private var openURL
     @State private var viewModel = RoomScanViewModel()
 
     public var onScanComplete: ((UUID) -> Void)?
@@ -43,16 +44,18 @@ public struct RoomScanView: View {
         Group {
             if viewModel.state == .unsupported {
                 hardwareRequiredView
+            } else if viewModel.state == .cameraDenied {
+                cameraPermissionView
             } else {
                 scannerView
             }
         }
+        .task {
+            await viewModel.ensureCameraPermissionIfNeeded()
+        }
         .onAppear {
             if case .completed = viewModel.state {
                 viewModel.reset()
-            }
-            if viewModel.state == .ready {
-                viewModel.startScanning()
             }
         }
         .onDisappear {
@@ -76,19 +79,26 @@ public struct RoomScanView: View {
         ZStack {
             Color.black.ignoresSafeArea()
 
-            RoomCaptureViewWrapper(
-                captureView: viewModel.captureView,
-                isCancelled: viewModel.isCancelled,
-                onComplete: { capturedRoom in
-                    viewModel.process(capturedRoom: capturedRoom, modelContext: modelContext)
-                },
-                onError: { error in
-                    if !viewModel.isCancelled {
-                        viewModel.state = .error(error.localizedDescription)
+            if viewModel.isCameraAuthorized {
+                RoomCaptureViewWrapper(
+                    captureView: viewModel.captureView,
+                    isCancelled: viewModel.isCancelled,
+                    onReadyToScan: {
+                        if viewModel.state == .ready {
+                            viewModel.startScanning()
+                        }
+                    },
+                    onComplete: { capturedRoom in
+                        viewModel.process(capturedRoom: capturedRoom, modelContext: modelContext)
+                    },
+                    onError: { error in
+                        if !viewModel.isCancelled {
+                            viewModel.state = .error(error.localizedDescription)
+                        }
                     }
-                }
-            )
-            .ignoresSafeArea()
+                )
+                .ignoresSafeArea()
+            }
 
             RoomScanOverlayView(
                 state: viewModel.state,
@@ -154,6 +164,54 @@ public struct RoomScanView: View {
                 .zIndex(2)
             }
         }
+    }
+
+    private var cameraPermissionView: some View {
+        VStack(spacing: 24) {
+            Spacer()
+
+            Image(systemName: "camera.badge.ellipsis")
+                .font(.system(size: 54))
+                .foregroundStyle(Color.alcoveInk)
+
+            VStack(spacing: 8) {
+                Text("Camera Access Required")
+                    .font(.custom("Cleanow", size: 30, relativeTo: .title))
+                    .foregroundStyle(Color.alcoveInk)
+
+                Text("Alcove requires camera access to scan your room in 3D. Please enable camera access in Settings.")
+                    .font(.system(.title3, design: .rounded, weight: .medium))
+                    .foregroundStyle(Color.alcoveMutedInk)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 40)
+            }
+
+            Spacer()
+
+            VStack(spacing: 12) {
+                TactilePillButton(
+                    title: "Open Settings",
+                    size: .compact,
+                    appearance: .primary
+                ) {
+                    if let url = URL(string: UIApplication.openSettingsURLString) {
+                        openURL(url)
+                    }
+                }
+
+                TactilePillButton(
+                    title: "Cancel",
+                    size: .compact,
+                    appearance: .cream
+                ) {
+                    onCancel?()
+                    dismiss()
+                }
+            }
+            .padding(.bottom, 32)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.alcoveBackground.ignoresSafeArea())
     }
 
     private var hardwareRequiredView: some View {

@@ -1,4 +1,5 @@
 import Foundation
+import AVFoundation
 import CoreGraphics
 import Observation
 import RoomPlan
@@ -12,6 +13,7 @@ public final class RoomScanViewModel {
     public enum ScanState: Equatable {
         case checkingHardware
         case unsupported
+        case cameraDenied
         case ready
         case scanning
         case processing
@@ -26,6 +28,37 @@ public final class RoomScanViewModel {
 
     public var isSupported: Bool {
         RoomCaptureSession.isSupported
+    }
+
+    public private(set) var isCameraAuthorized: Bool = {
+        #if targetEnvironment(simulator)
+        return true
+        #else
+        return AVCaptureDevice.authorizationStatus(for: .video) == .authorized
+        #endif
+    }()
+
+    public func ensureCameraPermissionIfNeeded() async {
+        #if !targetEnvironment(simulator)
+        guard isSupported else { return }
+        let status = AVCaptureDevice.authorizationStatus(for: .video)
+        switch status {
+        case .authorized:
+            isCameraAuthorized = true
+            if state == .cameraDenied { state = .ready }
+        case .notDetermined:
+            let granted = await AVCaptureDevice.requestAccess(for: .video)
+            guard !isCancelled else { return }
+            isCameraAuthorized = granted
+            state = granted ? .ready : .cameraDenied
+        case .denied, .restricted:
+            isCameraAuthorized = false
+            state = .cameraDenied
+        @unknown default:
+            isCameraAuthorized = false
+            state = .cameraDenied
+        }
+        #endif
     }
 
     @ObservationIgnored private var _captureView: RoomCaptureView?
@@ -63,6 +96,28 @@ public final class RoomScanViewModel {
             return
         }
 
+        let status = AVCaptureDevice.authorizationStatus(for: .video)
+        switch status {
+        case .authorized:
+            runCaptureSession()
+        case .notDetermined:
+            Task { @MainActor [weak self] in
+                let granted = await AVCaptureDevice.requestAccess(for: .video)
+                guard let self, !self.isCancelled else { return }
+                if granted {
+                    self.runCaptureSession()
+                } else {
+                    self.state = .cameraDenied
+                }
+            }
+        case .denied, .restricted:
+            state = .cameraDenied
+        @unknown default:
+            state = .cameraDenied
+        }
+    }
+
+    private func runCaptureSession() {
         isCancelled = false
         isShowingConfirmationAlert = false
         compassCapture.start()

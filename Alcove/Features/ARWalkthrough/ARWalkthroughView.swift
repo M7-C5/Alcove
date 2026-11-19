@@ -16,9 +16,13 @@ public struct ARWalkthroughView: View {
 
     public var body: some View {
         ZStack(alignment: .topLeading) {
-            // Full-screen 1:1 AR Viewport
-            ARWalkthroughViewport(room: room, viewModel: viewModel)
-                .ignoresSafeArea()
+            // Full-screen 1:1 AR Viewport (mounted only once camera permission is authorized)
+            if viewModel.cameraPermission == .authorized {
+                ARWalkthroughViewport(room: room, viewModel: viewModel)
+                    .ignoresSafeArea()
+            } else {
+                Color.black.ignoresSafeArea()
+            }
 
             // Top Navigation HUD: Dismiss button & Instruction pill
             HStack(spacing: 14) {
