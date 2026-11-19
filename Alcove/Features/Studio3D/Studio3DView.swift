@@ -22,6 +22,7 @@ public struct Studio3DView: View {
     @State private var viewportFrame: CGRect = .zero
     @State private var isCameraMenuPresented: Bool = false
     @State private var selectedCameraPreset: ViewportPreset = .dollhouse
+    @State private var headerOverlapped: Bool = false
     @State private var congratulationsAssets = CongratulationsAssetStore()
 
     public init(room: Room, stage: StageType = .rearrangement) {
@@ -166,12 +167,15 @@ public struct Studio3DView: View {
                 VStack(spacing: 12) {
                     studioHeader
                     stageProgressBar
+                        .opacity(headerOverlapped ? 0 : 1)
+                        .accessibilityHidden(headerOverlapped)
                     Spacer()
                 }
                 .padding(.horizontal, 28)
                 .padding(.top, 16)
                 .padding(.bottom, 16)
                 .safeAreaPadding(.top)
+                .animation(.easeInOut(duration: 0.2), value: headerOverlapped)
 
                 // Bottom-Center Furniture Archive Dock (when archive open)
                 if viewModel.isArchiveListPresented && viewModel.currentStage.unlockedTools.contains(.inventoryArchive) && viewModel.currentStage != .harmony {
@@ -382,7 +386,7 @@ public struct Studio3DView: View {
     // MARK: - Top Header & 5-Step Stage Stepper (Figma / Light Stage Style)
 
     private var studioHeader: some View {
-        StudioHeaderLayout(title: stageHeaderTitle) {
+        StudioHeaderLayout(title: stageHeaderTitle, titleHidden: headerOverlapped) {
             Button {
                 if let router {
                     router.popToRoot()
@@ -566,7 +570,8 @@ public struct Studio3DView: View {
                                     }
                                     playSnapFeedback()
                                 }
-                            }
+                            },
+                            onHeaderOverlap: { headerOverlapped = $0 }
                         )
                         .background {
                             GeometryReader { frameProxy in
