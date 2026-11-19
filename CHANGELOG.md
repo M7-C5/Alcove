@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Hide header on zoom overlap and use secondary style for warning override button.
 - Add smooth celebration and refine preview controls.
 - Add Home button to return to dashboard.
 - Make Otter badge clickable to open design chat.
