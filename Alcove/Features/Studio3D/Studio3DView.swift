@@ -31,12 +31,16 @@ public struct Studio3DView: View {
     public init(room: Room, stage: StageType = .rearrangement) {
         self.room = room
         self.stage = stage
-        let completedCurriculum = room.isCompleted(.harmony)
+        let completedCurriculum = room.isCompleted(.harmony) || room.isUnlocked(.harmony)
         self._isFreeEditResultMode = State(initialValue: completedCurriculum)
         self._viewModel = State(initialValue: Studio3DViewModel(room: room, stage: completedCurriculum ? .harmony : stage))
     }
 
     private func returnToDashboard() {
+        if isFreeEditResultMode && !room.isCompleted(.harmony) {
+            let metrics = viewModel.currentHarmonyMetrics
+            room.completeStage(.harmony, score: metrics.overallHarmonyScore, feedback: metrics.summaryVerdict)
+        }
         if let router {
             router.popToRoot()
         } else {
@@ -117,6 +121,12 @@ public struct Studio3DView: View {
                 )
                 .transition(.opacity)
                 .zIndex(32)
+            }
+        }
+        .onChange(of: viewModel.currentStage) { _, newStage in
+            if newStage == .harmony && !isFreeEditResultMode {
+                isFreeEditResultMode = true
+                resultMode = .overview
             }
         }
         .overlay {
