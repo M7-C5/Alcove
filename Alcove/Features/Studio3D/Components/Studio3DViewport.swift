@@ -120,7 +120,9 @@ public struct Studio3DViewport: UIViewRepresentable {
         context.coordinator.onFurnitureDragging = onFurnitureDragging
         context.coordinator.onComputeWarningSeverities = onComputeWarningSeverities
         context.coordinator.updateRoomLighting()
-        context.coordinator.updateFurnitureEntities(from: room)
+        if !context.coordinator.isTranslatingFurniture {
+            context.coordinator.updateFurnitureEntities(from: room)
+        }
         context.coordinator.updateSelectionHalos()
         context.coordinator.updateSelectedProjection()
         context.coordinator.onTapBackground = onTapBackground
@@ -446,20 +448,32 @@ public struct Studio3DViewport: UIViewRepresentable {
         func projectToFloor(from screenPoint: CGPoint, in arView: ARView) -> SIMD3<Float>? {
             guard let ray = arView.ray(through: screenPoint) else { return nil }
             let floorY: Float = 0.0
-            guard abs(ray.direction.y) > 1e-4 else {
-                let projected = ray.origin + distance * ray.direction
+            let maxT = max(distance * 3.0, cameraController.span * 2.5)
+            // At very shallow/upward grazing angles (heavy zoom + low pitch), avoid exploding intersections.
+            guard ray.direction.y < -0.05 else {
+                let projected = ray.origin + min(distance, maxT) * ray.direction
                 return SIMD3<Float>(projected.x, floorY, projected.z)
             }
-            let t = (floorY - ray.origin.y) / ray.direction.y
+            let t = min(maxT, (floorY - ray.origin.y) / ray.direction.y)
             if t > 0 {
-                return ray.origin + t * ray.direction
+                let hit = ray.origin + t * ray.direction
+                return SIMD3<Float>(hit.x, floorY, hit.z)
             } else {
-                let projected = ray.origin + distance * ray.direction
+                let projected = ray.origin + min(distance, maxT) * ray.direction
                 return SIMD3<Float>(projected.x, floorY, projected.z)
             }
         }
 
         // MARK: - Gesture Setup & Handling
+
+        private weak var twoFingerPanGesture: UIPanGestureRecognizer?
+        private weak var pinchGesture: UIPinchGestureRecognizer?
+        private var twoFingerPanStartTarget: SIMD3<Float> = .zero
+
+        var isTranslatingFurniture: Bool {
+            if case .translating = dragMode { return true }
+            return false
+        }
 
         private func setupGestures(in arView: ARView) {
             let tap = UITapGestureRecognizer(target: self, action: #selector(handleTap(_:)))
@@ -467,19 +481,31 @@ public struct Studio3DViewport: UIViewRepresentable {
             arView.addGestureRecognizer(tap)
 
             let pan = UIPanGestureRecognizer(target: self, action: #selector(handlePan(_:)))
+            pan.maximumNumberOfTouches = 1
             pan.delegate = self
             arView.addGestureRecognizer(pan)
+
+            let twoFingerPan = UIPanGestureRecognizer(target: self, action: #selector(handleTwoFingerPan(_:)))
+            twoFingerPan.minimumNumberOfTouches = 2
+            twoFingerPan.maximumNumberOfTouches = 2
+            twoFingerPan.delegate = self
+            arView.addGestureRecognizer(twoFingerPan)
+            self.twoFingerPanGesture = twoFingerPan
 
             let pinch = UIPinchGestureRecognizer(target: self, action: #selector(handlePinch(_:)))
             pinch.delegate = self
             arView.addGestureRecognizer(pinch)
+            self.pinchGesture = pinch
         }
 
         public func gestureRecognizer(
             _ gestureRecognizer: UIGestureRecognizer,
             shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer
         ) -> Bool {
-            false
+            let isTwoFingerAndPinch =
+                (gestureRecognizer === twoFingerPanGesture && otherGestureRecognizer === pinchGesture) ||
+                (gestureRecognizer === pinchGesture && otherGestureRecognizer === twoFingerPanGesture)
+            return isTwoFingerAndPinch
         }
 
         @objc private func handleTap(_ gesture: UITapGestureRecognizer) {
@@ -618,7 +644,7 @@ public struct Studio3DViewport: UIViewRepresentable {
                 }
                 dragMode = .none
 
-            case .cancelled:
+            case .cancelled, .failed:
                 dragMode = .none
 
             default:
@@ -637,6 +663,27 @@ public struct Studio3DViewport: UIViewRepresentable {
                     updateCamera()
                     updateSelectedProjection()
                 }
+            default:
+                break
+            }
+        }
+
+        @objc private func handleTwoFingerPan(_ gesture: UIPanGestureRecognizer) {
+            guard let arView = arView else { return }
+            switch gesture.state {
+            case .began:
+                animationTask?.cancel()
+                twoFingerPanStartTarget = cameraController.target
+            case .changed:
+                let translation = gesture.translation(in: arView)
+                cameraController.panAnchor(
+                    from: twoFingerPanStartTarget,
+                    deltaX: translation.x,
+                    deltaY: translation.y
+                )
+                updateCamera()
+                updateWallCutaways()
+                updateSelectedProjection()
             default:
                 break
             }

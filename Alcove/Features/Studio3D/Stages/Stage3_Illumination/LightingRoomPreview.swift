@@ -62,13 +62,18 @@ struct LightingRoomPreview: UIViewRepresentable {
         view.scene.addAnchor(context.coordinator.root)
         let pan = UIPanGestureRecognizer(target: context.coordinator, action: #selector(LightingRoomScene.orbit(_:)))
         pan.maximumNumberOfTouches = 1
+        let twoFingerPan = UIPanGestureRecognizer(target: context.coordinator, action: #selector(LightingRoomScene.panAnchor(_:)))
+        twoFingerPan.minimumNumberOfTouches = 2
+        twoFingerPan.maximumNumberOfTouches = 2
         let pinch = UIPinchGestureRecognizer(target: context.coordinator, action: #selector(LightingRoomScene.magnify(_:)))
         view.addGestureRecognizer(pan)
+        view.addGestureRecognizer(twoFingerPan)
         view.addGestureRecognizer(pinch)
         let reset = UITapGestureRecognizer(target: context.coordinator, action: #selector(LightingRoomScene.resetCamera))
         reset.numberOfTapsRequired = 2
         view.addGestureRecognizer(reset)
         context.coordinator.panGesture = pan
+        context.coordinator.twoFingerPanGesture = twoFingerPan
         context.coordinator.pinchGesture = pinch
         context.coordinator.resetGesture = reset
         let tap = UITapGestureRecognizer(target: context.coordinator, action: #selector(LightingRoomScene.tapLayout(_:)))
@@ -140,6 +145,7 @@ final class LightingRoomScene: NSObject {
     private(set) var isPlacementMode = false
     var isSelectingMultiple = false
     weak var panGesture: UIPanGestureRecognizer?
+    weak var twoFingerPanGesture: UIPanGestureRecognizer?
     weak var pinchGesture: UIPinchGestureRecognizer?
     weak var resetGesture: UITapGestureRecognizer?
     var onPlaceLight: ((SIMD2<Float>) -> Void)?
@@ -486,6 +492,20 @@ final class LightingRoomScene: NSObject {
         cameraController.magnify(from: cameraController.distance, scale: Float(gesture.scale))
         gesture.scale = 1
         positionCamera()
+    }
+
+    @objc func panAnchor(_ gesture: UIPanGestureRecognizer) {
+        guard !isPlacementMode, let view = gesture.view as? ARView else { return }
+        if gesture.state == .changed {
+            let delta = gesture.translation(in: view)
+            cameraController.panAnchor(
+                from: cameraController.target,
+                deltaX: delta.x,
+                deltaY: delta.y
+            )
+            gesture.setTranslation(.zero, in: view)
+            positionCamera()
+        }
     }
 
     @objc func resetCamera() {

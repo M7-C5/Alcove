@@ -10,15 +10,19 @@ final class StudioOrbitCameraController {
     var pitch: Float = 0.62
     var distance: Float
     var target: SIMD3<Float>
+    let defaultTarget: SIMD3<Float>
     let span: Float
+    let roomHeight: Float
     let initialDistance: Float
     private(set) var animationTask: Task<Void, Never>?
 
     init(width: Double, length: Double, height: Double) {
         span = Float(max(width, length, 3))
+        roomHeight = Float(max(height, 2.0))
         initialDistance = min(20, max(5, span * 1.5))
         distance = initialDistance
-        target = [0, Float(height) * 0.35, 0]
+        defaultTarget = [0, Float(height) * 0.35, 0]
+        target = defaultTarget
     }
 
     var position: SIMD3<Float> {
@@ -54,16 +58,35 @@ final class StudioOrbitCameraController {
         distance = min(span * 3.5, max(span * 0.6, startDistance / scale))
     }
 
-    /// Preserve Audit's 350 ms easing and shortest yaw path; presets preserve zoom.
+    /// Shifts the camera orbit anchor horizontally and vertically in camera screen space (two-finger pan).
+    func panAnchor(from startTarget: SIMD3<Float>, deltaX: Double, deltaY: Double) {
+        guard deltaX.isFinite, deltaY.isFinite else { return }
+        cancelAnimation()
+        let scale = distance * 0.0022
+        let right = SIMD3<Float>(cos(yaw), 0, -sin(yaw))
+        let up = SIMD3<Float>(-sin(pitch) * sin(yaw), cos(pitch), -sin(pitch) * cos(yaw))
+        let rawTarget = startTarget - right * Float(deltaX) * scale + up * Float(deltaY) * scale
+        let maxHoriz = span * 0.9
+        let maxY = max(roomHeight * 1.2, 3.0)
+        target = SIMD3<Float>(
+            min(maxHoriz, max(-maxHoriz, rawTarget.x)),
+            min(maxY, max(0, rawTarget.y)),
+            min(maxHoriz, max(-maxHoriz, rawTarget.z))
+        )
+    }
+
+    /// Preserve Audit's 350 ms easing and shortest yaw path; presets preserve zoom and re-center the anchor.
     func snap(to preset: ViewportPreset, animated: Bool = true, onUpdate: @escaping @MainActor () -> Void) {
         let startYaw = yaw
         let startPitch = pitch
+        let startTarget = target
         let targetYaw = preset.targetYaw
         let targetPitch = preset.targetPitch
         cancelAnimation()
         guard animated else {
             yaw = targetYaw
             pitch = targetPitch
+            target = defaultTarget
             onUpdate()
             return
         }
@@ -78,6 +101,7 @@ final class StudioOrbitCameraController {
                 let t = Float(progress < 0.5 ? 2 * progress * progress : 1 - pow(-2 * progress + 2, 2) / 2)
                 yaw = startYaw + deltaYaw * t
                 pitch = startPitch + (targetPitch - startPitch) * t
+                target = startTarget + (defaultTarget - startTarget) * t
                 onUpdate()
                 if progress >= 1 { break }
                 try? await Task.sleep(nanoseconds: 16_000_000)
