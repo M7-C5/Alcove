@@ -53,11 +53,13 @@ public struct ScannedOpeningPayload: Sendable {
     public let type: String          // "window", "door", "opening"
     public let position: SIMD3<Float>
     public let dimensions: SIMD3<Float>
+    public let rotationYaw: Float
 
-    public init(type: String, position: SIMD3<Float>, dimensions: SIMD3<Float>) {
+    public init(type: String, position: SIMD3<Float>, dimensions: SIMD3<Float>, rotationYaw: Float = 0.0) {
         self.type = type
         self.position = position
         self.dimensions = dimensions
+        self.rotationYaw = rotationYaw
     }
 }
 
@@ -108,19 +110,49 @@ public struct CapturedRoomPayload: Sendable {
     }
 }
 
-/// Scan-local projection data used to draw the captured room in a stable 2D plan.
-public struct RoomPlanSnapshot: Codable, Sendable, Hashable {
-    public struct WallSegment: Codable, Sendable, Hashable {
+/// Scan-local projection data used to draw the captured room walls, openings, and objects 1:1.
+nonisolated public struct RoomPlanSnapshot: Codable, Sendable, Hashable {
+    nonisolated public struct WallSegment: Codable, Sendable, Hashable {
         public let startX: Float
         public let startZ: Float
         public let endX: Float
         public let endZ: Float
+        public let height: Float
 
-        public init(startX: Float, startZ: Float, endX: Float, endZ: Float) {
+        public init(startX: Float, startZ: Float, endX: Float, endZ: Float, height: Float = 2.6) {
             self.startX = startX
             self.startZ = startZ
             self.endX = endX
             self.endZ = endZ
+            self.height = height
+        }
+    }
+
+    nonisolated public struct OpeningSegment: Codable, Sendable, Hashable {
+        public let type: String
+        public let centerX: Float
+        public let centerZ: Float
+        public let bottomY: Float
+        public let width: Float
+        public let height: Float
+        public let yaw: Float
+
+        public init(
+            type: String,
+            centerX: Float,
+            centerZ: Float,
+            bottomY: Float,
+            width: Float,
+            height: Float,
+            yaw: Float
+        ) {
+            self.type = type
+            self.centerX = centerX
+            self.centerZ = centerZ
+            self.bottomY = bottomY
+            self.width = width
+            self.height = height
+            self.yaw = yaw
         }
     }
 
@@ -129,14 +161,20 @@ public struct RoomPlanSnapshot: Codable, Sendable, Hashable {
     public let yawRadians: Float
     public let floorLevel: Float?
     public let wallSegments: [WallSegment]
+    public let openings: [OpeningSegment]
 
-    public init(walls: [ScannedWallPayload], floorLevel: Float? = nil) {
+    public init(
+        walls: [ScannedWallPayload],
+        openings: [ScannedOpeningPayload] = [],
+        floorLevel: Float? = nil
+    ) {
         self.floorLevel = floorLevel
         guard let primaryWall = walls.max(by: { $0.dimensions.x < $1.dimensions.x }) else {
             centerX = 0
             centerZ = 0
             yawRadians = 0
             wallSegments = []
+            self.openings = []
             return
         }
 
@@ -145,9 +183,11 @@ public struct RoomPlanSnapshot: Codable, Sendable, Hashable {
         let sine = sin(yaw)
         let axisX = SIMD2<Float>(cosine, -sine)
         let axisZ = SIMD2<Float>(sine, cosine)
-        let wallCenters = walls.map { SIMD2<Float>($0.position.x, $0.position.z) }
-        let xProjections = wallCenters.map { $0.x * axisX.x + $0.y * axisX.y }
-        let zProjections = wallCenters.map { $0.x * axisZ.x + $0.y * axisZ.y }
+
+        // Center on the bounding box of all wall endpoints so partial 2-3 wall scans stay centered
+        let endpoints = walls.flatMap { [$0.startPoint, $0.endPoint] }
+        let xProjections = endpoints.map { $0.x * axisX.x + $0.y * axisX.y }
+        let zProjections = endpoints.map { $0.x * axisZ.x + $0.y * axisZ.y }
 
         let centerAlongX = ((xProjections.min() ?? 0) + (xProjections.max() ?? 0)) / 2
         let centerAlongZ = ((zProjections.min() ?? 0) + (zProjections.max() ?? 0)) / 2
@@ -172,7 +212,34 @@ public struct RoomPlanSnapshot: Codable, Sendable, Hashable {
                 cosine: cosine,
                 sine: sine
             )
-            return WallSegment(startX: start.x, startZ: start.y, endX: end.x, endZ: end.y)
+            return WallSegment(
+                startX: start.x,
+                startZ: start.y,
+                endX: end.x,
+                endZ: end.y,
+                height: max(2.2, wall.dimensions.y)
+            )
+        }
+
+        let baseFloorY = floorLevel ?? 0.0
+        self.openings = openings.map { opening in
+            let localCenter = Self.localPoint(
+                SIMD2<Float>(opening.position.x, opening.position.z),
+                centerX: worldCenterX,
+                centerZ: worldCenterZ,
+                cosine: cosine,
+                sine: sine
+            )
+            let bottomY = max(0.0, (opening.position.y - opening.dimensions.y / 2.0) - baseFloorY)
+            return OpeningSegment(
+                type: opening.type,
+                centerX: localCenter.x,
+                centerZ: localCenter.y,
+                bottomY: bottomY,
+                width: max(0.2, opening.dimensions.x),
+                height: max(0.2, opening.dimensions.y),
+                yaw: opening.rotationYaw - yaw
+            )
         }
     }
 
