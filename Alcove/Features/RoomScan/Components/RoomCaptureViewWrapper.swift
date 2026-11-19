@@ -41,17 +41,20 @@ public final class RoomCaptureCoordinator: NSObject, RoomCaptureViewDelegate {
 public struct RoomCaptureViewWrapper: UIViewRepresentable {
     public let captureView: RoomCaptureView
     public let isCancelled: Bool
+    public let onReadyToScan: (() -> Void)?
     public let onComplete: (CapturedRoom) -> Void
     public let onError: (Error) -> Void
 
     public init(
         captureView: RoomCaptureView,
         isCancelled: Bool = false,
+        onReadyToScan: (() -> Void)? = nil,
         onComplete: @escaping (CapturedRoom) -> Void,
         onError: @escaping (Error) -> Void = { _ in }
     ) {
         self.captureView = captureView
         self.isCancelled = isCancelled
+        self.onReadyToScan = onReadyToScan
         self.onComplete = onComplete
         self.onError = onError
     }
@@ -68,6 +71,12 @@ public struct RoomCaptureViewWrapper: UIViewRepresentable {
         context.coordinator.isCancelled = isCancelled
         context.coordinator.onComplete = onComplete
         context.coordinator.onError = onError
+        if uiView.window != nil, uiView.bounds.width > 1, uiView.bounds.height > 1 {
+            DispatchQueue.main.async {
+                guard uiView.window != nil, uiView.bounds.width > 1, uiView.bounds.height > 1 else { return }
+                onReadyToScan?()
+            }
+        }
     }
 
     public func makeCoordinator() -> RoomCaptureCoordinator {
