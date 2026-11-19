@@ -82,4 +82,24 @@ struct SharedStudioCameraTests {
         #expect(camera.pitch == ViewportPreset.right.targetPitch)
         #expect(camera.animationTask == nil)
     }
+
+    @Test func twoFingerPanMovesCameraAnchorHorizontallyAndVerticallyAndSnapResetsToCenter() {
+        let camera = StudioOrbitCameraController(width: 4, length: 5, height: 2.6)
+        let center = camera.defaultTarget
+        #expect(camera.target == center)
+
+        // Pan horizontally and vertically in camera screen space
+        camera.panAnchor(from: center, deltaX: 120, deltaY: 80)
+        #expect(camera.target.x < center.x)
+        #expect(camera.target.y > center.y)
+
+        // Extreme pan stays clamped within room bounds
+        camera.panAnchor(from: center, deltaX: 100_000, deltaY: -100_000)
+        #expect(camera.target.x >= -camera.span * 0.9)
+        #expect(camera.target.y >= 0)
+
+        // Snapping to a preset re-centers the anchor on the room
+        camera.snap(to: .dollhouse, animated: false) {}
+        #expect(camera.target == center)
+    }
 }
