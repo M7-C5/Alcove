@@ -24,45 +24,44 @@ public struct ARWalkthroughView: View {
                 Color.black.ignoresSafeArea()
             }
 
-            // Top Navigation HUD: Dismiss button & Instruction pill
-            HStack(spacing: 14) {
-                // Circular Close Button (44x44pt HIG compliant)
-                Button {
-                    dismiss()
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(.primary)
-                        .frame(width: 44, height: 44)
-                        .background(.regularMaterial, in: Circle())
-                        .overlay(Circle().stroke(Color.primary.opacity(0.08), lineWidth: 1))
-                        .shadow(color: Color.black.opacity(0.08), radius: 6, y: 2)
+            // Top Navigation HUD: Back button & Instruction pill
+            ZStack {
+                HStack {
+                    StudioStageButton(title: "Back", role: .previous) {
+                        StudioViewportFeedback.snap()
+                        dismiss()
+                    }
+                    .accessibilityLabel("Exit AR Walkthrough")
+
+                    Spacer()
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Exit AR Walkthrough")
 
-                Spacer()
+                // Center Status / Guidance Pill (Alcove cream notification capsule)
+                HStack(spacing: 10) {
+                    ZStack {
+                        Circle()
+                            .fill(viewModel.isPlaced ? Color.alcoveProgressDone : Color.alcovePrimaryFill)
+                        Circle()
+                            .stroke(Color.alcoveInk, lineWidth: 1.75)
+                        Image(systemName: viewModel.isPlaced ? "checkmark" : "viewfinder")
+                            .font(.system(size: 12, weight: .heavy))
+                            .foregroundStyle(Color.alcoveInk)
+                    }
+                    .frame(width: 26, height: 26)
 
-                // Center Status / Guidance Pill
-                HStack(spacing: 8) {
-                    Image(systemName: viewModel.isPlaced ? "checkmark.circle.fill" : "viewfinder")
-                        .foregroundStyle(viewModel.isPlaced ? Color.green : Color.accentColor)
                     Text(viewModel.instructionMessage)
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.primary)
+                        .font(.system(.subheadline, design: .rounded, weight: .bold))
+                        .foregroundStyle(Color.alcoveInk)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.85)
                 }
-                .padding(.horizontal, 16)
+                .padding(.leading, 10)
+                .padding(.trailing, 16)
                 .frame(minHeight: 44)
-                .background(.regularMaterial, in: Capsule())
-                .overlay(Capsule().stroke(Color.primary.opacity(0.08), lineWidth: 1))
-                .shadow(color: Color.black.opacity(0.06), radius: 6, y: 2)
+                .background(Color.alcoveSurface, in: Capsule())
+                .overlay(Capsule().strokeBorder(Color.alcoveInk, lineWidth: 2.5))
+                .shadow(color: Color.alcoveInk.opacity(0.18), radius: 8, y: 3)
                 .animation(.easeInOut(duration: 0.25), value: viewModel.instructionMessage)
-
-                Spacer()
-
-                // Placeholder balancer for symmetric centering
-                Color.clear
-                    .frame(width: 44, height: 44)
             }
             .padding(.horizontal, 20)
             .padding(.top, 20)
@@ -75,44 +74,42 @@ public struct ARWalkthroughView: View {
                     HStack(spacing: 12) {
                         // Rotate Counter-Clockwise
                         Button {
+                            StudioViewportFeedback.snap()
                             viewModel.rotateRoom(by: -.pi / 12.0)
                         } label: {
                             Image(systemName: "rotate.left")
-                                .font(.body.weight(.semibold))
-                                .frame(width: 44, height: 44)
-                                .background(.regularMaterial, in: Circle())
-                                .overlay(Circle().stroke(Color.primary.opacity(0.08), lineWidth: 1))
+                                .font(.system(size: 17, weight: .bold))
+                                .foregroundStyle(Color.alcoveInk)
+                                .frame(width: 45, height: 45)
+                                .background { StudioTactileCircleBackground() }
+                                .contentShape(Circle())
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel("Rotate room counter-clockwise")
 
                         // Reposition Room Button
-                        Button {
+                        StudioStageButton(
+                            title: "Reposition",
+                            role: .next,
+                            systemImage: "arrow.counterclockwise",
+                            showsNavigationChevron: false
+                        ) {
+                            StudioViewportFeedback.snap()
                             viewModel.repositionRoom()
-                        } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: "arrow.counterclockwise")
-                                Text("Reposition")
-                                    .font(.subheadline.weight(.semibold))
-                            }
-                            .foregroundStyle(.primary)
-                            .padding(.horizontal, 16)
-                            .frame(minHeight: 44)
-                            .background(.regularMaterial, in: Capsule())
-                            .overlay(Capsule().stroke(Color.primary.opacity(0.08), lineWidth: 1))
                         }
-                        .buttonStyle(.plain)
                         .accessibilityLabel("Reposition room anchor")
 
                         // Rotate Clockwise
                         Button {
+                            StudioViewportFeedback.snap()
                             viewModel.rotateRoom(by: .pi / 12.0)
                         } label: {
                             Image(systemName: "rotate.right")
-                                .font(.body.weight(.semibold))
-                                .frame(width: 44, height: 44)
-                                .background(.regularMaterial, in: Circle())
-                                .overlay(Circle().stroke(Color.primary.opacity(0.08), lineWidth: 1))
+                                .font(.system(size: 17, weight: .bold))
+                                .foregroundStyle(Color.alcoveInk)
+                                .frame(width: 45, height: 45)
+                                .background { StudioTactileCircleBackground() }
+                                .contentShape(Circle())
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel("Rotate room clockwise")
@@ -127,41 +124,46 @@ public struct ARWalkthroughView: View {
             // Camera Permission Denied Card Overlay
             if viewModel.cameraPermission == .denied {
                 VStack(spacing: 16) {
-                    Image(systemName: "camera.badge.ellipsis")
-                        .font(.system(size: 48))
-                        .foregroundStyle(Color.accentColor)
+                    ZStack {
+                        Circle()
+                            .fill(Color.alcovePrimaryFill)
+                        Circle()
+                            .stroke(Color.alcoveInk, lineWidth: 2.5)
+                        Image(systemName: "camera.badge.ellipsis")
+                            .font(.system(size: 28, weight: .bold))
+                            .foregroundStyle(Color.alcoveInk)
+                    }
+                    .frame(width: 64, height: 64)
 
                     Text("Camera Access Required")
-                        .font(.title3.weight(.bold))
-                        .foregroundStyle(.primary)
+                        .font(.custom("Cleanow", size: 22, relativeTo: .title3))
+                        .foregroundStyle(Color.alcoveInk)
 
                     Text("Alcove requires camera access for the 1:1 life-size spatial walkthrough. Please enable camera access in Settings.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .font(.system(.subheadline, design: .rounded, weight: .semibold))
+                        .foregroundStyle(Color.alcoveMutedInk)
                         .multilineTextAlignment(.center)
                         .frame(maxWidth: 340)
 
-                    Button {
+                    StudioStageButton(
+                        title: "Open Settings",
+                        role: .next,
+                        systemImage: "gearshape.fill",
+                        showsNavigationChevron: false
+                    ) {
+                        StudioViewportFeedback.snap()
                         if let url = URL(string: UIApplication.openSettingsURLString) {
                             openURL(url)
                         }
-                    } label: {
-                        Text("Open Settings")
-                            .font(.headline)
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 24)
-                            .frame(minHeight: 44)
-                            .background(Color.accentColor, in: Capsule())
                     }
-                    .buttonStyle(.plain)
                 }
                 .padding(32)
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24))
+                .background(Color.alcoveSurface, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 24)
-                        .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+                    RoundedRectangle(cornerRadius: 28, style: .continuous)
+                        .strokeBorder(Color.alcoveInk, lineWidth: 3)
                 )
-                .shadow(color: Color.black.opacity(0.12), radius: 24, y: 8)
+                .shadow(color: Color.alcoveInk.opacity(0.22), radius: 20, y: 8)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
                 .zIndex(30)
             }
