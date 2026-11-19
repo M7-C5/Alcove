@@ -24,11 +24,42 @@ public struct Studio3DView: View {
     @State private var selectedCameraPreset: ViewportPreset = .dollhouse
     @State private var headerOverlapped: Bool = false
     @State private var congratulationsAssets = CongratulationsAssetStore()
+    @State private var isFreeEditResultMode: Bool
+    @State private var resultMode: ResultWorkspaceMode = .overview
+    @State private var isResultSplitActive: Bool = false
 
     public init(room: Room, stage: StageType = .rearrangement) {
         self.room = room
         self.stage = stage
-        self._viewModel = State(initialValue: Studio3DViewModel(room: room, stage: stage))
+        let completedCurriculum = room.isCompleted(.harmony)
+        self._isFreeEditResultMode = State(initialValue: completedCurriculum)
+        self._viewModel = State(initialValue: Studio3DViewModel(room: room, stage: completedCurriculum ? .harmony : stage))
+    }
+
+    private func returnToDashboard() {
+        if let router {
+            router.popToRoot()
+        } else {
+            dismiss()
+        }
+        playSnapFeedback()
+    }
+
+    private func switchResultMode(_ mode: ResultWorkspaceMode) {
+        isCameraMenuPresented = false
+        viewModel.isFurnitureCatalogPresented = false
+        viewModel.isArchiveListPresented = false
+        viewModel.swapTargetFurnitureID = nil
+        resultMode = mode
+        switch mode {
+        case .overview:
+            viewModel.switchToStage(.harmony)
+        case .lighting:
+            viewModel.switchToStage(.illumination)
+        case .rearrange:
+            viewModel.switchToStage(.rearrangement)
+        }
+        playSnapFeedback()
     }
 
     public var body: some View {
@@ -52,6 +83,13 @@ public struct Studio3DView: View {
                     onSelectStage: { targetStage in
                         viewModel.switchToStage(targetStage)
                         playSnapFeedback()
+                    },
+                    isResultMode: isFreeEditResultMode,
+                    onSelectResultMode: { mode in
+                        switchResultMode(mode)
+                    },
+                    onBackToDashboard: {
+                        returnToDashboard()
                     }
                 ) {
                     viewModel.switchToStage(.rearrangement)
@@ -135,6 +173,13 @@ public struct Studio3DView: View {
     }
 
     private var stageHeaderTitle: String {
+        if isFreeEditResultMode {
+            switch resultMode {
+            case .overview: return "Result"
+            case .lighting: return "Result: Lighting"
+            case .rearrange: return "Result: Rearrange"
+            }
+        }
         switch viewModel.currentStage {
         case .audit:
             return "Stage 2: Check Your Room"
@@ -166,9 +211,11 @@ public struct Studio3DView: View {
 
                 VStack(spacing: 12) {
                     studioHeader
-                    stageProgressBar
-                        .opacity(headerOverlapped ? 0 : 1)
-                        .accessibilityHidden(headerOverlapped)
+                    if !isFreeEditResultMode {
+                        stageProgressBar
+                            .opacity(headerOverlapped ? 0 : 1)
+                            .accessibilityHidden(headerOverlapped)
+                    }
                     Spacer()
                 }
                 .padding(.horizontal, 28)
@@ -226,6 +273,7 @@ public struct Studio3DView: View {
                         StudioBottomHUD(
                             mascotEmotion: viewModel.mascotEmotion,
                             mascotMessage: viewModel.mascotMessage,
+                            showsNextStage: !isFreeEditResultMode,
                             onTriggerEvaluation: { viewModel.triggerStageEvaluation() },
                             onOpenChat: {
                                 withAnimation(.easeInOut(duration: 0.2)) {
@@ -261,8 +309,12 @@ public struct Studio3DView: View {
                 }
 
                 if isCameraMenuPresented {
-                    let hasArchive = viewModel.currentStage.unlockedTools.contains(.inventoryArchive) && viewModel.currentStage != .harmony
-                    let buttonsToRight = (hasArchive ? 1 : 0) + (viewModel.canManipulateFurniture ? 1 : 0)
+                    let buttonsToRight: Int = if isFreeEditResultMode {
+                        3 + (resultMode == .rearrange ? 2 : 0)
+                    } else {
+                        (viewModel.currentStage.unlockedTools.contains(.inventoryArchive) && viewModel.currentStage != .harmony ? 1 : 0)
+                        + (viewModel.canManipulateFurniture ? 1 : 0)
+                    }
                     let cameraTrailing: CGFloat = 28 + CGFloat(buttonsToRight) * 64
                     VStack {
                         HStack {
@@ -307,7 +359,7 @@ public struct Studio3DView: View {
                                     }
                                 }
                             )
-                            .padding(.trailing, 28)
+                            .padding(.trailing, isFreeEditResultMode ? 92 : 28)
                             .padding(.top, 16)
                             .safeAreaPadding(.top)
                         }
@@ -387,42 +439,59 @@ public struct Studio3DView: View {
 
     private var studioHeader: some View {
         StudioHeaderLayout(title: stageHeaderTitle, titleHidden: headerOverlapped) {
-            Button {
-                if let router {
-                    router.popToRoot()
-                } else {
-                    dismiss()
-                }
-                playSnapFeedback()
-            } label: {
-                Image(systemName: "house")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(Color(red: 0x6D / 255.0, green: 0x45 / 255.0, blue: 0x31 / 255.0))
-                    .frame(width: 54, height: 45)
-                    .background { tactileCircleBackground(isCoralActive: false) }
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Home")
-            if viewModel.currentStage != .audit {
-                StudioStageButton(title: "Previous Stage", role: .previous) {
-                    switch viewModel.currentStage {
-                    case .rearrangement:
-                        viewModel.switchToStage(.audit)
-                    case .illumination:
-                        viewModel.switchToStage(.rearrangement)
-                    case .harmony:
-                        viewModel.switchToStage(.illumination)
-                    case .audit:
-                        break
-                    }
+            if isFreeEditResultMode {
+                StudioStageButton(title: "Back", role: .previous) {
+                    returnToDashboard()
                 }
             } else {
-                Color.clear
-                    .frame(width: 100, height: 44)
+                Button {
+                    returnToDashboard()
+                } label: {
+                    Image(systemName: "house")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(Color(red: 0x6D / 255.0, green: 0x45 / 255.0, blue: 0x31 / 255.0))
+                        .frame(width: 54, height: 45)
+                        .background { tactileCircleBackground(isCoralActive: false) }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Home")
+                if viewModel.currentStage != .audit {
+                    StudioStageButton(title: "Previous Stage", role: .previous) {
+                        switch viewModel.currentStage {
+                        case .rearrangement:
+                            viewModel.switchToStage(.audit)
+                        case .illumination:
+                            viewModel.switchToStage(.rearrangement)
+                        case .harmony:
+                            viewModel.switchToStage(.illumination)
+                        case .audit:
+                            break
+                        }
+                    }
+                } else {
+                    Color.clear
+                        .frame(width: 100, height: 44)
+                }
             }
 
         } actions: {
             HStack(spacing: 10) {
+                if isFreeEditResultMode {
+                    StudioResultIconButton(
+                        systemImage: "arrow.left.and.right",
+                        active: resultMode == .overview && isResultSplitActive,
+                        accessibilityLabel: "Toggle Before and After Split"
+                    ) {
+                        if resultMode == .overview {
+                            isResultSplitActive.toggle()
+                            playSnapFeedback()
+                        } else {
+                            isResultSplitActive = true
+                            switchResultMode(.overview)
+                        }
+                    }
+                }
+
                 Button {
                     withAnimation(.spring(response: 0.34, dampingFraction: 0.78)) {
                         viewModel.isFurnitureCatalogPresented = false
@@ -441,6 +510,24 @@ public struct Studio3DView: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Camera view")
+
+                if isFreeEditResultMode {
+                    StudioResultIconButton(
+                        systemImage: "lightbulb",
+                        active: resultMode == .lighting,
+                        accessibilityLabel: "Lighting"
+                    ) {
+                        switchResultMode(.lighting)
+                    }
+
+                    StudioResultIconButton(
+                        systemImage: "arrow.up.and.down.and.arrow.left.and.right",
+                        active: resultMode == .rearrange,
+                        accessibilityLabel: "Rearrange"
+                    ) {
+                        switchResultMode(resultMode == .rearrange ? .overview : .rearrange)
+                    }
+                }
 
 
                 if viewModel.currentStage.unlockedTools.contains(.inventoryArchive) && viewModel.currentStage != .harmony {
@@ -494,6 +581,16 @@ public struct Studio3DView: View {
                     .buttonStyle(.plain)
                     .accessibilityLabel("Add furniture")
                 }
+
+                if isFreeEditResultMode {
+                    StudioResultIconButton(
+                        labelText: "AR",
+                        accessibilityLabel: "Launch 1:1 Life-Size AR Walkthrough"
+                    ) {
+                        isARWalkthroughPresented = true
+                        playSnapFeedback()
+                    }
+                }
             }
         }
     }
@@ -544,7 +641,7 @@ public struct Studio3DView: View {
                             viewportSize: viewportGeometry.size,
                             ghostFurnitureID: ghostFurnitureID,
                             ghostFloorPosition: ghostFloorPosition,
-                            currentStage: viewModel.currentStage,
+                            currentStage: (isFreeEditResultMode && resultMode == .overview && !isResultSplitActive) ? .audit : viewModel.currentStage,
                             beforeAfterSplit: viewModel.beforeAfterSplit,
                             revealMode: viewModel.revealMode,
                             furnitureWarningSeverities: warningSeverities,
@@ -626,7 +723,9 @@ public struct Studio3DView: View {
                     }
 
                     // Stage 4 Harmony: Split Curtain Divider inside viewport
-                    if viewModel.currentStage == .harmony && !viewModel.isArchiveListPresented {
+                    if viewModel.currentStage == .harmony
+                        && (!isFreeEditResultMode || (resultMode == .overview && isResultSplitActive))
+                        && !viewModel.isArchiveListPresented {
                         SplitCurtainDividerView(
                             splitFraction: beforeAfterSplit,
                             totalWidth: viewportGeometry.size.width,
