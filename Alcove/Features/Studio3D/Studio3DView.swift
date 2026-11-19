@@ -325,7 +325,7 @@ public struct Studio3DView: View {
                         (viewModel.currentStage.unlockedTools.contains(.inventoryArchive) && viewModel.currentStage != .harmony ? 1 : 0)
                         + (viewModel.canManipulateFurniture ? 1 : 0)
                     }
-                    let cameraTrailing: CGFloat = 28 + CGFloat(buttonsToRight) * 64
+                    let cameraTrailing: CGFloat = 28 + CGFloat(buttonsToRight) * 59
                     VStack {
                         HStack {
                             Spacer()
@@ -369,7 +369,7 @@ public struct Studio3DView: View {
                                     }
                                 }
                             )
-                            .padding(.trailing, isFreeEditResultMode ? 92 : 28)
+                            .padding(.trailing, isFreeEditResultMode ? 87 : 28)
                             .padding(.top, 16)
                             .safeAreaPadding(.top)
                         }
@@ -460,7 +460,7 @@ public struct Studio3DView: View {
                     Image(systemName: "house")
                         .font(.system(size: 18, weight: .semibold))
                         .foregroundStyle(Color(red: 0x6D / 255.0, green: 0x45 / 255.0, blue: 0x31 / 255.0))
-                        .frame(width: 54, height: 45)
+                        .frame(width: 49, height: 45)
                         .background { tactileCircleBackground(isCoralActive: false) }
                 }
                 .buttonStyle(.plain)
@@ -513,7 +513,7 @@ public struct Studio3DView: View {
                     Image(systemName: "rotate.3d")
                         .font(.system(size: 18, weight: .semibold))
                         .foregroundStyle(Color(red: 0x6D / 255.0, green: 0x45 / 255.0, blue: 0x31 / 255.0))
-                        .frame(width: 54, height: 45)
+                        .frame(width: 49, height: 45)
                         .background {
                             tactileCircleBackground(isCoralActive: isCameraMenuPresented)
                         }
@@ -551,7 +551,7 @@ public struct Studio3DView: View {
                             Image(systemName: "archivebox")
                                 .font(.system(size: 17, weight: .bold))
                                 .foregroundStyle(Color(red: 0x6D / 255.0, green: 0x45 / 255.0, blue: 0x31 / 255.0))
-                                .frame(width: 54, height: 45)
+                                .frame(width: 49, height: 45)
                                 .background {
                                     tactileCircleBackground(isCoralActive: viewModel.isArchiveListPresented)
                                 }
@@ -583,7 +583,7 @@ public struct Studio3DView: View {
                         Image(systemName: "plus")
                             .font(.system(size: 18, weight: .bold))
                             .foregroundStyle(Color(red: 0x6D / 255.0, green: 0x45 / 255.0, blue: 0x31 / 255.0))
-                            .frame(width: 54, height: 45)
+                            .frame(width: 49, height: 45)
                             .background {
                                 tactileCircleBackground(isCoralActive: viewModel.isFurnitureCatalogPresented && viewModel.swapTargetFurnitureID == nil)
                             }

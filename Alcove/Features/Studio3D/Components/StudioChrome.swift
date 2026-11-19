@@ -185,24 +185,21 @@ enum ResultWorkspaceMode: Equatable {
 
 struct StudioTactileCircleBackground: View {
     var active = false
-    var body: some View {
-        let outerShape = RoundedRectangle(cornerRadius: 21, style: .continuous)
-        let innerShape = RoundedRectangle(cornerRadius: 19, style: .continuous)
+    private let shape = RoundedRectangle(cornerRadius: 20, style: .continuous)
 
+    var body: some View {
         ZStack {
-            outerShape.fill(Color.alcoveInk)
+            shape.fill(Color.alcoveInk)
             ZStack {
-                VStack(spacing: 0) {
-                    active ? Color.alcoveBackground : Color.alcoveSecondaryHighlight
-                    active ? Color.alcoveControlActiveShadow : Color.alcoveSecondaryShadow
-                }
-                innerShape
+                shape
+                    .fill(active ? Color.alcoveControlActiveShadow : Color.alcoveSecondaryShadow)
+                shape
                     .fill(active ? Color.alcoveControlActiveFill : Color.alcoveSurfaceElevated)
-                    .padding(.top, active ? 2.5 : 2)
+                    .padding(.horizontal, 1.5)
                     .padding(.bottom, 3.5)
             }
-            .clipShape(innerShape)
-            .padding(2)
+            .clipShape(shape)
+            .padding(2.5)
         }
     }
 }
@@ -252,9 +249,9 @@ struct StudioResultIconButton: View {
                 }
             }
             .foregroundStyle(Color.alcoveInk)
-            .frame(width: 54, height: 45)
+            .frame(width: 49, height: 45)
             .background { StudioTactileCircleBackground(active: active) }
-            .contentShape(Capsule())
+            .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         }
         .buttonStyle(.plain)
         .accessibilityLabel(accessibilityLabel)
