@@ -230,7 +230,9 @@ public struct MascotChatDrawer: View {
                         .allowsHitTesting(false)
                 }
                 .padding(.horizontal, 40)
-                .padding(.bottom, max(24, keyboardHeight + 16))
+                // SwiftUI already shrinks the safe area for the software keyboard;
+                // adding `keyboardHeight` here would double-pad and push the card to the top of the screen.
+                .padding(.bottom, keyboardHeight > 0 ? 12 : 24)
                 .safeAreaPadding(.bottom)
                 .animation(.easeOut(duration: 0.25), value: keyboardHeight)
             }
