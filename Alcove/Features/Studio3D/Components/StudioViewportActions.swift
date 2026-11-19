@@ -34,7 +34,6 @@ struct StudioViewportActions: View {
                     cameraPresented = false
                 })
                 .fixedSize(horizontal: true, vertical: true)
-                .offset(x: -55)
                 .transition(.opacity.combined(with: .scale(scale: 0.18, anchor: .topTrailing)))
             }
         }

@@ -257,7 +257,9 @@ public struct Studio3DView: View {
                 }
 
                 if isCameraMenuPresented {
-                    let cameraTrailing: CGFloat = viewModel.canManipulateFurniture ? 193 : 83
+                    let hasArchive = viewModel.currentStage.unlockedTools.contains(.inventoryArchive) && viewModel.currentStage != .harmony
+                    let buttonsToRight = (hasArchive ? 1 : 0) + (viewModel.canManipulateFurniture ? 1 : 0)
+                    let cameraTrailing: CGFloat = 28 + CGFloat(buttonsToRight) * 55
                     VStack {
                         HStack {
                             Spacer()
