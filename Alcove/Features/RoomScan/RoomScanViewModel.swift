@@ -277,15 +277,18 @@ public final class RoomScanViewModel {
         var openings: [ScannedOpeningPayload] = []
         for window in room.windows {
             let pos = SIMD3<Float>(window.transform.columns.3.x, window.transform.columns.3.y, window.transform.columns.3.z)
-            openings.append(ScannedOpeningPayload(type: "window", position: pos, dimensions: window.dimensions))
+            let yaw = atan2(-window.transform.columns.0.z, window.transform.columns.0.x)
+            openings.append(ScannedOpeningPayload(type: "window", position: pos, dimensions: window.dimensions, rotationYaw: yaw))
         }
         for door in room.doors {
             let pos = SIMD3<Float>(door.transform.columns.3.x, door.transform.columns.3.y, door.transform.columns.3.z)
-            openings.append(ScannedOpeningPayload(type: "door", position: pos, dimensions: door.dimensions))
+            let yaw = atan2(-door.transform.columns.0.z, door.transform.columns.0.x)
+            openings.append(ScannedOpeningPayload(type: "door", position: pos, dimensions: door.dimensions, rotationYaw: yaw))
         }
         for opening in room.openings {
             let pos = SIMD3<Float>(opening.transform.columns.3.x, opening.transform.columns.3.y, opening.transform.columns.3.z)
-            openings.append(ScannedOpeningPayload(type: "opening", position: pos, dimensions: opening.dimensions))
+            let yaw = atan2(-opening.transform.columns.0.z, opening.transform.columns.0.x)
+            openings.append(ScannedOpeningPayload(type: "opening", position: pos, dimensions: opening.dimensions, rotationYaw: yaw))
         }
 
         var objects: [ScannedObjectPayload] = []
