@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Celebrate the Stage 4 to Stage 5 transition with a bounded Otter GIF, sparse, smooth center-out confetti bursts whose particles fall to the screen edges, and View My Room / Back to Home actions.
+- Add smooth celebration and refine preview controls.
 - Add Home button to return to dashboard.
 - Make Otter badge clickable to open design chat.
 - Update landing copy, subtitle color token, and chevron icon.
@@ -83,8 +83,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Replace the clear-room preview mode with fixture visibility that preserves lighting; align the camera menu beside its button and remove native lamp-picker chrome.
-- Unify Lighting and studio header, progress, navigation, camera menus and quick-action styling; present north as a shadow-free floor decal.
 - Remove interactive game-style tutorial overlay.
 - Remove numerical scores and grades from evaluations.
 - Share room validation/persistence and use alcoveSurfaceElevated token.
@@ -99,12 +97,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Preserve the closing Lighting evaluation until dismissal, prevent duplicate stage advances, and defer celebration while another evaluation is presented.
-
-- Predecode celebration textures off the main thread, wait for evaluation dismissal before presenting, and start playback after the fade to avoid first-frame stalls and clipping.
-- Stabilize spotlight shadow clipping and avoid redundant cutaway component writes while orbiting; use the requested orange for Lights and Sunlight toggles.
-- Return Lighting directly to Rearrange, suppress repeated Otter introductions on previous-stage navigation, and remove the viewport top inset.
-- Unify Lighting button fades, camera menus, lamp-type selection and Otter delete confirmation.
+- Prevent double keyboard padding from pushing chat card to top.
+- Preserve evaluation content through stage transition.
+- Wire LightingWorkspaceView onTapOtter after rebase onto dev.
 - Show yellow warning cards for non-colliding tight clearances.
 - Support tucked chairs along long tables without false collisions.
 - Refine room scan mapper, studio sync, and scan HUD tweaks.
