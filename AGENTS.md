@@ -26,7 +26,7 @@ Alcove/
 │   │   ├── 01-verification-loop.md         # Autonomous test verification & thermal guard
 │   │   ├── 02-swift-apple-architecture.md   # SwiftData models, Vertical Slices, HIG
 │   │   ├── 03-apple-hig-design-standards.md # iPad landscape HUD, Light-only Alcove* tokens, 44pt targets
-│   │   └── 04-learned-patterns.md          # LP-007 through LP-017 empirical patterns & traps
+│   │   └── 04-learned-patterns.md          # LP-007 through LP-018 empirical patterns & traps
 │   └── skills/
 │       ├── code-review/SKILL.md            # Adversarial PR/diff checklist (signing, RealityKit, Swift 6)
 │       └── perf-audit/SKILL.md             # Compile flags, RealityKit retain cycles, fast-path latency
