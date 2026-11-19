@@ -27,6 +27,8 @@ public struct FurnitureInventoryDock: View {
         self.onCardDragEnded = onCardDragEnded
     }
 
+    private let dockHeight: CGFloat = 92
+
     public var body: some View {
         Group {
             if archivedFurnitures.isEmpty {
@@ -34,8 +36,7 @@ public struct FurnitureInventoryDock: View {
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 24)
-                    .padding(.vertical, 16)
-                    .frame(width: dockWidth, alignment: .center)
+                    .frame(width: dockWidth, height: dockHeight, alignment: .center)
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 12) {
@@ -59,12 +60,12 @@ public struct FurnitureInventoryDock: View {
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 10)
-                    .frame(minWidth: dockWidth, alignment: .center)
+                    .frame(minWidth: dockWidth, alignment: .leading)
                 }
-                .frame(width: dockWidth)
+                .frame(width: dockWidth, height: dockHeight)
             }
         }
-        .frame(width: dockWidth)
+        .frame(width: dockWidth, height: dockHeight)
         .background(
             Color(red: 0xFE / 255.0, green: 0xEE / 255.0, blue: 0xDE / 255.0),
             in: RoundedRectangle(cornerRadius: 24, style: .continuous)
@@ -116,7 +117,7 @@ public struct ArchivedFurnitureCard: View {
         }
         .frame(width: 76, height: 72)
         .background(
-            Color(red: 0xF9 / 255.0, green: 0xE4 / 255.0, blue: 0xC9 / 255.0),
+            Color(red: 0xFB / 255.0, green: 0xD2 / 255.0, blue: 0xAC / 255.0),
             in: RoundedRectangle(cornerRadius: 16, style: .continuous)
         )
         .overlay(
