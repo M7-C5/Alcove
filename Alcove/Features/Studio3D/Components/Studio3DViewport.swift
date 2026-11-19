@@ -26,6 +26,7 @@ public struct Studio3DViewport: UIViewRepresentable {
     public var onFloorRaycasterResolved: ((@escaping FloorRaycaster) -> Void)? = nil
     public var onSnapToViewportResolved: ((@escaping ViewportSnapper) -> Void)? = nil
     public var onTapBackground: (() -> Void)? = nil
+    public var onHeaderOverlap: ((Bool) -> Void)? = nil
 
     public init(
         room: Room,
@@ -43,7 +44,8 @@ public struct Studio3DViewport: UIViewRepresentable {
         onComputeWarningSeverities: (() -> [UUID: SpatialWarningSeverity])? = nil,
         onFloorRaycasterResolved: ((@escaping FloorRaycaster) -> Void)? = nil,
         onSnapToViewportResolved: ((@escaping ViewportSnapper) -> Void)? = nil,
-        onTapBackground: (() -> Void)? = nil
+        onTapBackground: (() -> Void)? = nil,
+        onHeaderOverlap: ((Bool) -> Void)? = nil
     ) {
         self.room = room
         self._selectedFurnitureID = selectedFurnitureID
@@ -61,6 +63,7 @@ public struct Studio3DViewport: UIViewRepresentable {
         self.onFloorRaycasterResolved = onFloorRaycasterResolved
         self.onSnapToViewportResolved = onSnapToViewportResolved
         self.onTapBackground = onTapBackground
+        self.onHeaderOverlap = onHeaderOverlap
     }
 
     public func makeCoordinator() -> Coordinator {
@@ -77,7 +80,8 @@ public struct Studio3DViewport: UIViewRepresentable {
             onFurnitureMoved: onFurnitureMoved,
             onFurnitureDragging: onFurnitureDragging,
             onComputeWarningSeverities: onComputeWarningSeverities,
-            onTapBackground: onTapBackground
+            onTapBackground: onTapBackground,
+            onHeaderOverlap: onHeaderOverlap
         )
     }
 
@@ -128,6 +132,7 @@ public struct Studio3DViewport: UIViewRepresentable {
             context.coordinator.updateSelectedProjection()
         }
         context.coordinator.onTapBackground = onTapBackground
+        context.coordinator.onHeaderOverlap = onHeaderOverlap
         if let selectedFurnitureID, selectedFurnitureID != previousSelection {
             context.coordinator.focusMascot(onFurnitureID: selectedFurnitureID)
         }
@@ -159,6 +164,8 @@ public struct Studio3DViewport: UIViewRepresentable {
         var onFurnitureDragging: (() -> Void)?
         var onComputeWarningSeverities: (() -> [UUID: SpatialWarningSeverity])?
         var onTapBackground: (() -> Void)?
+        var onHeaderOverlap: ((Bool) -> Void)?
+        private var headerOverlap = false
 
         private let blueHaloMaterial = SimpleMaterial(
             color: UIColor.systemBlue.withAlphaComponent(0.45),
@@ -223,7 +230,8 @@ public struct Studio3DViewport: UIViewRepresentable {
             onFurnitureMoved: ((FurnitureMoveEvent) -> Void)?,
             onFurnitureDragging: (() -> Void)? = nil,
             onComputeWarningSeverities: (() -> [UUID: SpatialWarningSeverity])? = nil,
-            onTapBackground: (() -> Void)? = nil
+            onTapBackground: (() -> Void)? = nil,
+            onHeaderOverlap: ((Bool) -> Void)? = nil
         ) {
             self.room = room
             self.selectedFurnitureID = selectedFurnitureID
@@ -234,6 +242,7 @@ public struct Studio3DViewport: UIViewRepresentable {
             self.onFurnitureDragging = onFurnitureDragging
             self.onComputeWarningSeverities = onComputeWarningSeverities
             self.onTapBackground = onTapBackground
+            self.onHeaderOverlap = onHeaderOverlap
             cameraController = StudioOrbitCameraController(width: room.dimensionsWidth, length: room.dimensionsLength,
                                                            height: room.dimensionsHeight)
             super.init()
@@ -417,6 +426,9 @@ public struct Studio3DViewport: UIViewRepresentable {
         private var lastProjectedPoint: CGPoint? = nil
 
         func updateSelectedProjection() {
+            if let arView {
+                updateHeaderOverlap(in: arView)
+            }
             guard let arView = arView,
                   let id = selectedFurnitureID,
                   let container = arView.scene.findEntity(named: "Furniture_\(id.uuidString)") else {
@@ -449,6 +461,24 @@ public struct Studio3DViewport: UIViewRepresentable {
                 lastProjectedPoint = projected
                 DispatchQueue.main.async { [weak self] in
                     self?.onProjectSelectedFurniture?(projected)
+                }
+            }
+        }
+
+        private func updateHeaderOverlap(in arView: ARView) {
+            let w = Float(room.dimensionsWidth / 2)
+            let l = Float(room.dimensionsLength / 2)
+            let h = Float(room.dimensionsHeight)
+            let points = [-w, w].flatMap { x in
+                [Float(0), h].flatMap { y in
+                    [-l, l].compactMap { z in arView.project(root.convert(position: [x, y, z], to: nil)) }
+                }
+            }
+            let overlap = LightingViewportGeometry.overlapsHeader(points)
+            if headerOverlap != overlap {
+                headerOverlap = overlap
+                DispatchQueue.main.async { [weak self] in
+                    self?.onHeaderOverlap?(overlap)
                 }
             }
         }
