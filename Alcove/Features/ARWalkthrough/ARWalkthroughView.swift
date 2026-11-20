@@ -63,9 +63,8 @@ public struct ARWalkthroughView: View {
                 .shadow(color: Color.alcoveInk.opacity(0.18), radius: 8, y: 3)
                 .animation(.easeInOut(duration: 0.25), value: viewModel.instructionMessage)
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 20)
-            .safeAreaPadding(.top)
+            .padding(.horizontal, 28)
+            .padding(.top, 16)
 
             // Bottom Minimalist Reposition HUD
             if viewModel.isPlaced {
