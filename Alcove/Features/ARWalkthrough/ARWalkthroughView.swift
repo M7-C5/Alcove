@@ -77,7 +77,7 @@ public struct ARWalkthroughView: View {
                             viewModel.rotateRoom(by: -.pi / 12.0)
                         } label: {
                             Image(systemName: "rotate.left")
-                                .font(.system(size: 17, weight: .bold))
+                                .font(.system(size: 17, weight: .semibold))
                                 .foregroundStyle(Color.alcoveInk)
                                 .frame(width: 45, height: 45)
                                 .background { StudioTactileCircleBackground() }
@@ -104,7 +104,7 @@ public struct ARWalkthroughView: View {
                             viewModel.rotateRoom(by: .pi / 12.0)
                         } label: {
                             Image(systemName: "rotate.right")
-                                .font(.system(size: 17, weight: .bold))
+                                .font(.system(size: 17, weight: .semibold))
                                 .foregroundStyle(Color.alcoveInk)
                                 .frame(width: 45, height: 45)
                                 .background { StudioTactileCircleBackground() }

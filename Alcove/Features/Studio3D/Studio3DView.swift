@@ -539,7 +539,7 @@ public struct Studio3DView: View {
                     } label: {
                         ZStack(alignment: .topTrailing) {
                             Image(systemName: "archivebox")
-                                .font(.system(size: 17, weight: .bold))
+                                .font(.system(size: 17, weight: .semibold))
                                 .foregroundStyle(Color(red: 0x6D / 255.0, green: 0x45 / 255.0, blue: 0x31 / 255.0))
                                 .frame(width: 49, height: 45)
                                 .background {
@@ -571,7 +571,7 @@ public struct Studio3DView: View {
                         }
                     } label: {
                         Image(systemName: "plus")
-                            .font(.system(size: 18, weight: .bold))
+                            .font(.system(size: 18, weight: .semibold))
                             .foregroundStyle(Color(red: 0x6D / 255.0, green: 0x45 / 255.0, blue: 0x31 / 255.0))
                             .frame(width: 49, height: 45)
                             .background {

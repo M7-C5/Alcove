@@ -152,7 +152,7 @@ struct StudioStageButton: View {
                     .contentTransition(.opacity)
                 if role == .next && showsNavigationChevron { Image(systemName: "chevron.right") }
             }
-            .font(.system(.subheadline, design: .rounded, weight: .heavy))
+            .font(.system(.subheadline, design: .rounded, weight: .semibold))
             .foregroundStyle(Color.alcoveInk)
             .padding(.horizontal, role == .next ? 20 : 16)
             .frame(minWidth: 44, minHeight: minimumHeight)
@@ -185,20 +185,24 @@ enum ResultWorkspaceMode: Equatable {
 
 struct StudioTactileCircleBackground: View {
     var active = false
-    private let shape = RoundedRectangle(cornerRadius: 20, style: .continuous)
-
     var body: some View {
+        let outerShape = RoundedRectangle(cornerRadius: 21, style: .continuous)
+        let innerShape = RoundedRectangle(cornerRadius: 19, style: .continuous)
+
         ZStack {
-            shape.fill(Color.alcoveInk)
+            outerShape.fill(Color.alcoveInk)
             ZStack {
-                shape
-                    .fill(active ? Color.alcoveControlActiveShadow : Color.alcoveSecondaryShadow)
-                shape
+                VStack(spacing: 0) {
+                    active ? Color.alcoveBackground : Color.alcoveSecondaryHighlight
+                    active ? Color.alcoveControlActiveShadow : Color.alcoveSecondaryShadow
+                }
+                innerShape
                     .fill(active ? Color.alcoveControlActiveFill : Color.alcoveSurfaceElevated)
-                    .offset(y: -3.5)
+                    .padding(.top, active ? 2.5 : 2)
+                    .padding(.bottom, 3.5)
             }
-            .clipShape(shape)
-            .padding(2.5)
+            .clipShape(innerShape)
+            .padding(2)
         }
     }
 }
@@ -244,7 +248,7 @@ struct StudioResultIconButton: View {
                         .font(.system(size: 18, weight: .semibold))
                 } else if let labelText {
                     Text(labelText)
-                        .font(.system(.caption, design: .rounded, weight: .heavy))
+                        .font(.system(.callout, design: .rounded, weight: .semibold))
                 }
             }
             .foregroundStyle(Color.alcoveInk)
