@@ -64,25 +64,48 @@ public struct ProceduralRoomShellBuilder {
         let centerZ = bounds.minZ + roomL / 2.0
         let wallThickness: Float = 0.12
 
-        // Floor Plane matching the scanned room footprint
-        let floorMesh = MeshResource.generateBox(
-            size: SIMD3<Float>(roomW, 0.02, roomL),
-            cornerRadius: 0.005
-        )
+        // Floor Plane using RoomPlan's native floor polygon (handles L-shapes, stepped walls, and diagonals),
+        // falling back to the 2D convex hull of scanned wall endpoints when floor corners are absent.
         let floorMaterial = SimpleMaterial(
             color: UIColor(red: 0.78, green: 0.64, blue: 0.48, alpha: 1.0),
             roughness: 0.45,
             isMetallic: false
         )
-        let floorEntity = ModelEntity(mesh: floorMesh, materials: [floorMaterial])
-        floorEntity.name = "Floor"
-        floorEntity.position = SIMD3<Float>(centerX, -0.01, centerZ)
-        shell.addChild(floorEntity)
+        let polygon = Self.floorPolygon(from: snapshot)
+        if let polyFloorMesh = Self.buildPolygonSlabMesh(polygon: polygon, thickness: 0.02, topY: 0.0) {
+            let floorEntity = ModelEntity(mesh: polyFloorMesh, materials: [floorMaterial])
+            floorEntity.name = "Floor"
+            shell.addChild(floorEntity)
+        } else {
+            let floorMesh = MeshResource.generateBox(
+                size: SIMD3<Float>(roomW, 0.02, roomL),
+                cornerRadius: 0.005
+            )
+            let floorEntity = ModelEntity(mesh: floorMesh, materials: [floorMaterial])
+            floorEntity.name = "Floor"
+            floorEntity.position = SIMD3<Float>(centerX, -0.01, centerZ)
+            shell.addChild(floorEntity)
+        }
 
         if includeCeiling {
-            let ceiling = buildCeiling(width: Double(roomW), length: Double(roomL), height: height)
-            ceiling.position = SIMD3<Float>(centerX, Float(height) + 0.01, centerZ)
-            shell.addChild(ceiling)
+            let ceilingMaterial = SimpleMaterial(
+                color: UIColor(red: 0.96, green: 0.96, blue: 0.95, alpha: 1.0),
+                roughness: 0.90,
+                isMetallic: false
+            )
+            if let polyCeilingMesh = Self.buildPolygonSlabMesh(
+                polygon: polygon,
+                thickness: 0.02,
+                topY: Float(height) + 0.02
+            ) {
+                let ceilingEntity = ModelEntity(mesh: polyCeilingMesh, materials: [ceilingMaterial])
+                ceilingEntity.name = "Ceiling"
+                shell.addChild(ceilingEntity)
+            } else {
+                let ceiling = buildCeiling(width: Double(roomW), length: Double(roomL), height: height)
+                ceiling.position = SIMD3<Float>(centerX, Float(height) + 0.01, centerZ)
+                shell.addChild(ceiling)
+            }
         }
 
         let wallMaterial = SimpleMaterial(
@@ -194,6 +217,247 @@ public struct ProceduralRoomShellBuilder {
         shell.addChild(leftGroup)
         shell.addChild(rightGroup)
         return shell
+    }
+
+    // MARK: - Scanned Polygon Floor Geometry
+
+    /// Primary: uses Apple RoomPlan's native `floorPolygon` corners (supports concave L-shapes,
+    /// stepped walls, and diagonals).
+    /// Fallback: computes the 2D convex hull (Andrew's monotone chain) of all scanned wall endpoints
+    /// so partial/legacy scans always cover the full interior without slicing stepped rooms in half
+    /// or poking outside diagonal outer walls.
+    static func floorPolygon(from snapshot: RoomPlanSnapshot) -> [SIMD2<Float>] {
+        if snapshot.floorPolygon.count >= 3 {
+            let raw = snapshot.floorPolygon.map { SIMD2<Float>($0.x, $0.z) }
+            let cleaned = deduplicatePolygon(raw)
+            if cleaned.count >= 3, polygonArea(cleaned) > 0.05 {
+                return ensureCCW(cleaned)
+            }
+        }
+
+        let wallPoints = snapshot.wallSegments.flatMap { seg in
+            [SIMD2<Float>(seg.startX, seg.startZ), SIMD2<Float>(seg.endX, seg.endZ)]
+        }
+        let hull = convexHull(wallPoints)
+        return hull.count >= 3 ? ensureCCW(hull) : []
+    }
+
+    private static func deduplicatePolygon(_ points: [SIMD2<Float>]) -> [SIMD2<Float>] {
+        var cleaned: [SIMD2<Float>] = []
+        cleaned.reserveCapacity(points.count)
+        for pt in points {
+            if let last = cleaned.last, simd_distance(last, pt) < 0.02 { continue }
+            cleaned.append(pt)
+        }
+        if cleaned.count >= 2, simd_distance(cleaned[0], cleaned[cleaned.count - 1]) < 0.02 {
+            cleaned.removeLast()
+        }
+        return cleaned
+    }
+
+    private static func ensureCCW(_ polygon: [SIMD2<Float>]) -> [SIMD2<Float>] {
+        var pts = polygon
+        if signedPolygonArea(pts) < 0 {
+            pts.reverse()
+        }
+        return pts
+    }
+
+    /// 2D Convex Hull via Andrew's Monotone Chain (returns CCW vertices).
+    static func convexHull(_ points: [SIMD2<Float>]) -> [SIMD2<Float>] {
+        guard points.count >= 3 else { return points }
+        let sorted = points.sorted { a, b in
+            if abs(a.x - b.x) > 1e-4 { return a.x < b.x }
+            return a.y < b.y
+        }
+        var unique: [SIMD2<Float>] = []
+        for pt in sorted {
+            if let last = unique.last, simd_distance(last, pt) < 0.01 { continue }
+            unique.append(pt)
+        }
+        guard unique.count >= 3 else { return unique }
+
+        func cross(_ o: SIMD2<Float>, _ a: SIMD2<Float>, _ b: SIMD2<Float>) -> Float {
+            (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x)
+        }
+
+        var lower: [SIMD2<Float>] = []
+        for p in unique {
+            while lower.count >= 2 && cross(lower[lower.count - 2], lower[lower.count - 1], p) <= 1e-5 {
+                lower.removeLast()
+            }
+            lower.append(p)
+        }
+
+        var upper: [SIMD2<Float>] = []
+        for p in unique.reversed() {
+            while upper.count >= 2 && cross(upper[upper.count - 2], upper[upper.count - 1], p) <= 1e-5 {
+                upper.removeLast()
+            }
+            upper.append(p)
+        }
+
+        lower.removeLast()
+        upper.removeLast()
+        return lower + upper
+    }
+
+    private static func signedPolygonArea(_ polygon: [SIMD2<Float>]) -> Float {
+        guard polygon.count >= 3 else { return 0 }
+        var area: Float = 0
+        for i in 0..<polygon.count {
+            let a = polygon[i]
+            let b = polygon[(i + 1) % polygon.count]
+            area += (a.x * b.y - b.x * a.y)
+        }
+        return area * 0.5
+    }
+
+    static func polygonArea(_ polygon: [SIMD2<Float>]) -> Float {
+        abs(signedPolygonArea(polygon))
+    }
+
+    /// Ear-clipping triangulation for any simple CCW 2D polygon (both concave RoomPlan floors and convex hulls).
+    static func triangulatePolygon(_ polygon: [SIMD2<Float>]) -> [UInt32] {
+        let n = polygon.count
+        guard n >= 3 else { return [] }
+        if n == 3 { return [0, 1, 2] }
+
+        var indices = Array(0..<n)
+        var triangles: [UInt32] = []
+        triangles.reserveCapacity((n - 2) * 3)
+
+        func cross2D(_ a: SIMD2<Float>, _ b: SIMD2<Float>, _ c: SIMD2<Float>) -> Float {
+            (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)
+        }
+
+        func pointInTriangle(_ p: SIMD2<Float>, _ a: SIMD2<Float>, _ b: SIMD2<Float>, _ c: SIMD2<Float>) -> Bool {
+            let c1 = cross2D(a, b, p)
+            let c2 = cross2D(b, c, p)
+            let c3 = cross2D(c, a, p)
+            return c1 >= -1e-5 && c2 >= -1e-5 && c3 >= -1e-5
+        }
+
+        var guardCounter = 0
+        let maxIterations = n * n
+
+        while indices.count > 3 && guardCounter < maxIterations {
+            guardCounter += 1
+            var earFound = false
+            let count = indices.count
+
+            for i in 0..<count {
+                let prevIdx = indices[(i + count - 1) % count]
+                let currIdx = indices[i]
+                let nextIdx = indices[(i + 1) % count]
+
+                let a = polygon[prevIdx]
+                let b = polygon[currIdx]
+                let c = polygon[nextIdx]
+
+                guard cross2D(a, b, c) > 1e-6 else { continue }
+
+                var containsOther = false
+                for j in 0..<count {
+                    let testIdx = indices[j]
+                    if testIdx == prevIdx || testIdx == currIdx || testIdx == nextIdx { continue }
+                    if pointInTriangle(polygon[testIdx], a, b, c) {
+                        containsOther = true
+                        break
+                    }
+                }
+
+                if !containsOther {
+                    triangles.append(UInt32(prevIdx))
+                    triangles.append(UInt32(currIdx))
+                    triangles.append(UInt32(nextIdx))
+                    indices.remove(at: i)
+                    earFound = true
+                    break
+                }
+            }
+
+            if !earFound { break }
+        }
+
+        if indices.count == 3 {
+            triangles.append(UInt32(indices[0]))
+            triangles.append(UInt32(indices[1]))
+            triangles.append(UInt32(indices[2]))
+        } else if triangles.isEmpty {
+            for i in 1..<(n - 1) {
+                triangles.append(0)
+                triangles.append(UInt32(i))
+                triangles.append(UInt32(i + 1))
+            }
+        }
+        return triangles
+    }
+
+    private static func buildPolygonSlabMesh(
+        polygon: [SIMD2<Float>],
+        thickness: Float,
+        topY: Float
+    ) -> MeshResource? {
+        guard polygon.count >= 3 else { return nil }
+        let tris = triangulatePolygon(polygon)
+        guard tris.count >= 3 else { return nil }
+
+        let bottomY = topY - thickness
+        let count = polygon.count
+
+        var positions: [SIMD3<Float>] = []
+        var normals: [SIMD3<Float>] = []
+        var indices: [UInt32] = []
+
+        // Top face vertices [0 ..< count]
+        for pt in polygon {
+            positions.append(SIMD3<Float>(pt.x, topY, pt.y))
+            normals.append(SIMD3<Float>(0, 1, 0))
+        }
+        // In right-handed Y-up, CCW in (x, z) has +Y normal when wound (a, c, b)
+        for i in stride(from: 0, to: tris.count, by: 3) {
+            indices.append(tris[i])
+            indices.append(tris[i + 2])
+            indices.append(tris[i + 1])
+        }
+
+        // Bottom face vertices [count ..< 2*count]
+        let bottomOffset = UInt32(count)
+        for pt in polygon {
+            positions.append(SIMD3<Float>(pt.x, bottomY, pt.y))
+            normals.append(SIMD3<Float>(0, -1, 0))
+        }
+        for i in stride(from: 0, to: tris.count, by: 3) {
+            indices.append(bottomOffset + tris[i])
+            indices.append(bottomOffset + tris[i + 1])
+            indices.append(bottomOffset + tris[i + 2])
+        }
+
+        // Perimeter side skirt quads
+        for i in 0..<count {
+            let a = polygon[i]
+            let b = polygon[(i + 1) % count]
+            let edge = b - a
+            let len = simd_length(edge)
+            guard len > 1e-4 else { continue }
+            let outward = SIMD3<Float>(edge.y / len, 0, -edge.x / len)
+            let base = UInt32(positions.count)
+
+            positions.append(SIMD3<Float>(a.x, topY, a.y))
+            positions.append(SIMD3<Float>(b.x, topY, b.y))
+            positions.append(SIMD3<Float>(b.x, bottomY, b.y))
+            positions.append(SIMD3<Float>(a.x, bottomY, a.y))
+            normals.append(contentsOf: [outward, outward, outward, outward])
+
+            indices.append(contentsOf: [base, base + 1, base + 2, base, base + 2, base + 3])
+        }
+
+        var descriptor = MeshDescriptor(name: "ScannedPolygonSlab")
+        descriptor.positions = MeshBuffer(positions)
+        descriptor.normals = MeshBuffer(normals)
+        descriptor.primitives = .triangles(indices)
+        return try? MeshResource.generate(from: [descriptor])
     }
 
     /// Shared ceiling geometry; viewports may use it as a visually cutaway shadow occluder.
