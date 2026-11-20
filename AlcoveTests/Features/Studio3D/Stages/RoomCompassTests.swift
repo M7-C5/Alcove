@@ -8,6 +8,47 @@ import simd
 
 @Suite("Room compass") @MainActor
 struct RoomCompassTests {
+    @Test(arguments: [0.0, 90, 180, 270, 359])
+    func scanCompassStaysInWorldFrameWhileCameraTurns(worldHeading: Double) throws {
+        var stabilizer = RoomCompassStabilizer()
+        var result: Double?
+        for cameraOffset in [-70.0, 25, 140] {
+            let angle = Float(cameraOffset * .pi / 180)
+            let forward = SIMD3<Float>(sin(angle), 0, -cos(angle))
+            let bearing = try #require(RoomCompassCapture.worldBearing(
+                cameraBearing: worldHeading + cameraOffset, cameraForward: forward))
+            result = stabilizer.append(bearing)
+        }
+        let heading = try #require(result)
+        let error = (heading - worldHeading + 540).truncatingRemainder(dividingBy: 360) - 180
+        #expect(abs(error) < 0.001)
+        #expect(RoomCompassCapture.worldBearing(cameraBearing: 0, cameraForward: [0, -1, 0]) == nil)
+        #expect(RoomCompassCapture.worldBearing(cameraBearing: 0, cameraForward: [.nan, 0, -1]) == nil)
+    }
+
+    @Test(arguments: [0.0, Double.pi / 2, -Double.pi / 2, Double.pi, 0.63])
+    func scannedNorthMatchesNormalizedWallsAndFurniture(wallYaw: Double) throws {
+        let orientation = try #require(RoomCompassOrientation(magneticForwardBearingDegrees: 37))
+        let payload = CapturedRoomPayload(roomLength: 4, roomWidth: 5, roomHeight: 2.6,
+            walls: [ScannedWallPayload(position: [2, 1.3, -3], dimensions: [5, 2.6, 0.1],
+                                       rotationYaw: Float(wallYaw))], openings: [], objects: [])
+        let room = RoomCaptureMapper().mapToRoom(payload: payload, compassOrientation: orientation)
+        let snapshot = try #require(room.planSnapshot)
+        let localCompass = try #require(room.compassOrientation)
+        #expect(localCompass.capturedAt == orientation.capturedAt)
+        for bearing in [0.0, 90, 180, 270] {
+            let worldDirection = orientation.direction(forBearingDegrees: bearing)
+            let origin = snapshot.localCoordinates(worldX: snapshot.centerX, worldZ: snapshot.centerZ)
+            let point = snapshot.localCoordinates(worldX: snapshot.centerX + worldDirection.x,
+                                                  worldZ: snapshot.centerZ + worldDirection.z)
+            let expected = SIMD3<Float>(point.x - origin.x, 0, point.y - origin.y)
+            #expect(simd_distance(localCompass.direction(forBearingDegrees: bearing), expected) < 0.001)
+        }
+        let marker = RoomNorthMarker.build(snapshot: LightingRoomSnapshot(room: room))
+        #expect(simd_distance(marker.orientation.act([0, 0, -1]),
+                              localCompass.direction(forBearingDegrees: 0)) < 0.001)
+    }
+
     @Test func cameraDirectionUsesRearCameraInsteadOfInterfaceOrientation() throws {
         #expect(RoomCompassCapture.cameraBearing(north: 1, west: 0) == 0)
         #expect(RoomCompassCapture.cameraBearing(north: 0, west: -1) == 90)

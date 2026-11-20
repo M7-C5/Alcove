@@ -5,6 +5,44 @@ import Testing
 
 @Suite("Lighting viewport framing") @MainActor
 struct LightingViewportOverlayTests {
+    @Test func placementBeforeFirstLayoutStillFitsOverviewWhenFinished() {
+        let room = SampleData.createStarterRoom()
+        let scene = LightingRoomScene(snapshot: LightingRoomSnapshot(room: room))
+        let view = ARView(frame: CGRect(x: 0, y: 0, width: 1024, height: 768),
+                          cameraMode: .nonAR, automaticallyConfigureSession: false)
+        view.scene.addAnchor(scene.root)
+        defer { view.scene.anchors.removeAll() }
+        scene.setPlacementMode(true)
+        scene.apply(LightingSimulationSettings(), preset: .top, in: view)
+        scene.updateViewportProjection(in: view)
+        scene.setPlacementMode(false)
+        scene.apply(LightingSimulationSettings(), preset: .dollhouse, in: view)
+        let points = StudioViewportGeometry.roomCorners(width: room.dimensionsWidth,
+            length: room.dimensionsLength, height: room.dimensionsHeight).compactMap {
+                view.project(scene.root.convert(position: $0, to: nil))
+            }
+        #expect(points.count == 8)
+        #expect(points.allSatisfy { $0.y >= StudioViewportGeometry.headerBottom + 24 })
+    }
+
+    @Test(arguments: [ViewportPreset.top, .dollhouse])
+    func lightingEntryKeepsRoomBelowHeader(preset: ViewportPreset) {
+        let room = SampleData.createStarterRoom()
+        let scene = LightingRoomScene(snapshot: LightingRoomSnapshot(room: room))
+        let view = ARView(frame: CGRect(x: 0, y: 0, width: 1024, height: 768),
+                          cameraMode: .nonAR, automaticallyConfigureSession: false)
+        view.scene.addAnchor(scene.root)
+        defer { view.scene.anchors.removeAll() }
+        scene.apply(LightingSimulationSettings(), preset: preset, in: view)
+        let points = StudioViewportGeometry.roomCorners(width: room.dimensionsWidth,
+            length: room.dimensionsLength, height: room.dimensionsHeight).compactMap {
+                view.project(scene.root.convert(position: $0, to: nil))
+            }
+        #expect(points.count == 8)
+        #expect(points.allSatisfy { $0.y >= StudioViewportGeometry.headerBottom + 24 })
+        #expect(!StudioViewportGeometry.overlapsHeader(points))
+    }
+
     @Test func initialRoomFitsOnceAndSubsequentUpdatesPreserveUserZoom() {
         let room = SampleData.createStarterRoom()
         let scene = LightingRoomScene(snapshot: LightingRoomSnapshot(room: room))
@@ -13,18 +51,19 @@ struct LightingViewportOverlayTests {
         scene.apply(LightingSimulationSettings(), preset: .top, in: view)
         let fitted = LightingPlacementFraming.distance(width: room.dimensionsWidth, length: room.dimensionsLength,
                                                        height: room.dimensionsHeight, viewport: view.bounds.size)
-        #expect(scene.cameraController.distance == fitted)
-        scene.cameraController.distance = fitted * 0.7
+        #expect(scene.cameraController.distance >= fitted)
+        let overviewDistance = scene.cameraController.distance
+        scene.cameraController.distance = overviewDistance * 0.7
         scene.apply(LightingSimulationSettings(), preset: .front, in: view)
         scene.updateViewportProjection(in: view)
-        #expect(scene.cameraController.distance == fitted * 0.7)
+        #expect(scene.cameraController.distance == overviewDistance * 0.7)
     }
 
     @Test func headerOverlapClearsWhenRoomMovesBelowHeader() {
-        #expect(LightingViewportGeometry.overlapsHeader([
+        #expect(StudioViewportGeometry.overlapsHeader([
             CGPoint(x: 100, y: 120), CGPoint(x: 500, y: 120), CGPoint(x: 500, y: 600)
         ]))
-        #expect(!LightingViewportGeometry.overlapsHeader([
+        #expect(!StudioViewportGeometry.overlapsHeader([
             CGPoint(x: 100, y: 200), CGPoint(x: 500, y: 200), CGPoint(x: 500, y: 600)
         ]))
     }

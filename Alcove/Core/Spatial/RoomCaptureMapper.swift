@@ -8,7 +8,8 @@ public final class RoomCaptureMapper: Sendable {
 
     public init() {}
 
-    public func mapToRoom(payload: CapturedRoomPayload, roomName: String = "Scanned Room") -> Room {
+    public func mapToRoom(payload: CapturedRoomPayload, roomName: String = "Scanned Room",
+                          compassOrientation: RoomCompassOrientation? = nil) -> Room {
         let roomHeight = Double(max(2.2, payload.roomHeight))
 
         let snapshot: RoomPlanSnapshot? = payload.walls.isEmpty
@@ -90,6 +91,7 @@ public final class RoomCaptureMapper: Sendable {
             workingLayout: working
         )
         room.planSnapshot = snapshot
+        room.compassOrientation = compassOrientation?.alignedToRoom(yawRadians: snapshot?.yawRadians ?? 0)
         baseline.room = room
         working.room = room
 

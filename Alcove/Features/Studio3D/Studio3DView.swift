@@ -138,12 +138,8 @@ public struct Studio3DView: View {
         }
         .overlay {
             if viewModel.showingCongratulations {
-                RoomCongratulationsView(assets: congratulationsAssets, onViewRoom: {
+                RoomCongratulationsView(assets: congratulationsAssets, onComplete: {
                     viewModel.showingCongratulations = false
-                    isARWalkthroughPresented = true
-                }, onBackHome: {
-                    viewModel.showingCongratulations = false
-                    if let router { router.popToRoot() } else { dismiss() }
                 })
                 .transition(.opacity)
                 .zIndex(100)
@@ -231,6 +227,7 @@ public struct Studio3DView: View {
                     if !isFreeEditResultMode {
                         stageProgressBar
                             .opacity(headerOverlapped ? 0 : 1)
+                            .allowsHitTesting(!headerOverlapped)
                             .accessibilityHidden(headerOverlapped)
                     }
                     Spacer()
@@ -509,24 +506,10 @@ public struct Studio3DView: View {
                     }
                 }
 
-                Button {
-                    withAnimation(.spring(response: 0.34, dampingFraction: 0.78)) {
-                        viewModel.isFurnitureCatalogPresented = false
-                        viewModel.swapTargetFurnitureID = nil
-                        isCameraMenuPresented.toggle()
-                    }
-                    playSnapFeedback()
-                } label: {
-                    Image(systemName: "rotate.3d")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(Color(red: 0x6D / 255.0, green: 0x45 / 255.0, blue: 0x31 / 255.0))
-                        .frame(width: 49, height: 45)
-                        .background {
-                            tactileCircleBackground(isCoralActive: isCameraMenuPresented)
-                        }
+                StudioCameraButton(isPresented: $isCameraMenuPresented) {
+                    viewModel.isFurnitureCatalogPresented = false
+                    viewModel.swapTargetFurnitureID = nil
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Camera view")
 
                 if isFreeEditResultMode {
                     StudioResultIconButton(

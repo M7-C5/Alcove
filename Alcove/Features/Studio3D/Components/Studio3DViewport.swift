@@ -67,7 +67,7 @@ public struct Studio3DViewport: UIViewRepresentable {
     }
 
     public func makeCoordinator() -> Coordinator {
-        Coordinator(
+        let coordinator = Coordinator(
             room: room,
             selectedFurnitureID: selectedFurnitureID,
             furnitureWarningSeverities: furnitureWarningSeverities,
@@ -83,6 +83,8 @@ public struct Studio3DViewport: UIViewRepresentable {
             onTapBackground: onTapBackground,
             onHeaderOverlap: onHeaderOverlap
         )
+        coordinator.currentStage = currentStage
+        return coordinator
     }
 
     public func makeUIView(context: Context) -> ARView {
@@ -123,6 +125,7 @@ public struct Studio3DViewport: UIViewRepresentable {
         context.coordinator.furnitureWarningSeverities = furnitureWarningSeverities
         context.coordinator.onFurnitureDragging = onFurnitureDragging
         context.coordinator.onComputeWarningSeverities = onComputeWarningSeverities
+        context.coordinator.onHeaderOverlap = onHeaderOverlap
         if !context.coordinator.isTranslatingFurniture {
             context.coordinator.updateRoomLighting()
             context.coordinator.updateFurnitureEntities(from: room)
@@ -132,7 +135,6 @@ public struct Studio3DViewport: UIViewRepresentable {
             context.coordinator.updateSelectedProjection()
         }
         context.coordinator.onTapBackground = onTapBackground
-        context.coordinator.onHeaderOverlap = onHeaderOverlap
         if let selectedFurnitureID, selectedFurnitureID != previousSelection {
             context.coordinator.focusMascot(onFurnitureID: selectedFurnitureID)
         }
@@ -165,7 +167,7 @@ public struct Studio3DViewport: UIViewRepresentable {
         var onComputeWarningSeverities: (() -> [UUID: SpatialWarningSeverity])?
         var onTapBackground: (() -> Void)?
         var onHeaderOverlap: ((Bool) -> Void)?
-        private var headerOverlap = false
+        private var headerOverlap: Bool?
 
         private let blueHaloMaterial = SimpleMaterial(
             color: UIColor.systemBlue.withAlphaComponent(0.45),
@@ -269,7 +271,7 @@ public struct Studio3DViewport: UIViewRepresentable {
             // Procedural Room Shell: Floor and 4 Cardinal Walls
             let shell = ProceduralRoomShellBuilder.buildShell(for: room, includeCeiling: false)
             root.addChild(shell)
-            root.addChild(RoomNorthMarker.build(snapshot: LightingRoomSnapshot(room: room)))
+            RoomNorthMarker.installIfEnabled(in: root, snapshot: LightingRoomSnapshot(room: room))
 
             // Procedural Low-Poly Furniture Entities
             let furnitureGroup = Entity()
@@ -379,8 +381,29 @@ public struct Studio3DViewport: UIViewRepresentable {
 
         func updateCamera() {
             cameraController.apply(to: camera)
+            updateHeaderOverlap()
             if currentStage == .harmony {
                 updateFurnitureEntities(from: room)
+            }
+        }
+
+        /// Runs independently of furniture selection, including Audit and Harmony.
+        func updateHeaderOverlap() {
+            guard !isTranslatingFurniture, let arView,
+                  arView.bounds.width > 1, arView.bounds.height > 1 else { return }
+            if cameraController.frameInitialViewport(arView.bounds.size) {
+                cameraController.apply(to: camera)
+            }
+            let points = StudioViewportGeometry.roomCorners(width: room.dimensionsWidth,
+                length: room.dimensionsLength, height: room.dimensionsHeight).compactMap {
+                    arView.project(root.convert(position: $0, to: nil))
+            }
+            let overlap = StudioViewportGeometry.overlapsHeader(points)
+            guard headerOverlap != overlap else { return }
+            headerOverlap = overlap
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.headerOverlap == overlap else { return }
+                self.onHeaderOverlap?(overlap)
             }
         }
 
@@ -426,9 +449,7 @@ public struct Studio3DViewport: UIViewRepresentable {
         private var lastProjectedPoint: CGPoint? = nil
 
         func updateSelectedProjection() {
-            if let arView, !isTranslatingFurniture {
-                updateHeaderOverlap(in: arView)
-            }
+            updateHeaderOverlap()
             guard let arView = arView,
                   let id = selectedFurnitureID,
                   let container = arView.scene.findEntity(named: "Furniture_\(id.uuidString)") else {
@@ -461,24 +482,6 @@ public struct Studio3DViewport: UIViewRepresentable {
                 lastProjectedPoint = projected
                 DispatchQueue.main.async { [weak self] in
                     self?.onProjectSelectedFurniture?(projected)
-                }
-            }
-        }
-
-        private func updateHeaderOverlap(in arView: ARView) {
-            let w = Float(room.dimensionsWidth / 2)
-            let l = Float(room.dimensionsLength / 2)
-            let h = Float(room.dimensionsHeight)
-            let points = [-w, w].flatMap { x in
-                [Float(0), h].flatMap { y in
-                    [-l, l].compactMap { z in arView.project(root.convert(position: [x, y, z], to: nil)) }
-                }
-            }
-            let overlap = LightingViewportGeometry.overlapsHeader(points)
-            if headerOverlap != overlap {
-                headerOverlap = overlap
-                DispatchQueue.main.async { [weak self] in
-                    self?.onHeaderOverlap?(overlap)
                 }
             }
         }

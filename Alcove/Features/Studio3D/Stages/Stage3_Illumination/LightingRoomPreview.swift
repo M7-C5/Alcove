@@ -41,7 +41,7 @@ struct LightingRoomPreview: UIViewRepresentable {
     let snapshot: LightingRoomSnapshot
     let settings: LightingSimulationSettings
     let preset: ViewportPreset
-    var cameraRequestID = 0
+    var onSnapToViewportResolved: ((@escaping Studio3DViewport.ViewportSnapper) -> Void)?
     var onHeaderOverlap: ((Bool) -> Void)?
     var backgroundColor: UIColor = .init(white: 0.08, alpha: 1)
     var onPlaceLight: ((SIMD2<Float>) -> Void)?
@@ -59,6 +59,7 @@ struct LightingRoomPreview: UIViewRepresentable {
         view.isOpaque = false
         view.backgroundColor = .clear
         view.environment.background = .color(resolvedBackground)
+        view.renderOptions.insert([.disableMotionBlur, .disableDepthOfField])
         view.scene.addAnchor(context.coordinator.root)
         let pan = UIPanGestureRecognizer(target: context.coordinator, action: #selector(LightingRoomScene.orbit(_:)))
         pan.maximumNumberOfTouches = 1
@@ -87,7 +88,10 @@ struct LightingRoomPreview: UIViewRepresentable {
         context.coordinator.setPlacementMode(isPlacementMode)
         context.coordinator.setSelection(selectedFixtureIDs)
         context.coordinator.isSelectingMultiple = isSelectingMultiple
-        context.coordinator.apply(settings, preset: preset, in: view, animated: true, requestID: cameraRequestID)
+        context.coordinator.apply(settings, preset: preset, in: view, animated: true)
+        onSnapToViewportResolved? { [weak coordinator = context.coordinator] preset in
+            coordinator?.snapToViewport(preset)
+        }
         let coordinator = context.coordinator
         coordinator.badgeSubscription = view.scene.subscribe(to: SceneEvents.Update.self) { [weak coordinator, weak view] event in
             guard let view else { return }
@@ -109,7 +113,7 @@ struct LightingRoomPreview: UIViewRepresentable {
         context.coordinator.updateFixtures(snapshot.fixtures)
         context.coordinator.setSelection(selectedFixtureIDs)
         context.coordinator.isSelectingMultiple = isSelectingMultiple
-        context.coordinator.apply(settings, preset: preset, in: view, animated: true, requestID: cameraRequestID)
+        context.coordinator.apply(settings, preset: preset, in: view, animated: true)
     }
 
     static func dismantleUIView(_ view: ARView, coordinator: LightingRoomScene) {
@@ -137,7 +141,6 @@ final class LightingRoomScene: NSObject {
     private var previousSettings: LightingSimulationSettings?
     private var previousPreset: ViewportPreset?
     let cameraController: StudioOrbitCameraController
-    private var previousCameraRequestID: Int?
     private var placementCameraDistance: Float?
     private var walls: [(entity: Entity, normal: SIMD3<Float>)] = []
     private var fixtureDefinitions: [LightFixture] = []
@@ -171,19 +174,15 @@ final class LightingRoomScene: NSObject {
     }
 
     func apply(_ settings: LightingSimulationSettings, preset: ViewportPreset, in view: ARView,
-               animated: Bool = false, requestID: Int = 0) {
+               animated: Bool = false) {
+        let effectivePreset: ViewportPreset = isPlacementMode ? .top : preset
+        if previousPreset != effectivePreset {
+            let animate = animated && previousPreset != nil && !isPlacementMode
+            setCameraPreset(effectivePreset, animated: animate)
+        }
         initializeFraming(in: view)
         if isPlacementMode, view.bounds.width > 0, view.bounds.height > 0 {
             fitPlacement(in: view)
-        }
-        let effectivePreset: ViewportPreset = isPlacementMode ? .top : preset
-        if previousPreset != effectivePreset || previousCameraRequestID != requestID {
-            let animate = animated && previousPreset != nil && !isPlacementMode
-            previousPreset = effectivePreset
-            previousCameraRequestID = requestID
-            cameraController.snap(to: effectivePreset, animated: animate) { [weak self] in
-                self?.positionCamera()
-            }
         }
         guard previousSettings != settings else { return }
         previousSettings = settings
@@ -204,6 +203,19 @@ final class LightingRoomScene: NSObject {
             fixture.light.apply(output: output, kelvin: fixture.definition.colorTemperatureKelvin, enabled: enabled)
             fixture.model.applyAppearance(output: isPlacementMode ? 0 : output,
                                           kelvin: fixture.definition.colorTemperatureKelvin)
+        }
+    }
+
+    /// The same immediate camera command used by the other studio stages.
+    func snapToViewport(_ preset: ViewportPreset, animated: Bool = true) {
+        guard !isPlacementMode else { return }
+        setCameraPreset(preset, animated: animated)
+    }
+
+    private func setCameraPreset(_ preset: ViewportPreset, animated: Bool) {
+        previousPreset = preset
+        cameraController.snap(to: preset, animated: animated) { [weak self] in
+            self?.positionCamera()
         }
     }
 
@@ -277,10 +289,13 @@ final class LightingRoomScene: NSObject {
     }
 
     private func initializeFraming(in view: ARView) {
-        guard !hasInitialFraming, view.bounds.width > 0, view.bounds.height > 0 else { return }
+        guard !isPlacementMode, !hasInitialFraming,
+              view.bounds.width > 1, view.bounds.height > 1 else { return }
         hasInitialFraming = true
         // Fit only on entry. Subsequent updates preserve the user's zoom and camera controls.
-        if !isPlacementMode { fitPlacement(in: view) }
+        fitPlacement(in: view)
+        cameraController.frameInitialViewport(view.bounds.size)
+        positionCamera()
     }
 
     private func fitPlacement(in view: ARView) {
@@ -292,15 +307,11 @@ final class LightingRoomScene: NSObject {
     func updateViewportProjection(in view: ARView) {
         initializeFraming(in: view)
         if isPlacementMode, view.bounds.width > 0 { fitPlacement(in: view) }
-        let w = Float(snapshot.geometry.width / 2)
-        let l = Float(snapshot.geometry.length / 2)
-        let h = Float(snapshot.geometry.height)
-        let points = [-w, w].flatMap { x in
-            [Float(0), h].flatMap { y in
-                [-l, l].compactMap { z in view.project(root.convert(position: [x, y, z], to: nil)) }
-            }
+        let points = StudioViewportGeometry.roomCorners(width: snapshot.geometry.width,
+            length: snapshot.geometry.length, height: snapshot.geometry.height).compactMap {
+                view.project(root.convert(position: $0, to: nil))
         }
-        let overlap = LightingViewportGeometry.overlapsHeader(points) && !isPlacementMode
+        let overlap = StudioViewportGeometry.overlapsHeader(points) && !isPlacementMode
         if headerOverlap != overlap {
             headerOverlap = overlap
             onHeaderOverlap?(overlap)
@@ -356,7 +367,7 @@ final class LightingRoomScene: NSObject {
             includeCeiling: false
         )
         root.addChild(shell)
-        root.addChild(RoomNorthMarker.build(snapshot: snapshot))
+        RoomNorthMarker.installIfEnabled(in: root, snapshot: snapshot)
         root.addChild(StudioDaylightRig.roofOccluder(geometry: geometry))
         let wallGroups: [(String, SIMD3<Float>)] = [
             ("FrontWallGroup", WallCutawayEvaluator.frontNormal),

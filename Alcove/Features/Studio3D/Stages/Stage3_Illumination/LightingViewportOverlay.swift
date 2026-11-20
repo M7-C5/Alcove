@@ -1,13 +1,6 @@
 import CoreGraphics
 import Foundation
 
-/// Geometry checks do not draw over the room canvas.
-enum LightingViewportGeometry {
-    static func overlapsHeader(_ points: [CGPoint]) -> Bool {
-        points.contains { $0.x.isFinite && $0.y.isFinite && $0.y < 160 }
-    }
-}
-
 /// Fits the entire placement plane into the clear area between the open inspectors.
 enum LightingPlacementFraming {
     static func distance(width: Double, length: Double, height: Double, viewport: CGSize) -> Float {
