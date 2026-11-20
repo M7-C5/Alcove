@@ -17,6 +17,7 @@ struct LayoutCardView: View {
     @Binding var openMenuLayoutID: UUID?
     @State private var cachedThumbnail: UIImage?
     @State private var cachedFingerprint: String = ""
+    @State private var isCardVisible: Bool = false
 
     init(
         room: Room? = nil,
@@ -237,6 +238,12 @@ struct LayoutCardView: View {
                 )
                 .allowsHitTesting(false)
         }
+        .onAppear {
+            isCardVisible = true
+        }
+        .onDisappear {
+            isCardVisible = false
+        }
     }
 
     // Room thumbnail
@@ -244,15 +251,23 @@ struct LayoutCardView: View {
     private var roomThumbnail: some View {
         if let room {
             let currentFingerprint = RoomThumbnailRenderer.layoutFingerprint(for: room)
-            if let cachedThumbnail, cachedFingerprint == currentFingerprint {
-                Image(uiImage: cachedThumbnail)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(
-                        width: cardWidth * 0.90,
-                        height: cardHeight * 0.70
-                    )
-                    .clipped()
+            if !isCardVisible || (cachedThumbnail != nil && cachedFingerprint == currentFingerprint) {
+                if let cachedThumbnail {
+                    Image(uiImage: cachedThumbnail)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(
+                            width: cardWidth * 0.90,
+                            height: cardHeight * 0.70
+                        )
+                        .clipped()
+                } else {
+                    thumbnailSurface
+                        .frame(
+                            width: cardWidth * 0.90,
+                            height: cardHeight * 0.70
+                        )
+                }
             } else {
                 ZStack {
                     if let cachedThumbnail {
