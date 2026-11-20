@@ -106,6 +106,9 @@ public final class Studio3DViewModel {
 
     // Live Spatial Warnings (Red collisions & Yellow improvements)
     public var dragRevision: Int = 0
+    @ObservationIgnored private var cachedWarningsSignature: Int? = nil
+    @ObservationIgnored private var cachedSpatialWarnings: [SpatialWarning] = []
+    @ObservationIgnored private var cachedSeverityMap: [UUID: SpatialWarningSeverity] = [:]
 
     @discardableResult
     public func notifyLiveFurnitureDrag() -> [UUID: SpatialWarningSeverity] {
@@ -114,27 +117,58 @@ public final class Studio3DViewModel {
         return warningSeverityByFurnitureID
     }
 
-    public var spatialWarnings: [SpatialWarning] {
+    private func recomputeWarningsIfNeeded() {
         _ = dragRevision
-        guard currentStage != .harmony else { return [] }
-        return FastPathRulebook().evaluateSpatialWarnings(
-            furnitures: activeFurnitures,
+        guard currentStage != .harmony else {
+            cachedWarningsSignature = nil
+            cachedSpatialWarnings = []
+            cachedSeverityMap = [:]
+            return
+        }
+        let active = activeFurnitures
+        var hasher = Hasher()
+        hasher.combine(currentStage)
+        hasher.combine(room.dimensionsWidth)
+        hasher.combine(room.dimensionsLength)
+        hasher.combine(active.count)
+        for item in active {
+            hasher.combine(item.id)
+            hasher.combine(item.positionX)
+            hasher.combine(item.positionZ)
+            hasher.combine(item.rotationYaw)
+            hasher.combine(item.width)
+            hasher.combine(item.length)
+        }
+        let signature = hasher.finalize()
+        guard signature != cachedWarningsSignature else { return }
+
+        let warnings = FastPathRulebook().evaluateSpatialWarnings(
+            furnitures: active,
             roomDimensions: (width: room.dimensionsWidth, length: room.dimensionsLength)
         )
+        cachedWarningsSignature = signature
+        cachedSpatialWarnings = warnings
+        cachedSeverityMap = FastPathRulebook.warningSeverityMap(from: warnings)
+    }
+
+    public var spatialWarnings: [SpatialWarning] {
+        recomputeWarningsIfNeeded()
+        return cachedSpatialWarnings
     }
 
     public var warningSeverityByFurnitureID: [UUID: SpatialWarningSeverity] {
-        FastPathRulebook.warningSeverityMap(from: spatialWarnings)
+        recomputeWarningsIfNeeded()
+        return cachedSeverityMap
     }
 
     public var activeTopWarning: SpatialWarning? {
+        let warnings = spatialWarnings
         if let selectedID = selectedFurnitureID {
-            let matching = spatialWarnings.filter { $0.furnitureIDs.contains(selectedID) }
-            if let highestForSelected = matching.first {
+            if let highestForSelected = warnings.first(where: { $0.furnitureIDs.contains(selectedID) }) {
                 return highestForSelected
             }
         }
-        return spatialWarnings.first
+        return warnings.first
     }
 
     public var archivedFurnitures: [Furniture] {

@@ -47,6 +47,7 @@ public struct MascotRoamingEngine: Sendable {
         public var verticalOffset: Float
         public var rollAngle: Float
         public var pitchAngle: Float
+        public var rerouteCooldown: Float
 
         public init(
             position: SIMD2<Float> = .zero,
@@ -55,7 +56,8 @@ public struct MascotRoamingEngine: Sendable {
             phase: Float = 0,
             verticalOffset: Float = 0,
             rollAngle: Float = 0,
-            pitchAngle: Float = 0
+            pitchAngle: Float = 0,
+            rerouteCooldown: Float = 0
         ) {
             self.position = position
             self.yaw = yaw
@@ -64,6 +66,7 @@ public struct MascotRoamingEngine: Sendable {
             self.verticalOffset = verticalOffset
             self.rollAngle = rollAngle
             self.pitchAngle = pitchAngle
+            self.rerouteCooldown = rerouteCooldown
         }
     }
 
@@ -432,10 +435,18 @@ public struct MascotRoamingEngine: Sendable {
                 return
             }
 
+            // Throttle A* pathfinding reroutes so moving furniture never triggers 60-120Hz grid searches
+            if state.rerouteCooldown > 0 {
+                state.rerouteCooldown = max(0, state.rerouteCooldown - clampedDt)
+            }
+
             // If an obstacle moved onto the path, recompute a clear path around it
             if !isPointClear(nextWaypoint, roomSize: roomSize, obstacles: obstacles) ||
                 !isSegmentClear(from: state.position, to: nextWaypoint, roomSize: roomSize, obstacles: obstacles) {
-                if let finalGoal = path.last, isPointClear(finalGoal, roomSize: roomSize, obstacles: obstacles) {
+                if state.rerouteCooldown <= 0,
+                   let finalGoal = path.last,
+                   isPointClear(finalGoal, roomSize: roomSize, obstacles: obstacles) {
+                    state.rerouteCooldown = 0.35
                     let rerouted = findPath(from: state.position, to: finalGoal, roomSize: roomSize, obstacles: obstacles)
                     if !rerouted.isEmpty {
                         state.activity = .walking(path: rerouted, lookAtOnArrival: lookAtOnArrival)
