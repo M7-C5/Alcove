@@ -45,11 +45,14 @@ final class StudioOrbitCameraController {
         animationTask = nil
     }
 
+    static let minOrbitPitch: Float = 0.12
+    static let maxOrbitPitch: Float = 1.55
+
     func orbit(fromYaw startYaw: Float, pitch startPitch: Float, deltaX: Double, deltaY: Double) {
         guard deltaX.isFinite, deltaY.isFinite else { return }
         cancelAnimation()
         yaw = startYaw - Float(deltaX) * 0.007
-        pitch = min(1.55, max(0.12, startPitch + Float(deltaY) * 0.007))
+        pitch = min(Self.maxOrbitPitch, max(Self.minOrbitPitch, startPitch + Float(deltaY) * 0.007))
     }
 
     func magnify(from startDistance: Float, scale: Float) {
