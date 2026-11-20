@@ -642,6 +642,7 @@ public struct Studio3DView: View {
                             ghostFurnitureID: ghostFurnitureID,
                             ghostFloorPosition: ghostFloorPosition,
                             currentStage: (isFreeEditResultMode && resultMode == .overview && !isResultSplitActive) ? .audit : viewModel.currentStage,
+                            useBrightStudioLighting: !isFreeEditResultMode && (viewModel.currentStage == .audit || viewModel.currentStage == .rearrangement),
                             beforeAfterSplit: viewModel.beforeAfterSplit,
                             revealMode: viewModel.revealMode,
                             furnitureWarningSeverities: warningSeverities,
@@ -670,6 +671,7 @@ public struct Studio3DView: View {
                             },
                             onHeaderOverlap: { headerOverlapped = $0 }
                         )
+                        .lightingSettings(viewModel.lightingSettings)
                         .background {
                             GeometryReader { frameProxy in
                                 Color.clear

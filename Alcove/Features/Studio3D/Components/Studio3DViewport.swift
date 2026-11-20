@@ -15,6 +15,8 @@ public struct Studio3DViewport: UIViewRepresentable {
     public var ghostFurnitureID: UUID? = nil
     public var ghostFloorPosition: SIMD3<Float>? = nil
     public var currentStage: StageType = .rearrangement
+    var lightingSettings: LightingSimulationSettings = LightingSimulationSettings()
+    public var useBrightStudioLighting: Bool = false
     public var beforeAfterSplit: Double = 1.0
     public var revealMode: HarmonyRevealMode = .splitSlider
     public var furnitureWarningSeverities: [UUID: SpatialWarningSeverity] = [:]
@@ -36,6 +38,7 @@ public struct Studio3DViewport: UIViewRepresentable {
         ghostFurnitureID: UUID? = nil,
         ghostFloorPosition: SIMD3<Float>? = nil,
         currentStage: StageType = .rearrangement,
+        useBrightStudioLighting: Bool = false,
         beforeAfterSplit: Double = 1.0,
         revealMode: HarmonyRevealMode = .splitSlider,
         furnitureWarningSeverities: [UUID: SpatialWarningSeverity] = [:],
@@ -54,6 +57,7 @@ public struct Studio3DViewport: UIViewRepresentable {
         self.ghostFurnitureID = ghostFurnitureID
         self.ghostFloorPosition = ghostFloorPosition
         self.currentStage = currentStage
+        self.useBrightStudioLighting = useBrightStudioLighting
         self.beforeAfterSplit = beforeAfterSplit
         self.revealMode = revealMode
         self.furnitureWarningSeverities = furnitureWarningSeverities
@@ -66,9 +70,18 @@ public struct Studio3DViewport: UIViewRepresentable {
         self.onHeaderOverlap = onHeaderOverlap
     }
 
+    func lightingSettings(_ settings: LightingSimulationSettings) -> Studio3DViewport {
+        var copy = self
+        copy.lightingSettings = settings
+        return copy
+    }
+
     public func makeCoordinator() -> Coordinator {
         let coordinator = Coordinator(
             room: room,
+            currentStage: currentStage,
+            lightingSettings: lightingSettings,
+            useBrightStudioLighting: useBrightStudioLighting,
             selectedFurnitureID: selectedFurnitureID,
             furnitureWarningSeverities: furnitureWarningSeverities,
             onSelectFurniture: { id in
@@ -120,6 +133,8 @@ public struct Studio3DViewport: UIViewRepresentable {
         context.coordinator.ghostFurnitureID = ghostFurnitureID
         context.coordinator.ghostFloorPosition = ghostFloorPosition
         context.coordinator.currentStage = currentStage
+        context.coordinator.lightingSettings = lightingSettings
+        context.coordinator.useBrightStudioLighting = useBrightStudioLighting
         context.coordinator.beforeAfterSplit = beforeAfterSplit
         context.coordinator.revealMode = revealMode
         context.coordinator.furnitureWarningSeverities = furnitureWarningSeverities
@@ -157,6 +172,8 @@ public struct Studio3DViewport: UIViewRepresentable {
         var ghostFurnitureID: UUID?
         var ghostFloorPosition: SIMD3<Float>?
         var currentStage: StageType = .rearrangement
+        var lightingSettings: LightingSimulationSettings = LightingSimulationSettings()
+        var useBrightStudioLighting: Bool = false
         var beforeAfterSplit: Double = 1.0
         var revealMode: HarmonyRevealMode = .splitSlider
         var furnitureWarningSeverities: [UUID: SpatialWarningSeverity] = [:]
@@ -188,8 +205,17 @@ public struct Studio3DViewport: UIViewRepresentable {
         let root = Entity()
         let camera = PerspectiveCamera()
         let sun = DirectionalLight()
+        let stageFillLight = PointLight()
         private var lightingDefinitions: [LightFixture] = []
+        private var lastLightingStage: StageType? = nil
+        private var lastLightingCompass: RoomCompassOrientation? = nil
+        private var lastLightingSettings: LightingSimulationSettings? = nil
+        private var lastUseBrightStudioLighting: Bool? = nil
+        private var lastLightingViewAttached: Bool = false
         private var fixtureLights: [(light: LightingFixtureLight, model: LightingFixtureModel)] = []
+        private var cachedObstacles: [MascotRoamingEngine.Obstacle] = []
+        private enum HaloVisualState: Equatable { case hidden, selected, caution, collision }
+        private var lastHaloStates: [UUID: HaloVisualState] = [:]
 
         var updateSubscription: (any Cancellable)?
         private var entitySignatures: [UUID: String] = [:]
@@ -225,6 +251,9 @@ public struct Studio3DViewport: UIViewRepresentable {
 
         init(
             room: Room,
+            currentStage: StageType = .rearrangement,
+            lightingSettings: LightingSimulationSettings? = nil,
+            useBrightStudioLighting: Bool = false,
             selectedFurnitureID: UUID?,
             furnitureWarningSeverities: [UUID: SpatialWarningSeverity] = [:],
             onSelectFurniture: ((UUID?) -> Void)?,
@@ -236,6 +265,9 @@ public struct Studio3DViewport: UIViewRepresentable {
             onHeaderOverlap: ((Bool) -> Void)? = nil
         ) {
             self.room = room
+            self.currentStage = currentStage
+            self.lightingSettings = lightingSettings ?? LightingSimulationSettings()
+            self.useBrightStudioLighting = useBrightStudioLighting
             self.selectedFurnitureID = selectedFurnitureID
             self.furnitureWarningSeverities = furnitureWarningSeverities
             self.onSelectFurniture = onSelectFurniture
@@ -266,6 +298,15 @@ public struct Studio3DViewport: UIViewRepresentable {
             StudioDaylightRig.configure(sun, geometry: geometry)
             root.addChild(sun)
             root.addChild(StudioDaylightRig.roofOccluder(geometry: geometry))
+
+            // Bright neutral studio fill light for Stages 2 & 3 (Check / Rearrange) before Stage 4 lighting applies
+            stageFillLight.name = "StudioStageFillLight"
+            stageFillLight.light.color = UIColor(red: 1.0, green: 0.98, blue: 0.95, alpha: 1.0)
+            stageFillLight.light.intensity = 4500
+            stageFillLight.light.attenuationRadius = Float(max(room.dimensionsWidth, room.dimensionsLength, 4.0)) * 2.5
+            stageFillLight.position = SIMD3<Float>(0, Float(room.dimensionsHeight) * 0.85, 0)
+            root.addChild(stageFillLight)
+
             updateRoomLighting()
 
             // Procedural Room Shell: Floor and 4 Cardinal Walls
@@ -287,44 +328,93 @@ public struct Studio3DViewport: UIViewRepresentable {
             root.addChild(furnitureGroup)
 
             // 3D Roaming Otter Mascot
+            refreshCachedObstacles()
             root.addChild(mascotController.rootEntity)
             mascotController.configureInitialPosition(
                 roomSize: roomSizeVector(),
-                obstacles: currentObstacles()
+                obstacles: cachedObstacles
             )
 
             updateCamera()
             updateWallCutaways()
         }
 
-        /// Stage previews use the same default noon sun and saved fixture optics as Lighting.
+        /// Stage previews use bright neutral fill in Stages 2–3 (Audit/Rearrange) before lighting becomes a factor,
+        /// and render the user's Stage 4 lighting simulation settings in Stage 5 (Harmony Reveal).
         func updateRoomLighting() {
-            let snapshot = LightingRoomSnapshot(room: room)
-            let settings = LightingSimulationSettings()
-            let daylight = IlluminationSimulationEngine().calculateDaylight(hourOfDay: settings.hourOfDay)
-            StudioDaylightRig.update(sun, in: root, geometry: snapshot.geometry,
-                                     orientation: snapshot.compassOrientation, daylight: daylight, enabled: true)
-            guard lightingDefinitions != snapshot.fixtures else { return }
-            for fixture in fixtureLights {
-                fixture.light.entity.removeFromParent()
-                fixture.model.root.removeFromParent()
+            let layoutFixtures = (room.workingLayout ?? room.baselineLayout)?.lightFixtures ?? []
+            let viewAttached = (arView != nil)
+            let usesBrightStudioFill = useBrightStudioLighting
+            let effectiveSettings = usesBrightStudioFill ? LightingSimulationSettings() : lightingSettings
+            let fixturesChanged = (lightingDefinitions != layoutFixtures)
+            let stageOrSettingsChanged = (
+                lastLightingStage != currentStage ||
+                lastLightingCompass != room.compassOrientation ||
+                lastLightingSettings != effectiveSettings ||
+                lastUseBrightStudioLighting != usesBrightStudioFill ||
+                lastLightingViewAttached != viewAttached
+            )
+            guard fixturesChanged || stageOrSettingsChanged else { return }
+
+            lastLightingStage = currentStage
+            lastLightingCompass = room.compassOrientation
+            lastLightingSettings = effectiveSettings
+            lastUseBrightStudioLighting = usesBrightStudioFill
+            lastLightingViewAttached = viewAttached
+
+            let daylight = IlluminationSimulationEngine().calculateDaylight(hourOfDay: effectiveSettings.hourOfDay)
+            let geometry = LightingRoomGeometry(
+                width: room.dimensionsWidth,
+                length: room.dimensionsLength,
+                height: room.dimensionsHeight
+            )
+            let sunEnabled = usesBrightStudioFill ? true : effectiveSettings.sunlightOn
+            StudioDaylightRig.update(sun, in: root, geometry: geometry,
+                                     orientation: room.compassOrientation, daylight: daylight, enabled: sunEnabled)
+
+            stageFillLight.isEnabled = usesBrightStudioFill
+            if let arView {
+                let fraction = sunEnabled ? Float(daylight.intensityLux / 10000) : 0
+                arView.environment.lighting.intensityExponent = usesBrightStudioFill
+                    ? 0.2
+                    : (-5 + fraction * 2)
             }
-            let activeIDs = settings.renderedFixtureIDs(in: snapshot.fixtures,
-                maximumCount: StudioLightBudget.maximumFixtures(sunlightActive: sun.isEnabled))
-            fixtureLights = snapshot.fixtures.map { fixture in
-                let model = LightingFixtureModel(fixture: fixture, room: snapshot)
-                let light = LightingFixtureLight(optics: model.optics)
-                light.entity.name = "LightingFixture-\(fixture.id)"
-                light.position(at: model.emitterPosition, direction: model.emissionDirection)
-                let enabled = activeIDs.contains(fixture.id)
-                light.apply(output: settings.output(for: fixture), kelvin: fixture.colorTemperatureKelvin, enabled: enabled)
-                model.applyAppearance(output: settings.output(for: fixture),
-                                      kelvin: fixture.colorTemperatureKelvin)
-                root.addChild(light.entity)
-                root.addChild(model.root)
-                return (light, model)
+
+            if fixturesChanged {
+                let snapshot = LightingRoomSnapshot(room: room)
+                for fixture in fixtureLights {
+                    fixture.light.entity.removeFromParent()
+                    fixture.model.root.removeFromParent()
+                }
+                let activeIDs = effectiveSettings.renderedFixtureIDs(in: snapshot.fixtures,
+                    maximumCount: StudioLightBudget.maximumFixtures(sunlightActive: sun.isEnabled))
+                fixtureLights = snapshot.fixtures.map { fixture in
+                    let model = LightingFixtureModel(fixture: fixture, room: snapshot)
+                    let light = LightingFixtureLight(optics: model.optics)
+                    light.entity.name = "LightingFixture-\(fixture.id)"
+                    light.position(at: model.emitterPosition, direction: model.emissionDirection)
+                    model.root.isEnabled = usesBrightStudioFill ? true : effectiveSettings.showsLightFixtures
+                    let enabled = activeIDs.contains(fixture.id)
+                    let output = effectiveSettings.output(for: fixture)
+                    light.apply(output: output, kelvin: fixture.colorTemperatureKelvin, enabled: enabled)
+                    model.applyAppearance(output: output, kelvin: fixture.colorTemperatureKelvin)
+                    root.addChild(light.entity)
+                    root.addChild(model.root)
+                    return (light, model)
+                }
+                lightingDefinitions = layoutFixtures
+            } else {
+                let activeIDs = effectiveSettings.renderedFixtureIDs(in: lightingDefinitions,
+                    maximumCount: StudioLightBudget.maximumFixtures(sunlightActive: sun.isEnabled))
+                for (index, fixture) in lightingDefinitions.enumerated() where index < fixtureLights.count {
+                    let pair = fixtureLights[index]
+                    pair.model.root.isEnabled = usesBrightStudioFill ? true : effectiveSettings.showsLightFixtures
+                    let enabled = activeIDs.contains(fixture.id)
+                    let output = effectiveSettings.output(for: fixture)
+                    pair.light.apply(output: output, kelvin: fixture.colorTemperatureKelvin, enabled: enabled)
+                    pair.model.applyAppearance(output: output, kelvin: fixture.colorTemperatureKelvin)
+                }
             }
-            lightingDefinitions = snapshot.fixtures
         }
 
         func install(in view: ARView) {
@@ -332,6 +422,7 @@ public struct Studio3DViewport: UIViewRepresentable {
             let anchor = AnchorEntity(world: .zero)
             anchor.addChild(root)
             view.scene.addAnchor(anchor)
+            updateRoomLighting()
 
             setupGestures(in: view)
 
@@ -359,21 +450,27 @@ public struct Studio3DViewport: UIViewRepresentable {
                 }
         }
 
+        private func refreshCachedObstacles() {
+            cachedObstacles = currentObstacles()
+        }
+
         func focusMascot(onFurnitureID id: UUID) {
-            let obstacles = currentObstacles()
-            guard let target = obstacles.first(where: { $0.id == id }) else { return }
+            refreshCachedObstacles()
+            guard let target = cachedObstacles.first(where: { $0.id == id }) else { return }
             mascotController.focusOnFurniture(
                 target,
                 roomSize: roomSizeVector(),
-                obstacles: obstacles
+                obstacles: cachedObstacles
             )
         }
 
         func updateMascot(dt: Float) {
+            // Pause mascot stepping & A* rerouting while actively dragging furniture
+            guard !isTranslatingFurniture else { return }
             mascotController.update(
                 dt: dt,
                 roomSize: roomSizeVector(),
-                obstacles: currentObstacles()
+                obstacles: cachedObstacles
             )
         }
 
@@ -777,6 +874,7 @@ public struct Studio3DViewport: UIViewRepresentable {
 
         func updateFurnitureEntities(from room: Room) {
             self.room = room
+            refreshCachedObstacles()
             guard let group = root.children.first(where: { $0.name == "FurnitureGroup" }) else { return }
             let layout = room.workingLayout ?? room.baselineLayout
             guard let layout else { return }
@@ -928,21 +1026,37 @@ public struct Studio3DViewport: UIViewRepresentable {
             for child in group.children {
                 if child.name.starts(with: "Furniture_") {
                     let idString = String(child.name.dropFirst("Furniture_".count))
-                    let uuid = UUID(uuidString: idString)
+                    guard let uuid = UUID(uuidString: idString) else { continue }
                     let isSelected = (idString == selectedFurnitureID?.uuidString)
                     let isGhost = (idString == ghostFurnitureID?.uuidString && ghostFloorPosition != nil)
+
+                    let desiredState: HaloVisualState
+                    if currentStage == .harmony {
+                        desiredState = (isSelected || isGhost) ? .selected : .hidden
+                    } else if let severity = furnitureWarningSeverities[uuid] {
+                        desiredState = (severity == .collision) ? .collision : .caution
+                    } else if isSelected || isGhost {
+                        desiredState = .selected
+                    } else {
+                        desiredState = .hidden
+                    }
+
+                    guard lastHaloStates[uuid] != desiredState else { continue }
+                    lastHaloStates[uuid] = desiredState
+
                     if let halo = child.children.first(where: { $0.name == "SelectionHalo" }) as? ModelEntity {
-                        if currentStage == .harmony {
-                            halo.isEnabled = isSelected || isGhost
-                            halo.model?.materials = [blueHaloMaterial]
-                        } else if let uuid, let severity = furnitureWarningSeverities[uuid] {
-                            halo.isEnabled = true
-                            halo.model?.materials = [severity == .collision ? redHaloMaterial : yellowHaloMaterial]
-                        } else if isSelected || isGhost {
-                            halo.isEnabled = true
-                            halo.model?.materials = [blueHaloMaterial]
-                        } else {
+                        switch desiredState {
+                        case .hidden:
                             halo.isEnabled = false
+                        case .selected:
+                            halo.isEnabled = true
+                            halo.model?.materials = [blueHaloMaterial]
+                        case .caution:
+                            halo.isEnabled = true
+                            halo.model?.materials = [yellowHaloMaterial]
+                        case .collision:
+                            halo.isEnabled = true
+                            halo.model?.materials = [redHaloMaterial]
                         }
                     }
                 }
