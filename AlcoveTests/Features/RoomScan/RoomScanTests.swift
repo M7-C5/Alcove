@@ -142,4 +142,45 @@ struct RoomScanTests {
             #expect(abs(sofa.positionZ - 1.5) < 0.01)
         }
     }
+
+    @Test func roomPlanFloorPolygonSupportsConcaveLShapeAndFallsBackToConvexHull() {
+        // 1. Primary path: native RoomPlan L-shaped floor corners (4x4 bounding box minus 2x2 cutout = 12 m^2)
+        let walls = [
+            ScannedWallPayload(position: [0, 1.3, -2], dimensions: [4.0, 2.6, 0.1], rotationYaw: 0),
+            ScannedWallPayload(position: [-2, 1.3, 0], dimensions: [4.0, 2.6, 0.1], rotationYaw: -.pi / 2)
+        ]
+        let lFloorCorners: [SIMD2<Float>] = [
+            [-2, -2], [2, -2], [2, 0], [0, 0], [0, 2], [-2, 2]
+        ]
+        let lSnapshot = RoomPlanSnapshot(
+            walls: walls,
+            openings: [],
+            floorPolygonWorldPoints: lFloorCorners
+        )
+        let lPoly = ProceduralRoomShellBuilder.floorPolygon(from: lSnapshot)
+        #expect(lPoly.count == 6)
+        #expect(abs(ProceduralRoomShellBuilder.polygonArea(lPoly) - 12.0) < 0.05)
+
+        let lTris = ProceduralRoomShellBuilder.triangulatePolygon(lPoly)
+        #expect(lTris.count == 12) // 6 vertices -> 4 triangles -> 12 indices
+
+        let lShell = ProceduralRoomShellBuilder.buildShell(
+            width: 4.0,
+            length: 4.0,
+            height: 2.6,
+            planSnapshot: lSnapshot
+        )
+        #expect(lShell.findEntity(named: "Floor") != nil)
+
+        // 2. Fallback path: stepped/diagonal wall scan with empty floorPolygon -> convex hull covers full interior
+        let steppedWalls = [
+            ScannedWallPayload(position: [1.0, 1.3, -2.5], dimensions: [3.0, 2.6, 0.1], rotationYaw: 0),
+            ScannedWallPayload(position: [-1.5, 1.3, -1.5], dimensions: [hypot(2.0, 2.0), 2.6, 0.1], rotationYaw: .pi / 4),
+            ScannedWallPayload(position: [-2.5, 1.3, 1.0], dimensions: [3.0, 2.6, 0.1], rotationYaw: .pi / 2)
+        ]
+        let fallbackSnapshot = RoomPlanSnapshot(walls: steppedWalls, openings: [])
+        let hullPoly = ProceduralRoomShellBuilder.floorPolygon(from: fallbackSnapshot)
+        #expect(hullPoly.count == 4) // 4 hull vertices covering the full interior without poking past the diagonal
+        #expect(ProceduralRoomShellBuilder.polygonArea(hullPoly) > 10.0)
+    }
 }
