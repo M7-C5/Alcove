@@ -119,24 +119,17 @@ public struct Studio3DViewport: UIViewRepresentable {
         context.coordinator.furnitureWarningSeverities = furnitureWarningSeverities
         context.coordinator.onFurnitureDragging = onFurnitureDragging
         context.coordinator.onComputeWarningSeverities = onComputeWarningSeverities
-        context.coordinator.updateRoomLighting()
         if !context.coordinator.isTranslatingFurniture {
+            context.coordinator.updateRoomLighting()
             context.coordinator.updateFurnitureEntities(from: room)
         }
         context.coordinator.updateSelectionHalos()
-        context.coordinator.updateSelectedProjection()
+        if selectedFurnitureID != previousSelection {
+            context.coordinator.updateSelectedProjection()
+        }
         context.coordinator.onTapBackground = onTapBackground
         if let selectedFurnitureID, selectedFurnitureID != previousSelection {
             context.coordinator.focusMascot(onFurnitureID: selectedFurnitureID)
-        }
-
-        onFloorRaycasterResolved? { [weak coordinator = context.coordinator, weak arView] screenPoint in
-            guard let coordinator, let arView else { return nil }
-            return coordinator.projectToFloor(from: screenPoint, in: arView)
-        }
-
-        onSnapToViewportResolved? { [weak coordinator = context.coordinator] preset in
-            coordinator?.snapToViewport(preset)
         }
     }
 
@@ -216,7 +209,7 @@ public struct Studio3DViewport: UIViewRepresentable {
 
         private enum DragMode {
             case none
-            case translating(furnitureID: UUID, offset: SIMD2<Float>, initialPos: SIMD3<Float>)
+            case translating(furnitureID: UUID, offset: SIMD2<Float>, initialPos: SIMD3<Float>, useScreenSpace: Bool)
             case orbiting(startYaw: Float, startPitch: Float)
         }
         private var dragMode: DragMode = .none
@@ -421,10 +414,14 @@ public struct Studio3DViewport: UIViewRepresentable {
 
         // MARK: - 3D to 2D Screen Projection (Native RealityKit Hardware Matrix)
 
+        private var lastProjectedPoint: CGPoint? = nil
+
         func updateSelectedProjection() {
             guard let arView = arView,
                   let id = selectedFurnitureID,
                   let container = arView.scene.findEntity(named: "Furniture_\(id.uuidString)") else {
+                guard lastProjectedPoint != nil else { return }
+                lastProjectedPoint = nil
                 DispatchQueue.main.async { [weak self] in
                     self?.onProjectSelectedFurniture?(nil)
                 }
@@ -437,9 +434,22 @@ public struct Studio3DViewport: UIViewRepresentable {
             let topCenter = SIMD3<Float>(pos.x, yPos, pos.z)
 
             // Native hardware camera projection: perfectly locks 2D Sims HUD above the 3D centroid
-            let projected = arView.project(topCenter)
-            DispatchQueue.main.async { [weak self] in
-                self?.onProjectSelectedFurniture?(projected)
+            let rawProjected = arView.project(topCenter)
+            let projected: CGPoint? = rawProjected.flatMap { pt in
+                (pt.x.isFinite && pt.y.isFinite) ? pt : nil
+            }
+
+            // Deduplicate sub-pixel updates so SceneEvents.Update does not trigger a 60Hz SwiftUI updateUIView loop
+            switch (lastProjectedPoint, projected) {
+            case (.none, .none):
+                return
+            case let (.some(prev), .some(next)) where hypot(next.x - prev.x, next.y - prev.y) < 0.75:
+                return
+            default:
+                lastProjectedPoint = projected
+                DispatchQueue.main.async { [weak self] in
+                    self?.onProjectSelectedFurniture?(projected)
+                }
             }
         }
 
@@ -469,6 +479,7 @@ public struct Studio3DViewport: UIViewRepresentable {
         private weak var twoFingerPanGesture: UIPanGestureRecognizer?
         private weak var pinchGesture: UIPinchGestureRecognizer?
         private var twoFingerPanStartTarget: SIMD3<Float> = .zero
+        private var lastLiveDragSyncTime: CFTimeInterval = 0
 
         var isTranslatingFurniture: Bool {
             if case .translating = dragMode { return true }
@@ -560,12 +571,15 @@ public struct Studio3DViewport: UIViewRepresentable {
                     if let container = current, container.name.hasPrefix("Furniture_") {
                         let uuidStr = String(container.name.dropFirst("Furniture_".count))
                         if let id = UUID(uuidString: uuidStr), id == selectedFurnitureID {
-                            // Already selected -> enter floor translation mode
-                            if let floorPos = projectToFloor(from: point, in: arView) {
+                            // Already selected -> enter floor translation mode.
+                            // At low/perpendicular camera pitch (< 0.45 rad), floor raycasts are grazing and unstable,
+                            // so use smooth camera-relative horizontal screen-space dragging instead.
+                            let useScreenSpace = pitch < 0.45
+                            if !useScreenSpace, let floorPos = projectToFloor(from: point, in: arView) {
                                 let offset = SIMD2<Float>(container.position.x - floorPos.x, container.position.z - floorPos.z)
-                                dragMode = .translating(furnitureID: id, offset: offset, initialPos: container.position)
+                                dragMode = .translating(furnitureID: id, offset: offset, initialPos: container.position, useScreenSpace: false)
                             } else {
-                                dragMode = .translating(furnitureID: id, offset: .zero, initialPos: container.position)
+                                dragMode = .translating(furnitureID: id, offset: .zero, initialPos: container.position, useScreenSpace: true)
                             }
                             updateSelectedProjection()
                             return
@@ -578,14 +592,27 @@ public struct Studio3DViewport: UIViewRepresentable {
 
             case .changed:
                 switch dragMode {
-                case .translating(let id, let offset, _):
+                case .translating(let id, let offset, let initialPos, let useScreenSpace):
                     guard canDragFurniture else { return }
-                    guard let floorPos = projectToFloor(from: point, in: arView) else { return }
                     guard let container = arView.scene.findEntity(named: "Furniture_\(id.uuidString)") else { return }
                     let layout = room.workingLayout ?? room.baselineLayout
                     guard let item = layout?.furnitures.first(where: { $0.id == id }) else { return }
 
-                    let candidatePos = SIMD3<Float>(floorPos.x + offset.x, 0.0, floorPos.z + offset.y)
+                    let candidatePos: SIMD3<Float>
+                    if useScreenSpace {
+                        let translation = gesture.translation(in: arView)
+                        let scale = distance * 0.0022
+                        let right = SIMD3<Float>(cos(yaw), 0, -sin(yaw))
+                        let forwardXZ = SIMD3<Float>(-sin(yaw), 0, -cos(yaw))
+                        candidatePos = SIMD3<Float>(
+                            initialPos.x + right.x * Float(translation.x) * scale - forwardXZ.x * Float(translation.y) * scale,
+                            0.0,
+                            initialPos.z + right.z * Float(translation.x) * scale - forwardXZ.z * Float(translation.y) * scale
+                        )
+                    } else {
+                        guard let floorPos = projectToFloor(from: point, in: arView) else { return }
+                        candidatePos = SIMD3<Float>(floorPos.x + offset.x, 0.0, floorPos.z + offset.y)
+                    }
                     let clamped = FurnitureTransformEngine.clampPosition(
                         position: candidatePos,
                         furnitureWidth: Float(item.width),
@@ -595,13 +622,19 @@ public struct Studio3DViewport: UIViewRepresentable {
                         roomLength: Float(room.dimensionsLength)
                     )
                     container.position = clamped
-                    item.positionX = Double(clamped.x)
-                    item.positionZ = Double(clamped.z)
-                    onFurnitureDragging?()
-                    if let computed = onComputeWarningSeverities?() {
-                        furnitureWarningSeverities = computed
+                    // Throttle SwiftData/SwiftUI warning & halo evaluation to ~15Hz during 120Hz touch drags
+                    // so RealityKit's Metal render loop is never starved by synchronous SwiftUI re-renders.
+                    let now = CACurrentMediaTime()
+                    if now - lastLiveDragSyncTime >= 0.065 {
+                        lastLiveDragSyncTime = now
+                        item.positionX = Double(clamped.x)
+                        item.positionZ = Double(clamped.z)
+                        onFurnitureDragging?()
+                        if let computed = onComputeWarningSeverities?() {
+                            furnitureWarningSeverities = computed
+                        }
+                        updateSelectionHalos()
                     }
-                    updateSelectionHalos()
                     updateSelectedProjection()
 
                 case .orbiting(let startYaw, let startPitch):
@@ -618,7 +651,7 @@ public struct Studio3DViewport: UIViewRepresentable {
 
             case .ended:
                 switch dragMode {
-                case .translating(let id, _, let initialPos):
+                case .translating(let id, _, let initialPos, _):
                     guard canDragFurniture else { break }
                     guard let container = arView.scene.findEntity(named: "Furniture_\(id.uuidString)") else { break }
                     let layout = room.workingLayout ?? room.baselineLayout
@@ -628,6 +661,10 @@ public struct Studio3DViewport: UIViewRepresentable {
                     item.positionX = Double(container.position.x)
                     item.positionZ = Double(container.position.z)
                     let newPos = (x: item.positionX, z: item.positionZ)
+                    if let computed = onComputeWarningSeverities?() {
+                        furnitureWarningSeverities = computed
+                    }
+                    updateSelectionHalos()
 
                     playTapFeedback()
                     focusMascot(onFurnitureID: id)
@@ -842,7 +879,7 @@ public struct Studio3DViewport: UIViewRepresentable {
                         entity.isEnabled = !item.isArchived
 
                         // Do not override translation if currently actively dragging
-                        if case .translating(let id, _, _) = dragMode, id == item.id {
+                        if case .translating(let id, _, _, _) = dragMode, id == item.id {
                             // Keep dragged position
                         } else {
                             entity.position = SIMD3<Float>(Float(item.positionX), Float(item.positionY), Float(item.positionZ))

@@ -101,8 +101,8 @@ public final class Studio3DViewModel {
     public var isArchiveListPresented: Bool = false
     public var isFurnitureCatalogPresented: Bool = false
     public var swapTargetFurnitureID: UUID? = nil
-    public var floorRaycaster: ((CGPoint) -> SIMD3<Float>?)? = nil
-    public var snapToViewport: ((ViewportPreset) -> Void)? = nil
+    @ObservationIgnored public var floorRaycaster: ((CGPoint) -> SIMD3<Float>?)? = nil
+    @ObservationIgnored public var snapToViewport: ((ViewportPreset) -> Void)? = nil
 
     // Live Spatial Warnings (Red collisions & Yellow improvements)
     public var dragRevision: Int = 0
