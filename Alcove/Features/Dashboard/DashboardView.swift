@@ -75,8 +75,15 @@ public struct DashboardView: View {
             .fullScreenCover(isPresented: $viewModel.showingScanSheet) {
                 RoomScanView(
                     onScanComplete: { scannedRoomID in
-                        viewModel.showingScanSheet = false
                         centeredRoomID = scannedRoomID
+                        let descriptor = FetchDescriptor<Room>(
+                            predicate: #Predicate { $0.id == scannedRoomID }
+                        )
+                        if let scannedRoom = rooms.first(where: { $0.id == scannedRoomID })
+                            ?? (try? modelContext.fetch(descriptor).first) {
+                            router.push(.studio(room: scannedRoom, stage: .audit))
+                        }
+                        viewModel.showingScanSheet = false
                     },
                     onCancel: {
                         viewModel.showingScanSheet = false
