@@ -1,5 +1,6 @@
 import Foundation
 import AVFoundation
+import ARKit
 import CoreGraphics
 import Observation
 import RoomPlan
@@ -120,9 +121,16 @@ public final class RoomScanViewModel {
     private func runCaptureSession() {
         isCancelled = false
         isShowingConfirmationAlert = false
-        compassCapture.start()
+        compassCapture.reset()
         let configuration = RoomCaptureSession.Configuration()
         captureView.captureSession.run(configuration: configuration)
+        compassCapture.start { [weak self] timestamp in
+            guard let frame = self?._captureView?.captureSession.arSession.currentFrame,
+                  case .normal = frame.camera.trackingState,
+                  abs(frame.timestamp - timestamp) < 0.15 else { return nil }
+            let z = frame.camera.transform.columns.2
+            return SIMD3<Float>(-z.x, -z.y, -z.z)
+        }
         state = .scanning
     }
 
@@ -215,8 +223,8 @@ public final class RoomScanViewModel {
             return nil
         }
 
-        let room = mapper.mapToRoom(payload: payload, roomName: roomName)
-        room.compassOrientation = compassCapture.orientation
+        let room = mapper.mapToRoom(payload: payload, roomName: roomName,
+                                    compassOrientation: compassCapture.orientation)
         return room
     }
 

@@ -4,6 +4,7 @@ struct LightingSourcePanel: View {
     @Bindable var editor: LightingSetupViewModel
     let isAdding: Bool
     let onAdd: () -> Void
+    let onDelete: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -59,20 +60,34 @@ struct LightingSourcePanel: View {
 
     private var selectionControls: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("\(editor.selectionCount) selected").font(.subheadline.bold())
             HStack(spacing: 8) {
-                Button { editor.selectAll() } label: {
-                    Text("Select all").frame(minWidth: 44, minHeight: 44).contentShape(Rectangle())
-                }
-                .disabled(editor.selectionCount == editor.drafts.count)
+                Text("\(editor.selectionCount) selected")
+                    .font(.system(.subheadline, design: .rounded, weight: .bold))
                 Spacer(minLength: 0)
-                Button { editor.clearSelection() } label: {
-                    Text("Clear").frame(minWidth: 44, minHeight: 44).contentShape(Rectangle())
+                Button(role: .destructive, action: onDelete) {
+                    Image(systemName: "trash")
+                        .foregroundStyle(.red)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
                 .disabled(editor.selectionCount == 0)
+                .accessibilityLabel(editor.selectionCount > 1 ? "Delete selected lights" : "Delete selected light")
             }
-            .font(.caption.bold())
-            .buttonStyle(.plain)
+            if editor.isSelectingMultiple {
+                HStack(spacing: 8) {
+                    Button { editor.selectAll() } label: {
+                        Text("Select all").frame(minWidth: 44, minHeight: 44).contentShape(Rectangle())
+                    }
+                    .disabled(editor.selectionCount == editor.drafts.count)
+                    Spacer(minLength: 0)
+                    Button { editor.clearSelection() } label: {
+                        Text("Clear").frame(minWidth: 44, minHeight: 44).contentShape(Rectangle())
+                    }
+                    .disabled(editor.selectionCount == 0)
+                }
+                .font(.caption.bold())
+                .buttonStyle(.plain)
+            }
         }
     }
 
@@ -85,7 +100,7 @@ struct LightingSourcePanel: View {
                     .frame(width: 24)
                     .opacity(fixture.isOn ? 1 : 0.5)
                 Text(fixture.name)
-                    .font(.custom("Cleanow", size: 16, relativeTo: .subheadline))
+                    .font(.system(.subheadline, design: .rounded, weight: .bold))
                     .multilineTextAlignment(.leading)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 if editor.isSelectingMultiple {
@@ -99,7 +114,7 @@ struct LightingSourcePanel: View {
             .frame(minHeight: 48)
             .background(selected ? Color.alcoveItemSurface : LightingTheme.row,
                         in: RoundedRectangle(cornerRadius: 16))
-            .overlay(RoundedRectangle(cornerRadius: 16).stroke(LightingTheme.ink.opacity(selected ? 1 : 0.3), lineWidth: 2))
+            .overlay(RoundedRectangle(cornerRadius: 16).stroke(LightingTheme.ink, lineWidth: 2))
             .contentShape(RoundedRectangle(cornerRadius: 16))
         }
         .buttonStyle(.plain)
@@ -114,26 +129,30 @@ struct LightingSimulationPanel: View {
     let activeFixtureCount: Int
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 16) {
             Label("Lighting preview", systemImage: "sun.max")
                 .font(.custom("Cleanow", size: 20, relativeTo: .headline))
                 .fixedSize(horizontal: false, vertical: true)
-            HStack(alignment: .top, spacing: 16) {
-                VStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(alignment: .top, spacing: 16) {
                     lightToggle("Lights", isOn: $settings.artificialLightsOn)
-                    Button { settings.showsLightFixtures.toggle() } label: {
-                        Label(settings.showsLightFixtures ? "Hide fixtures" : "Show fixtures",
-                              systemImage: settings.showsLightFixtures ? "eye.slash" : "eye")
-                            .font(.caption.weight(.semibold))
-                            .frame(minHeight: 44)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityValue(settings.showsLightFixtures ? "Visible" : "Hidden")
-                    .accessibilityHint("Hides the lamp models while keeping their light on.")
+                    lightToggle("Sunlight", isOn: $settings.sunlightOn)
                 }
-                .frame(maxWidth: .infinity)
-                lightToggle("Sunlight", isOn: $settings.sunlightOn)
+                Button { settings.showsLightFixtures.toggle() } label: {
+                    Label(settings.showsLightFixtures ? "Hide fixtures" : "Show fixtures",
+                          systemImage: settings.showsLightFixtures ? "eye.slash" : "eye")
+                        .font(.caption.weight(.semibold))
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
+                        .padding(.horizontal, 16)
+                        .frame(minHeight: 44)
+                        .background(LightingTheme.row, in: Capsule())
+                        .overlay(Capsule().stroke(LightingTheme.ink, lineWidth: 2))
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .accessibilityValue(settings.showsLightFixtures ? "Visible" : "Hidden")
+                .accessibilityHint("Hides the lamp models while keeping their light on.")
             }
             VStack(spacing: 0) {
                 HStack {
@@ -147,7 +166,7 @@ struct LightingSimulationPanel: View {
                 Slider(value: Binding(get: { Double(settings.clampedMinute) },
                                       set: { settings.minuteOfDay = Int($0) }), in: 0...1439, step: 1)
                     .frame(minHeight: 44)
-                    .tint(LightingTheme.accent)
+                    .tint(Color("AlcoveLightingToggle"))
                     .accessibilityLabel("Time of day")
                     .accessibilityValue(settings.timeLabel)
             }
@@ -178,7 +197,6 @@ struct LightingEditPanel: View {
     @Binding var typePickerPresented: Bool
     @Bindable var editor: LightingSetupViewModel
     var minimumHeight: Double = 0
-    let onDelete: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -186,11 +204,6 @@ struct LightingEditPanel: View {
                 Label("Light settings", systemImage: "lamp.desk.fill")
                     .font(.custom("Cleanow", size: 20, relativeTo: .headline))
                 Spacer(minLength: 0)
-                Button(role: .destructive, action: onDelete) {
-                    Image(systemName: "trash").foregroundStyle(.red).frame(width: 44, height: 44)
-                }
-                .disabled(editor.selected == nil)
-                .accessibilityLabel(editor.selectionCount > 1 ? "Delete selected lights" : "Delete selected light")
             }
             selectionSummary
             lampTypePicker
@@ -228,7 +241,7 @@ struct LightingEditPanel: View {
                 Image(systemName: "chevron.up.chevron.down").font(.caption.bold())
                 Spacer(minLength: 0)
             }
-            .font(.custom("Cleanow", size: 17, relativeTo: .subheadline))
+            .font(.system(.subheadline, design: .rounded, weight: .bold))
             .foregroundStyle(LightingTheme.ink)
             .padding(.horizontal, 14)
             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
@@ -247,7 +260,7 @@ struct LightingEditPanel: View {
         return VStack(alignment: .leading, spacing: 12) {
             VStack(spacing: 0) {
                 HStack {
-                    Text("Light color").font(.subheadline.bold())
+                    Text("Color Temperature").font(.subheadline.bold())
                     Spacer(minLength: 4)
                     Text(colorValue).font(.caption).monospacedDigit()
                 }
@@ -255,7 +268,7 @@ struct LightingEditPanel: View {
                     get: { Double(editor.selected?.colorTemperatureKelvin ?? fixture.colorTemperatureKelvin) },
                     set: { value in editor.updateSelected { $0.colorTemperatureKelvin = Int(value) } }
                 ), range: 2200...6500, step: 100, colors: [.orange, .yellow, LightingTheme.row, .cyan],
-                                       label: "Light color", formattedValue: editor.commonTemperature.map { "\($0) Kelvin" } ?? "Mixed values")
+                                       label: "Color Temperature", formattedValue: editor.commonTemperature.map { "\($0) Kelvin" } ?? "Mixed values")
                 HStack { Text("Warm"); Spacer(); Text("Cool") }.font(.caption)
             }
             VStack(spacing: 0) {
@@ -298,7 +311,7 @@ struct LightingLampTypeMenu: View {
                         Text(kind.title)
                         Spacer(minLength: 0)
                     }
-                    .font(.custom("Cleanow", size: 17, relativeTo: .subheadline))
+                    .font(.system(.subheadline, design: .rounded, weight: .bold))
                     .foregroundStyle(LightingTheme.ink)
                     .padding(.horizontal, 18)
                     .frame(minHeight: 44)

@@ -5,6 +5,20 @@ import simd
 /// A floor decal in room coordinates. Camera movement never changes its north bearing.
 @MainActor
 enum RoomNorthMarker {
+    /// Opt in through the Xcode scheme environment; normal debug and release runs stay clean.
+    static var isDeveloperVisualizationEnabled: Bool {
+        #if DEBUG
+        ProcessInfo.processInfo.environment["ALCOVE_SHOW_NORTH"] == "1"
+        #else
+        false
+        #endif
+    }
+
+    static func installIfEnabled(in root: Entity, snapshot: LightingRoomSnapshot) {
+        guard isDeveloperVisualizationEnabled else { return }
+        root.addChild(build(snapshot: snapshot))
+    }
+
     static func build(snapshot: LightingRoomSnapshot) -> Entity {
         let marker = Entity()
         marker.name = "RoomNorthMarker"

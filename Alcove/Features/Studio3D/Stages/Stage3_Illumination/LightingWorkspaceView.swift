@@ -3,8 +3,10 @@ import SwiftData
 
 /// Full-screen room canvas with independently collapsible floating inspectors.
 struct LightingWorkspaceView: View {
+    @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(NavigationRouter.self) private var router: NavigationRouter?
     let room: Room
     @Binding var settings: LightingSimulationSettings
     let onBack: () -> Void
@@ -21,7 +23,8 @@ struct LightingWorkspaceView: View {
     @State private var otterTapTrigger = 0
     @State private var editor: LightingSetupViewModel
     @State private var preset: ViewportPreset = .top
-    @State private var cameraRequestID = 0
+    @State private var isCameraMenuPresented = false
+    @State private var snapToViewport: Studio3DViewport.ViewportSnapper?
     @State private var placement = LightingPlacementState()
     @State private var showingDelete = false
     @State private var lampTypeMenuPresented = false
@@ -77,16 +80,16 @@ struct LightingWorkspaceView: View {
                     if !isResultMode {
                         stageProgress
                             .opacity(headerOverlapped ? 0 : 1)
+                            .allowsHitTesting(!headerOverlapped)
                             .accessibilityHidden(headerOverlapped)
                     }
 
+                    Spacer(minLength: 0)
                     Text(viewportPrompt)
-                        .font(.caption)
+                        .font(.system(.body, design: .rounded, weight: .medium))
+                        .fixedSize(horizontal: false, vertical: true)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 60)
-                        .padding(.top, 10)
-                        .opacity(headerOverlapped ? 0 : 1)
-                    Spacer(minLength: 0)
                     viewportControls
 //                    Text(room.compassOrientation == nil ? "Sunlight preview · Sample direction" : "Sunlight preview · Aligned to magnetic north")
 //                        .font(.caption2)
@@ -125,6 +128,25 @@ struct LightingWorkspaceView: View {
                     }
                     .padding(.trailing, 20)
                     .padding(.bottom, max(24, proxy.safeAreaInsets.bottom + 12))
+                }
+
+                if isCameraMenuPresented {
+                    Color.black.opacity(0.001)
+                        .ignoresSafeArea()
+                        .onTapGesture { closeCameraMenu() }
+                        .zIndex(39)
+                    VStack {
+                        HStack {
+                            Spacer(minLength: 0)
+                            cameraMenu
+                                .padding(.trailing, 28 + (isResultMode ? 3 * 59 : 0))
+                                .padding(.top, 16)
+                                .safeAreaPadding(.top)
+                        }
+                        Spacer(minLength: 0)
+                    }
+                    .transition(.scale(scale: 0.18, anchor: .topTrailing).combined(with: .opacity))
+                    .zIndex(40)
                 }
             }
 
@@ -192,6 +214,7 @@ struct LightingWorkspaceView: View {
             title: isResultMode ? "Result: Lighting" : "Stage 4: Mark & Simulate Your Room Lighting",
             titleHidden: headerOverlapped
         ) {
+            if !isResultMode { homeButton }
             StudioStageButton(title: isResultMode ? "Back" : "Previous Stage", role: .previous) {
                 do {
                     try editor.save(in: room, context: modelContext)
@@ -217,11 +240,7 @@ struct LightingWorkspaceView: View {
                             }
                         }
                     }
-                    StudioViewportActions(
-                        onSelectPreset: { preset = $0; cameraRequestID += 1 },
-                        onOpenAR: onOpenAR,
-                        cameraDisabled: placement.isActive
-                    )
+                    StudioCameraButton(isPresented: $isCameraMenuPresented, isDisabled: placement.isActive)
                     StudioResultIconButton(
                         systemImage: "lightbulb",
                         active: true,
@@ -244,12 +263,46 @@ struct LightingWorkspaceView: View {
                     }
                 }
             } else {
-                StudioViewportActions(
-                    onSelectPreset: { preset = $0; cameraRequestID += 1 },
-                    onOpenAR: onOpenAR,
-                    cameraDisabled: placement.isActive
-                )
+                StudioCameraButton(isPresented: $isCameraMenuPresented, isDisabled: placement.isActive)
             }
+        }
+    }
+
+    private var homeButton: some View {
+        Button {
+            do {
+                try editor.save(in: room, context: modelContext)
+                if let router {
+                    router.popToRoot()
+                } else {
+                    dismiss()
+                }
+                StudioViewportFeedback.snap()
+            } catch { saveError = error.localizedDescription }
+        } label: {
+            Image(systemName: "house")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(Color.alcoveInk)
+                .frame(width: 49, height: 45)
+                .background { StudioTactileCircleBackground(active: false) }
+                .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Home")
+    }
+
+    private var cameraMenu: some View {
+        StudioCameraMenuContent(selected: preset) { selected in
+            preset = selected
+            snapToViewport?(selected)
+            StudioViewportFeedback.snap()
+            closeCameraMenu()
+        }
+    }
+
+    private func closeCameraMenu() {
+        withAnimation(.spring(response: 0.32, dampingFraction: 0.80)) {
+            isCameraMenuPresented = false
         }
     }
 
@@ -280,7 +333,8 @@ struct LightingWorkspaceView: View {
         let editingHeight = max(160, columnHeight - previewHeight - 20)
         return HStack(alignment: .top, spacing: 0) {
             LightingCollapsiblePanel(title: "Your lights", expanded: $sourcesExpanded, edge: .leading, width: width) {
-                LightingSourcePanel(editor: editor, isAdding: placement.isActive, onAdd: togglePlacement)
+                LightingSourcePanel(editor: editor, isAdding: placement.isActive, onAdd: togglePlacement,
+                                    onDelete: { showingDelete = true })
                     .frame(width: width, height: columnHeight)
             }
             .frame(height: columnHeight)
@@ -293,8 +347,7 @@ struct LightingWorkspaceView: View {
                 }
                 .frame(height: previewHeight)
                 LightingCollapsiblePanel(title: "Light settings", expanded: $editingExpanded, edge: .trailing, width: width) {
-                    LightingEditPanel(typePickerPresented: $lampTypeMenuPresented, editor: editor, minimumHeight: editingHeight,
-                                      onDelete: { showingDelete = true })
+                    LightingEditPanel(typePickerPresented: $lampTypeMenuPresented, editor: editor, minimumHeight: editingHeight)
                     .frame(width: width, height: editingHeight)
                 }
                 .frame(height: editingHeight)
@@ -324,7 +377,7 @@ struct LightingWorkspaceView: View {
             snapshot: LightingRoomSnapshot(room: room, fixtures: editor.drafts),
             settings: settings,
             preset: preset,
-            cameraRequestID: cameraRequestID,
+            onSnapToViewportResolved: { snapToViewport = $0 },
             onHeaderOverlap: { headerOverlapped = $0 },
             backgroundColor: .clear,
             onPlaceLight: { point in
@@ -349,8 +402,6 @@ struct LightingWorkspaceView: View {
                     .frame(minWidth: 64, minHeight: 44)
                     .background(LightingTheme.row, in: Capsule())
             }
-        } else {
-            Text("Drag to turn · Pinch to zoom").font(.caption)
         }
     }
 

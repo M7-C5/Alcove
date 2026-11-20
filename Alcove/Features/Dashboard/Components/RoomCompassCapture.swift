@@ -1,6 +1,7 @@
 import CoreMotion
 import Foundation
 import Observation
+import simd
 
 /// Foreground scan companion. No location tracking or changes to the AR session are needed.
 @Observable @MainActor
@@ -13,7 +14,7 @@ final class RoomCompassCapture {
     @ObservationIgnored private var stabilizer = RoomCompassStabilizer()
     @ObservationIgnored private var generation = UUID()
 
-    func start() {
+    func start(cameraForward: (@MainActor (TimeInterval) -> SIMD3<Float>?)? = nil) {
         guard !running, orientation == nil else { return }
         guard motion.isDeviceMotionAvailable,
               CMMotionManager.availableAttitudeReferenceFrames().contains(.xMagneticNorthZVertical) else {
@@ -34,9 +35,12 @@ final class RoomCompassCapture {
             let west = matrix.map { -$0.m32 }
             let calibrated = update.map { $0.magneticField.accuracy == .medium || $0.magneticField.accuracy == .high } ?? false
             let failed = error != nil
+            let timestamp = update?.timestamp
             Task { @MainActor [weak self] in
                 guard let self, self.generation == generation else { return }
-                self.receive(north: north, west: west, calibrated: calibrated, failed: failed)
+                let forward = timestamp.flatMap { cameraForward?($0) }
+                self.receive(north: north, west: west, calibrated: calibrated, failed: failed,
+                             cameraForward: forward, requiresARFrame: cameraForward != nil)
             }
         }
     }
@@ -48,6 +52,12 @@ final class RoomCompassCapture {
         stabilizer = RoomCompassStabilizer()
     }
 
+    func reset() {
+        stop()
+        orientation = nil
+        status = .searching
+    }
+
     /// Transpose the reference-to-device matrix to project the rear camera's -Z axis.
     /// This stays independent of portrait/landscape interface orientation.
     static func cameraBearing(north: Double, west: Double) -> Double? {
@@ -55,14 +65,34 @@ final class RoomCompassCapture {
         return (atan2(-west, north) * 180 / .pi + 360).truncatingRemainder(dividingBy: 360)
     }
 
-    private func receive(north: Double?, west: Double?, calibrated: Bool, failed: Bool) {
+    /// Remove the camera's current yaw before stabilizing the AR world's -Z bearing.
+    /// A positive RealityKit yaw turns left, opposite to clockwise compass bearings.
+    static func worldBearing(cameraBearing: Double, cameraForward: SIMD3<Float>) -> Double? {
+        guard cameraBearing.isFinite, cameraForward.x.isFinite, cameraForward.z.isFinite,
+              hypot(cameraForward.x, cameraForward.z) >= 0.25 else { return nil }
+        let cameraOffset = Double(atan2(cameraForward.x, -cameraForward.z)) * 180 / .pi
+        return RoomCompassOrientation(magneticForwardBearingDegrees: cameraBearing - cameraOffset)?
+            .magneticForwardBearingDegrees
+    }
+
+    private func receive(north: Double?, west: Double?, calibrated: Bool, failed: Bool,
+                         cameraForward: SIMD3<Float>?, requiresARFrame: Bool) {
         guard running, orientation == nil else { return }
         if failed { status = .failed; stop(); return }
         guard calibrated else { status = .needsCalibration; stabilizer = RoomCompassStabilizer(); return }
-        guard let north, let west, let bearing = Self.cameraBearing(north: north, west: west) else {
+        guard let north, let west, var bearing = Self.cameraBearing(north: north, west: west) else {
             status = .needsUpright
             stabilizer = RoomCompassStabilizer()
             return
+        }
+        if requiresARFrame {
+            guard let cameraForward,
+                  let worldBearing = Self.worldBearing(cameraBearing: bearing, cameraForward: cameraForward) else {
+                status = .searching
+                stabilizer = RoomCompassStabilizer()
+                return
+            }
+            bearing = worldBearing
         }
         status = .searching
         guard let stableBearing = stabilizer.append(bearing) else { return }

@@ -1,46 +1,32 @@
 import AudioToolbox
 import SwiftUI
 
-struct StudioViewportActions: View {
-    let onSelectPreset: (ViewportPreset) -> Void
-    let onOpenAR: () -> Void
-    var cameraDisabled = false
-    @State private var cameraPresented = false
-    @State private var selected: ViewportPreset = .top
+/// Shared camera trigger; menus are presented above the workspace, outside the header's bounds.
+struct StudioCameraButton: View {
+    @Binding var isPresented: Bool
+    var isDisabled = false
+    var onToggle: () -> Void = {}
 
     var body: some View {
-        HStack(spacing: 10) {
-            Button {
-                cameraPresented.toggle()
-                StudioViewportFeedback.snap()
-            } label: {
-                Image(systemName: "rotate.3d")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(Color.alcoveInk)
-                    .frame(width: 49, height: 45)
-                    .background { StudioTactileCircleBackground(active: cameraPresented) }
-                    .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        Button {
+            withAnimation(.spring(response: 0.34, dampingFraction: 0.78)) {
+                onToggle()
+                isPresented.toggle()
             }
-            .accessibilityLabel("Camera view")
-            .disabled(cameraDisabled)
-
+            StudioViewportFeedback.snap()
+        } label: {
+            Image(systemName: "rotate.3d")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(Color.alcoveInk)
+                .frame(width: 49, height: 45)
+                .background { StudioTactileCircleBackground(active: isPresented) }
+                .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         }
-        .overlay(alignment: .topTrailing) {
-            if cameraPresented {
-                StudioCameraMenuContent(selected: selected, onSelect: { preset in
-                    selected = preset
-                    onSelectPreset(preset)
-                    StudioViewportFeedback.snap()
-                    cameraPresented = false
-                })
-                .fixedSize(horizontal: true, vertical: true)
-                .transition(.opacity.combined(with: .scale(scale: 0.18, anchor: .topTrailing)))
-            }
-        }
-        .animation(.spring(response: 0.32, dampingFraction: 0.80), value: cameraPresented)
+        .accessibilityLabel("Camera view")
+        .disabled(isDisabled)
         .buttonStyle(.plain)
-        .onChange(of: cameraDisabled) { _, disabled in
-            if disabled { cameraPresented = false }
+        .onChange(of: isDisabled) { _, disabled in
+            if disabled { isPresented = false }
         }
     }
 }

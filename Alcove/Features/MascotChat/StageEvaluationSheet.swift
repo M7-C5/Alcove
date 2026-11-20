@@ -13,9 +13,9 @@ private enum EvaluationReviewPalette {
     static let goldLip = Color(red: 0xFC / 255.0, green: 0xA6 / 255.0, blue: 0x0F / 255.0)
 
     static let greyBorder = Color(red: 0xB7 / 255.0, green: 0xB7 / 255.0, blue: 0xB7 / 255.0)
-    static let secondaryHighlight = Color(red: 0xF9 / 255.0, green: 0xE4 / 255.0, blue: 0xC9 / 255.0)
-    static let secondaryFace = Color(red: 0xFF / 255.0, green: 0xF7 / 255.0, blue: 0xE7 / 255.0)
-    static let secondaryLip = Color(red: 0xE9 / 255.0, green: 0xC7 / 255.0, blue: 0x9D / 255.0)
+    static let secondaryHighlight = Color.alcoveBackground
+    static let secondaryFace = Color.alcoveAdvisoryButtonFill
+    static let secondaryLip = Color.alcoveAdvisoryButtonShadow
 }
 
 /// Advisory stage evaluation dialog presenting Otter's review styled to match Alcove's Figma card system.

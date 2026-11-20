@@ -14,9 +14,13 @@ final class StudioOrbitCameraController {
     let span: Float
     let roomHeight: Float
     let initialDistance: Float
+    private let roomCorners: [SIMD3<Float>]
+    private var hasInitialFraming = false
+    private var fittedOverviewDistance: Float = 0
     private(set) var animationTask: Task<Void, Never>?
 
     init(width: Double, length: Double, height: Double) {
+        roomCorners = StudioViewportGeometry.roomCorners(width: width, length: length, height: height)
         span = Float(max(width, length, 3))
         roomHeight = Float(max(height, 2.0))
         initialDistance = min(20, max(5, span * 1.5))
@@ -40,6 +44,18 @@ final class StudioOrbitCameraController {
         camera.look(at: target, from: position, relativeTo: reference)
     }
 
+    /// Wait for real view bounds, fit once, then preserve the user's camera choices.
+    @discardableResult
+    func frameInitialViewport(_ viewport: CGSize) -> Bool {
+        guard !hasInitialFraming,
+              let fitted = StudioViewportGeometry.framingDistance(corners: roomCorners, target: target,
+                  yaw: yaw, pitch: pitch, viewport: viewport) else { return false }
+        hasInitialFraming = true
+        distance = max(distance, fitted)
+        fittedOverviewDistance = distance
+        return true
+    }
+
     func cancelAnimation() {
         animationTask?.cancel()
         animationTask = nil
@@ -58,7 +74,7 @@ final class StudioOrbitCameraController {
     func magnify(from startDistance: Float, scale: Float) {
         guard scale.isFinite, scale > 0.05 else { return }
         cancelAnimation()
-        distance = min(span * 3.5, max(span * 0.6, startDistance / scale))
+        distance = min(max(span * 3.5, fittedOverviewDistance), max(span * 0.6, startDistance / scale))
     }
 
     /// Shifts the camera orbit anchor horizontally and vertically in camera screen space (two-finger pan).

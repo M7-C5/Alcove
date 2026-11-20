@@ -301,6 +301,7 @@ struct StudioHeaderLayout<Previous: View, Actions: View>: View {
             StudioHeaderTitle(title: title)
                 .padding(.horizontal, 180)
                 .opacity(titleHidden ? 0 : 1)
+                .allowsHitTesting(!titleHidden)
                 .accessibilityHidden(titleHidden)
             HStack {
                 previous()

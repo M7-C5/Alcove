@@ -9,8 +9,7 @@ struct RoomCongratulationsView: View {
     let assets: CongratulationsAssetStore
     @State private var contentVisible = false
     @State private var animationsRunning = false
-    let onViewRoom: () -> Void
-    let onBackHome: () -> Void
+    let onComplete: () -> Void
 
     var body: some View {
         GeometryReader { geometry in
@@ -37,11 +36,6 @@ struct RoomCongratulationsView: View {
                         .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.top, 5)
-                    ViewThatFits(in: .horizontal) {
-                        HStack(spacing: 24) { actions }
-                        VStack(spacing: 12) { actions }
-                    }
-                    .padding(.top, 8)
                 }
                 .padding(24)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -57,6 +51,19 @@ struct RoomCongratulationsView: View {
             } completion: {
                 if contentVisible { animationsRunning = true }
             }
+            do {
+                try await Task.sleep(for: .seconds(3))
+                let fadeDuration = reduceMotion ? 0.15 : 0.35
+                withAnimation(.easeOut(duration: fadeDuration)) {
+                    contentVisible = false
+                }
+                try await Task.sleep(for: .seconds(fadeDuration))
+                guard !Task.isCancelled else { return }
+                onComplete()
+            } catch {
+                // Leaving the screen cancels the pending dismissal.
+                return
+            }
         }
         .onDisappear {
             animationsRunning = false
@@ -65,12 +72,6 @@ struct RoomCongratulationsView: View {
         .accessibilityAddTraits(.isModal)
     }
 
-    @ViewBuilder private var actions: some View {
-        StudioStageButton(title: "View My Room", role: .add, systemImage: "viewfinder",
-                          fontSize: 24, minimumHeight: 56, action: onViewRoom)
-        StudioStageButton(title: "Back to Home", role: .next, systemImage: "house",
-                          showsNavigationChevron: false, fontSize: 24, minimumHeight: 56, action: onBackHome)
-    }
 }
 
 private struct CongratulationsRibbon: View {
@@ -241,6 +242,6 @@ private struct CongratulationsOtter: UIViewRepresentable {
 #Preview("Room complete") {
     ZStack {
         LightingWorkspaceBackground()
-        RoomCongratulationsView(assets: CongratulationsAssetStore(), onViewRoom: {}, onBackHome: {})
+        RoomCongratulationsView(assets: CongratulationsAssetStore(), onComplete: {})
     }
 }

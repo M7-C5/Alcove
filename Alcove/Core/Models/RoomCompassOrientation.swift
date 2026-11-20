@@ -1,8 +1,7 @@
 import Foundation
 import simd
 
-/// Magnetic bearing of the room's forward (-Z) axis, frozen when capture starts.
-/// The current manual scan uses the rear camera's initial horizontal direction as -Z.
+/// Magnetic bearing of the room's forward (-Z) axis in its stored geometry frame.
 nonisolated public struct RoomCompassOrientation: Codable, Equatable, Sendable {
     public let magneticForwardBearingDegrees: Double
     public let capturedAt: Date
@@ -16,6 +15,14 @@ nonisolated public struct RoomCompassOrientation: Codable, Equatable, Sendable {
 
     public var isValid: Bool {
         magneticForwardBearingDegrees.isFinite && (0..<360).contains(magneticForwardBearingDegrees)
+    }
+
+    /// Match the same inverse yaw applied to scanned walls and furniture.
+    public func alignedToRoom(yawRadians: Float) -> RoomCompassOrientation? {
+        RoomCompassOrientation(
+            magneticForwardBearingDegrees: magneticForwardBearingDegrees - Double(yawRadians) * 180 / .pi,
+            capturedAt: capturedAt
+        )
     }
 
     /// Clockwise compass bearings become RealityKit directions (+Y up, -Z forward).
