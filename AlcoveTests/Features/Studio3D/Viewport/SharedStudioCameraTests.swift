@@ -98,6 +98,10 @@ struct SharedStudioCameraTests {
         #expect(camera.target.x >= -camera.span * 0.9)
         #expect(camera.target.y >= 0)
 
+        // Orbit pitch clamps to minOrbitPitch
+        camera.orbit(fromYaw: 0, pitch: 0.62, deltaX: 0, deltaY: -100_000)
+        #expect(camera.pitch == StudioOrbitCameraController.minOrbitPitch)
+
         // Snapping to a preset re-centers the anchor on the room
         camera.snap(to: .dollhouse, animated: false) {}
         #expect(camera.target == center)
