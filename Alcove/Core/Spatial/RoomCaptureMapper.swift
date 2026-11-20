@@ -16,7 +16,8 @@ public final class RoomCaptureMapper: Sendable {
             : RoomPlanSnapshot(
                 walls: payload.walls,
                 openings: payload.openings,
-                floorLevel: payload.floorLevel
+                floorLevel: payload.floorLevel,
+                floorPolygonWorldPoints: payload.floorPolygonWorldPoints
             )
 
         let bounds = RoomPlanBounds(
