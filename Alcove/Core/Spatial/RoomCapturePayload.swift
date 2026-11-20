@@ -90,6 +90,7 @@ public struct CapturedRoomPayload: Sendable {
     public let walls: [ScannedWallPayload]
     public let openings: [ScannedOpeningPayload]
     public let objects: [ScannedObjectPayload]
+    public let floorPolygonWorldPoints: [SIMD2<Float>]
 
     public init(
         roomLength: Float,
@@ -98,7 +99,8 @@ public struct CapturedRoomPayload: Sendable {
         floorLevel: Float = 0.0,
         walls: [ScannedWallPayload] = [],
         openings: [ScannedOpeningPayload],
-        objects: [ScannedObjectPayload]
+        objects: [ScannedObjectPayload],
+        floorPolygonWorldPoints: [SIMD2<Float>] = []
     ) {
         self.roomLength = roomLength
         self.roomWidth = roomWidth
@@ -107,6 +109,7 @@ public struct CapturedRoomPayload: Sendable {
         self.walls = walls
         self.openings = openings
         self.objects = objects
+        self.floorPolygonWorldPoints = floorPolygonWorldPoints
     }
 }
 
@@ -156,17 +159,44 @@ nonisolated public struct RoomPlanSnapshot: Codable, Sendable, Hashable {
         }
     }
 
+    nonisolated public struct FloorVertex: Codable, Sendable, Hashable {
+        public let x: Float
+        public let z: Float
+
+        public init(x: Float, z: Float) {
+            self.x = x
+            self.z = z
+        }
+    }
+
     public let centerX: Float
     public let centerZ: Float
     public let yawRadians: Float
     public let floorLevel: Float?
     public let wallSegments: [WallSegment]
     public let openings: [OpeningSegment]
+    public let floorPolygon: [FloorVertex]
+
+    private enum CodingKeys: String, CodingKey {
+        case centerX, centerZ, yawRadians, floorLevel, wallSegments, openings, floorPolygon
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        centerX = try container.decode(Float.self, forKey: .centerX)
+        centerZ = try container.decode(Float.self, forKey: .centerZ)
+        yawRadians = try container.decode(Float.self, forKey: .yawRadians)
+        floorLevel = try container.decodeIfPresent(Float.self, forKey: .floorLevel)
+        wallSegments = try container.decode([WallSegment].self, forKey: .wallSegments)
+        openings = try container.decodeIfPresent([OpeningSegment].self, forKey: .openings) ?? []
+        floorPolygon = try container.decodeIfPresent([FloorVertex].self, forKey: .floorPolygon) ?? []
+    }
 
     public init(
         walls: [ScannedWallPayload],
         openings: [ScannedOpeningPayload] = [],
-        floorLevel: Float? = nil
+        floorLevel: Float? = nil,
+        floorPolygonWorldPoints: [SIMD2<Float>] = []
     ) {
         self.floorLevel = floorLevel
         guard let primaryWall = walls.max(by: { $0.dimensions.x < $1.dimensions.x }) else {
@@ -175,6 +205,7 @@ nonisolated public struct RoomPlanSnapshot: Codable, Sendable, Hashable {
             yawRadians = 0
             wallSegments = []
             self.openings = []
+            self.floorPolygon = []
             return
         }
 
@@ -240,6 +271,17 @@ nonisolated public struct RoomPlanSnapshot: Codable, Sendable, Hashable {
                 height: max(0.2, opening.dimensions.y),
                 yaw: opening.rotationYaw - yaw
             )
+        }
+
+        self.floorPolygon = floorPolygonWorldPoints.map { worldPt in
+            let localPt = Self.localPoint(
+                worldPt,
+                centerX: worldCenterX,
+                centerZ: worldCenterZ,
+                cosine: cosine,
+                sine: sine
+            )
+            return FloorVertex(x: localPt.x, z: localPt.y)
         }
     }
 

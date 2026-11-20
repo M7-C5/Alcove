@@ -264,14 +264,22 @@ public final class RoomScanViewModel {
             wallLengths.append(wall.dimensions.x)
         }
 
-        let floorCorners = room.floors.first?.polygonCorners ?? []
+        let primaryFloor = room.floors.first
+        let floorCorners = primaryFloor?.polygonCorners ?? []
+        let floorPolygonWorldPoints: [SIMD2<Float>] = {
+            guard let floor = primaryFloor, floor.polygonCorners.count >= 3 else { return [] }
+            return floor.polygonCorners.map { corner in
+                let world = floor.transform * SIMD4<Float>(corner.x, corner.y, corner.z, 1.0)
+                return SIMD2<Float>(world.x, world.z)
+            }
+        }()
         let dims = RoomDimensionExtractor.extractDimensions(
             polygonCorners: floorCorners,
             walls: walls,
             wallHeights: wallHeights,
             wallLengths: wallLengths
         )
-        let floorLevel = room.floors.first?.transform.columns.3.y
+        let floorLevel = primaryFloor?.transform.columns.3.y
             ?? (walls.map { $0.position.y - $0.dimensions.y / 2.0 }.min() ?? 0.0)
 
         var openings: [ScannedOpeningPayload] = []
@@ -306,7 +314,8 @@ public final class RoomScanViewModel {
             floorLevel: floorLevel,
             walls: walls,
             openings: openings,
-            objects: objects
+            objects: objects,
+            floorPolygonWorldPoints: floorPolygonWorldPoints
         )
     }
 
