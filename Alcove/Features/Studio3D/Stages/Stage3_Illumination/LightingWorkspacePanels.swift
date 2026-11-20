@@ -139,16 +139,21 @@ struct LightingSimulationPanel: View {
                     lightToggle("Sunlight", isOn: $settings.sunlightOn)
                 }
                 Button { settings.showsLightFixtures.toggle() } label: {
-                    Label(settings.showsLightFixtures ? "Hide fixtures" : "Show fixtures",
-                          systemImage: settings.showsLightFixtures ? "eye.slash" : "eye")
-                        .font(.caption.weight(.semibold))
-                        .lineLimit(1)
-                        .fixedSize(horizontal: true, vertical: false)
-                        .padding(.horizontal, 16)
-                        .frame(minHeight: 44)
-                        .background(LightingTheme.row, in: Capsule())
-                        .overlay(Capsule().stroke(LightingTheme.ink, lineWidth: 2))
-                        .contentShape(Capsule())
+                    ZStack {
+                        // Reserve space for both states so toggling never resizes the button.
+                        Label("Hide fixtures", systemImage: "eye.slash").hidden()
+                        Label("Show fixtures", systemImage: "eye").hidden()
+                        Label(settings.showsLightFixtures ? "Hide fixtures" : "Show fixtures",
+                              systemImage: settings.showsLightFixtures ? "eye.slash" : "eye")
+                    }
+                    .font(.system(.subheadline, design: .rounded, weight: .bold))
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+                    .padding(.horizontal, 20)
+                    .frame(minHeight: 44)
+                    .background(LightingTheme.row, in: RoundedRectangle(cornerRadius: 12))
+                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(LightingTheme.ink, lineWidth: 2))
+                    .contentShape(RoundedRectangle(cornerRadius: 12))
                 }
                 .buttonStyle(.plain)
                 .accessibilityValue(settings.showsLightFixtures ? "Visible" : "Hidden")
