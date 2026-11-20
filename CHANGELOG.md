@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Enter Result hub immediately upon finishing Stage 4 Lighting.
 - Keep unlocked stages green and add post-completion Result hub.
 - Hide header on zoom overlap and use secondary style for warning override button.
+- Jump directly to Stage 2 after completing room scan.
+- Add two-finger camera anchor panning and stabilize floor drag projection.
+- Align AR walkthrough HUD, alerts, and navigation with Alcove design language.
+- Render real scanned walls and openings in ProceduralRoomShellBuilder.
+- Persist scanned wall and opening geometry in RoomPlanSnapshot.
 - Add smooth celebration and refine preview controls.
 - Add Home button to return to dashboard.
 - Make Otter badge clickable to open design chat.
@@ -101,6 +106,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Prevent double keyboard padding from pushing chat card to top.
+- Prevent drag-time updateUIView feedback loop and stabilize low-pitch furniture dragging.
+- Prevent off-screen RoomThumbnail3DView ARView leaks while navigating.
+- Mark ScannedWallPayload nonisolated to clear Swift 6 actor warnings.
+- Render scanned room shell in Stage 3 and refine scanned wall trim and openings.
+- Trigger onReadyToScan from container didMoveToWindow and layoutSubviews.
+- Map scanned RoomPlan furniture 1:1 without sanitizer distortion.
+- Gate AR and RoomPlan sessions on camera permission and non-zero bounds.
+- Snapshot 3D room thumbnails and dismantle ARView immediately.
 - Preserve evaluation content through stage transition.
 - Wire LightingWorkspaceView onTapOtter after rebase onto dev.
 - Show yellow warning cards for non-colliding tight clearances.
