@@ -181,7 +181,7 @@ struct StudioTactileCircleBackground: View {
     var active = false
     var body: some View {
         let outerShape = RoundedRectangle(cornerRadius: 21, style: .continuous)
-        let innerShape = RoundedRectangle(cornerRadius: 18.5, style: .continuous)
+        let innerShape = RoundedRectangle(cornerRadius: 19, style: .continuous)
 
         ZStack {
             outerShape.fill(Color.alcoveInk)
@@ -192,11 +192,11 @@ struct StudioTactileCircleBackground: View {
                 }
                 innerShape
                     .fill(active ? Color.alcoveControlActiveFill : Color.alcoveSurfaceElevated)
-                    .padding(.top, active ? 3 : 2)
-                    .padding(.bottom, 4.5)
+                    .padding(.top, active ? 2.5 : 2)
+                    .padding(.bottom, 3.5)
             }
             .clipShape(innerShape)
-            .padding(2.5)
+            .padding(2)
         }
     }
 }
