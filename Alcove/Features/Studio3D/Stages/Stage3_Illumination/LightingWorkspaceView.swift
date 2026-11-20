@@ -16,6 +16,7 @@ struct LightingWorkspaceView: View {
     let onSelectStage: ((StageType) -> Void)?
     let isResultMode: Bool
     let onSelectResultMode: ((ResultWorkspaceMode) -> Void)?
+    let onToggleResultSplit: (() -> Void)?
     let onBackToDashboard: (() -> Void)?
     @State private var otterTapTrigger = 0
     @State private var editor: LightingSetupViewModel
@@ -36,6 +37,7 @@ struct LightingWorkspaceView: View {
          onSelectStage: ((StageType) -> Void)? = nil,
          isResultMode: Bool = false,
          onSelectResultMode: ((ResultWorkspaceMode) -> Void)? = nil,
+         onToggleResultSplit: (() -> Void)? = nil,
          onBackToDashboard: (() -> Void)? = nil,
          onBack: @escaping () -> Void) {
         self.room = room
@@ -49,6 +51,7 @@ struct LightingWorkspaceView: View {
         self.onSelectStage = onSelectStage
         self.isResultMode = isResultMode
         self.onSelectResultMode = onSelectResultMode
+        self.onToggleResultSplit = onToggleResultSplit
         self.onBackToDashboard = onBackToDashboard
         let editor = LightingSetupViewModel(room: room)
         editor.selectedID = editor.drafts.first?.id
@@ -206,7 +209,13 @@ struct LightingWorkspaceView: View {
                         systemImage: "arrow.left.and.right",
                         accessibilityLabel: "Before and After Result"
                     ) {
-                        saveLightsAndSwitch { onSelectResultMode?(.overview) }
+                        saveLightsAndSwitch {
+                            if let onToggleResultSplit {
+                                onToggleResultSplit()
+                            } else {
+                                onSelectResultMode?(.overview)
+                            }
+                        }
                     }
                     StudioViewportActions(
                         onSelectPreset: { preset = $0; cameraRequestID += 1 },
@@ -218,7 +227,7 @@ struct LightingWorkspaceView: View {
                         active: true,
                         accessibilityLabel: "Lighting"
                     ) {
-                        // Already in Lighting mode
+                        saveLightsAndSwitch { onSelectResultMode?(.overview) }
                     }
                     StudioResultIconButton(
                         systemImage: "arrow.up.and.down.and.arrow.left.and.right",

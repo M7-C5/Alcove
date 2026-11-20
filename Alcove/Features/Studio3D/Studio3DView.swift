@@ -90,7 +90,14 @@ public struct Studio3DView: View {
                     },
                     isResultMode: isFreeEditResultMode,
                     onSelectResultMode: { mode in
+                        if mode == .overview {
+                            isResultSplitActive = false
+                        }
                         switchResultMode(mode)
+                    },
+                    onToggleResultSplit: {
+                        isResultSplitActive = true
+                        switchResultMode(.overview)
                     },
                     onBackToDashboard: {
                         returnToDashboard()

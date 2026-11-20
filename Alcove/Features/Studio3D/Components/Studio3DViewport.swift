@@ -426,7 +426,7 @@ public struct Studio3DViewport: UIViewRepresentable {
         private var lastProjectedPoint: CGPoint? = nil
 
         func updateSelectedProjection() {
-            if let arView {
+            if let arView, !isTranslatingFurniture {
                 updateHeaderOverlap(in: arView)
             }
             guard let arView = arView,
