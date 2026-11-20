@@ -33,10 +33,14 @@ struct StudioStageProgress: View {
         }
     }
 
+    static func isStepDone(candidate: StageType, currentStage: StageType, room: Room) -> Bool {
+        currentStage != candidate && (room.isCompleted(candidate) || room.isUnlocked(candidate))
+    }
+
     private func status(for candidate: StageType, number: Int) -> StepStatus {
         if stage == candidate {
             return .active(number)
-        } else if room.isCompleted(candidate) || room.isUnlocked(candidate) {
+        } else if Self.isStepDone(candidate: candidate, currentStage: stage, room: room) {
             return .done(number)
         } else {
             return .upcoming(number)

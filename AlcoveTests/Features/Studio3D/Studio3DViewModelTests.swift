@@ -516,4 +516,37 @@ struct Studio3DViewModelTests {
         #expect(vm.currentStage == .rearrangement)
         #expect(vm.canManipulateFurniture == true)
     }
+
+    @Test func studioStageProgressKeepsUnlockedStageDoneWhenSteppingBack() {
+        let room = SampleData.createStarterRoom()
+        room.completeStage(.audit, score: 90, feedback: "Passed")
+        room.completeStage(.rearrangement, score: 92, feedback: "Passed")
+
+        // User reached Stage 4 (.illumination) then stepped back to Stage 3 (.rearrangement)
+        #expect(room.isUnlocked(.illumination) == true)
+        #expect(room.isCompleted(.illumination) == false)
+        #expect(StudioStageProgress.isStepDone(candidate: .illumination, currentStage: .rearrangement, room: room) == true)
+        #expect(StudioStageProgress.isStepDone(candidate: .harmony, currentStage: .rearrangement, room: room) == false)
+    }
+
+    @Test func resultHubModeTransitionsBetweenOverviewLightingAndRearrange() {
+        let room = SampleData.createStarterRoom()
+        room.completeStage(.audit, score: 90, feedback: "Passed")
+        room.completeStage(.rearrangement, score: 92, feedback: "Passed")
+        room.completeStage(.illumination, score: 95, feedback: "Passed")
+        room.completeStage(.harmony, score: 95, feedback: "Passed")
+
+        let vm = Studio3DViewModel(room: room, stage: .harmony)
+        #expect(vm.currentStage == .harmony)
+
+        vm.switchToStage(.illumination)
+        #expect(vm.currentStage == .illumination)
+
+        vm.switchToStage(.rearrangement)
+        #expect(vm.currentStage == .rearrangement)
+        #expect(vm.canManipulateFurniture == true)
+
+        vm.switchToStage(.harmony)
+        #expect(vm.currentStage == .harmony)
+    }
 }
