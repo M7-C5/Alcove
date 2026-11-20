@@ -105,6 +105,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Align Result Lighting split/toggle behavior and skip header overlap projection during drag.
 - Prevent double keyboard padding from pushing chat card to top.
 - Prevent drag-time updateUIView feedback loop and stabilize low-pitch furniture dragging.
 - Prevent off-screen RoomThumbnail3DView ARView leaks while navigating.
